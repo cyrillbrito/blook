@@ -16,17 +16,10 @@ export function extensionCommand(opts: { pathOnly?: boolean; open?: boolean }) {
     process.exit(1);
   }
 
-  let openedChrome = false;
-  let revealed = '';
-  if (opts.open !== false) {
-    const run = (cmd: string, args: string[]) => spawnSync(cmd, args, { stdio: 'ignore' }).status === 0;
-    if (process.platform === 'darwin') {
-      openedChrome = run('open', ['-a', 'Google Chrome', 'chrome://extensions']);
-      if (run('open', ['-R', dir])) revealed = 'Finder';
-    } else if (process.platform === 'linux' && (process.env.DISPLAY || process.env.WAYLAND_DISPLAY)) {
-      if (run('xdg-open', [dir])) revealed = 'your file manager';
-    }
-  }
+  const openedChrome =
+    opts.open !== false &&
+    process.platform === 'darwin' &&
+    spawnSync('open', ['-a', 'Google Chrome', 'chrome://extensions'], { stdio: 'ignore' }).status === 0;
 
   const color = process.stdout.isTTY && !process.env.NO_COLOR;
   const s = (code: string) => (text: string) => (color ? `\x1b[${code}m${text}\x1b[0m` : text);
@@ -37,7 +30,7 @@ export function extensionCommand(opts: { pathOnly?: boolean; open?: boolean }) {
   process.stdout.write(`${bold('Next: load the extension in Chrome')}
   1. Open chrome://extensions${openedChrome ? dim('  (opened)') : ''}
   2. Turn on Developer mode, top right
-  3. Click Load unpacked and pick ${cyan(short)}${revealed ? dim(`  (shown in ${revealed})`) : ''}
+  3. Click Load unpacked and pick ${cyan(short)}
   4. Pin Blook from the puzzle icon in the toolbar
 ${dim("Already loaded? After an update, just click Blook's reload icon there.")}
 `);

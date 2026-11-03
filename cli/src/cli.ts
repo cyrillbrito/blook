@@ -26,7 +26,7 @@ Commands:
                                    ~/.agents/skills/blook/
   skill path | print               where --copy installs it | print SKILL.md
   extension [--path] [--no-open]   how to load the Chrome extension, and where its folder is
-                                   (~/Blook/extension); on macOS opens Chrome and Finder.
+                                   (~/Blook/extension); on macOS opens chrome://extensions.
                                    --path: print only the folder
   update                           re-run the install script: latest CLI, extension, skill
   --version

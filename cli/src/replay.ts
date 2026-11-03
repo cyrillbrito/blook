@@ -221,13 +221,14 @@ export class TabReplay {
         const q = 'input, textarea, select, option';
         const src = [el, ...el.querySelectorAll(q)];
         const dst = [clone, ...clone.querySelectorAll(q)];
-        src.forEach((s, i) => {
+        // Tag names, not instanceof: these elements belong to the replay iframe's window.
+        src.forEach((s: any, i) => {
           const d = dst[i]!;
-          if (s instanceof HTMLInputElement) {
+          if (s.tagName === 'INPUT') {
             if (s.type === 'checkbox' || s.type === 'radio') s.checked ? d.setAttribute('checked', '') : d.removeAttribute('checked');
             else if (s.value !== (s.getAttribute('value') ?? '')) d.setAttribute('value', s.value);
-          } else if (s instanceof HTMLTextAreaElement) d.textContent = s.value;
-          else if (s instanceof HTMLOptionElement) s.selected ? d.setAttribute('selected', '') : d.removeAttribute('selected');
+          } else if (s.tagName === 'TEXTAREA') d.textContent = s.value;
+          else if (s.tagName === 'OPTION') s.selected ? d.setAttribute('selected', '') : d.removeAttribute('selected');
         });
         // Drop what the replayer itself adds: its <style> under <html> and the paused class.
         if (clone.tagName === 'HTML') {
