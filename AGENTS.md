@@ -67,7 +67,18 @@ Details in [cli/README.md](cli/README.md).
 
 - [docs/](docs/README.md): architecture, the bundle format, and references
 - Technical detail lives next to the code: short comments, and READMEs like [cli/README.md](cli/README.md). Keep docs short, current and free of history.
-- Change the bundle and you change [docs/bundle-format.md](docs/bundle-format.md) and the skill with it. The bundle format version is `BUNDLE_FORMAT_VERSION` in `lib/export/bundle.ts`.
+- The bundle format version is `BUNDLE_FORMAT_VERSION` in `lib/export/bundle.ts`.
+
+## Keep every part in sync
+
+The extension, the bundle, the viewer, the CLI, the skill and the docs describe one product. A change in one part is done only when the others still match it:
+
+- **Extension or bundle change** (capture, export, a field, a file): update [docs/bundle-format.md](docs/bundle-format.md), the viewer, the CLI (`cli/src/bundle.ts` and its test fixture), and the skill's files table and recipes.
+- **CLI change** (a command, option, output shape or exit code): update `--help`, [cli/README.md](cli/README.md), the tests, and the skill's CLI section.
+- **Skill change**: run its commands and jq recipes against a real bundle.
+- **Any change**: update the docs it touches (README.md for users, AGENTS.md and docs/ for developers).
+
+Before calling it done, validate across parts: `bun run compile` and `bun run build` at the root; `bun run test` in `cli/`; record a short session with the built extension and check it in the Replay page, with `blook info`/`pointer`, and with the skill recipes that touch what changed.
 
 ## Prior art
 
