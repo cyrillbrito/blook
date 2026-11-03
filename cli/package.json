@@ -1,7 +1,7 @@
 {
   "name": "blook",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Replay a Blook bundle at time T: screenshot, DOM, pointer",
   "type": "module",
   "bin": {
