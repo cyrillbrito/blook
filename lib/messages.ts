@@ -36,7 +36,7 @@ export interface BackgroundRequests {
 
   // Content script (rrweb) → background. tabId and frameId come from the sender.
   /** Asks whether to record and with which rrweb options. */
-  'rrweb/hello': { req: {}; res: { record: boolean; mask: boolean; canvas?: boolean } };
+  'rrweb/hello': { req: {}; res: { record: boolean; mask: boolean; canvas: boolean } };
   /** A batch of rrweb events, flushed every second or so. */
   'rrweb/events': { req: { events: eventWithTime[] }; res: { ok: boolean } };
 

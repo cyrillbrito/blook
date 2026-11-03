@@ -1,4 +1,4 @@
-// Which HTTP bodies a recording keeps. The only place that decides; capture and export both ask.
+// Which HTTP bodies a recording keeps. The only place that decides; lib/capture/cdp.ts asks it.
 //
 // Rules (docs/architecture.md has the why, docs/bundle-format.md the fields):
 // - Request bodies (POST data) are always kept.

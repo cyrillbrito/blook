@@ -1,7 +1,7 @@
 // rrweb recorder, run in the page's MAIN world (/content-scripts/recorder-main.js).
 // It has to be MAIN: rrweb patches CSSStyleSheet.insertRule, adoptedStyleSheets, canvas
 // contexts and so on, and those patches only see the page's calls in the page's own world.
-// In an isolated world, CSS-in-JS rules (emotion in Grafana) were missing from the replay.
+// In an isolated world, CSS-in-JS rules (emotion in Grafana) would be missing from the replay.
 //
 // No extension APIs here. It talks to the isolated bridge (recorder.content.ts) with
 // CustomEvents on `document` whose detail is a JSON string (strings cross worlds safely):

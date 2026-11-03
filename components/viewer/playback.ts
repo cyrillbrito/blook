@@ -2,7 +2,7 @@
 // and the mic audio follow it. Times are session ms (the bundle's `t`).
 import { Replayer } from '@rrweb/replay';
 import type { eventWithTime } from '@rrweb/types';
-import type { AudioChunk, Bundle } from './bundle';
+import type { AudioChunkOut, Bundle } from './bundle';
 
 type Listener = () => void;
 
@@ -187,7 +187,7 @@ export class TabReplay {
 export class AudioSync {
   private el = new Audio();
   private urls = new Map<number, string>();
-  private current?: AudioChunk;
+  private current?: AudioChunkOut;
   private offs: (() => void)[] = [];
   muted = false;
 
@@ -209,7 +209,7 @@ export class AudioSync {
     this.el.muted = m;
   }
 
-  private url(c: AudioChunk) {
+  private url(c: AudioChunkOut) {
     let url = this.urls.get(c.index);
     if (!url) {
       const bytes = this.bundle.file(c.file);
@@ -222,7 +222,7 @@ export class AudioSync {
 
   private sync(force: boolean) {
     const t = this.clock.now();
-    const chunk = this.bundle.audio.find((c) => t >= c.t && t < (c.endT ?? c.t + 31_000));
+    const chunk = this.bundle.audio.find((c) => t >= c.t && t < c.endT);
     if (!this.clock.playing || !chunk || this.clock.speed > 4) {
       if (!this.el.paused) this.el.pause();
       this.current = chunk;

@@ -97,9 +97,8 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
         </span>
         <span className="flex shrink-0 gap-1">
           {s.status === 'recording' && <Badge tone="warn">ended without Stop</Badge>}
-          {s.settings?.mask && <Badge>masked</Badge>}
-          {s.settings?.canvas && <Badge>canvas</Badge>}
-          {s.version == null && <Badge tone="warn">old bundle format</Badge>}
+          {s.settings.mask && <Badge>masked</Badge>}
+          {s.settings.canvas && <Badge>canvas</Badge>}
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-2">
           {errors > 0 && <Badge tone="danger">{errors} errors</Badge>}
@@ -113,7 +112,7 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
           {tabs.length > 1 && (
             <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-gray-200 px-2 py-1">
               {tabs.map((id, i) => {
-                const url = s.tabs.find((t) => t.tabId === id)?.url || s.navigations?.find((n) => n.tabId === id)?.url;
+                const url = s.tabs.find((t) => t.tabId === id)?.url || s.navigations.find((n) => n.tabId === id)?.url;
                 return (
                   <button
                     key={id}
@@ -204,7 +203,7 @@ function Splitter({ onDrag }: { onDrag: (x: number) => void }) {
 /** The tab's URL at the playhead, from session.navigations. */
 function AddressBar({ bundle, tabId, clock }: { bundle: Bundle; tabId?: number; clock: Clock }) {
   const now = useNow(clock, 250);
-  const navs = useMemo(() => (bundle.session.navigations ?? []).filter((n) => n.tabId === tabId), [bundle, tabId]);
+  const navs = useMemo(() => bundle.session.navigations.filter((n) => n.tabId === tabId), [bundle, tabId]);
   const url = navs[lastAtOrBefore(navs, now)]?.url ?? bundle.session.tabs.find((t) => t.tabId === tabId)?.url ?? '';
   return (
     <div className="shrink-0 border-b border-gray-200 px-2 py-1">
@@ -230,7 +229,7 @@ function Stage({ bundle, tabId, clock }: { bundle: Bundle; tabId: number; clock:
     if (firstFull == null) return;
     let r: TabReplay;
     try {
-      r = new TabReplay(root, events, clock, { canvas: !!bundle.session.settings?.canvas });
+      r = new TabReplay(root, events, clock, { canvas: bundle.session.settings.canvas });
     } catch (e) {
       setError(String(e));
       return;

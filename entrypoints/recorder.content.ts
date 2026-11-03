@@ -87,7 +87,7 @@ function start() {
     if (options) return;
     const res = await sendToBackground({ type: 'rrweb/hello' }).catch(() => undefined);
     if (!res?.record || options) return;
-    options = { mask: res.mask, canvas: !!res.canvas };
+    options = { mask: res.mask, canvas: res.canvas };
     emit('blook:start', options);
   };
   window.__blookBridge = { hello };

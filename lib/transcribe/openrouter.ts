@@ -16,10 +16,7 @@ import type {
   TranscriptSegment,
   TranscriptWord,
 } from '../types';
-import { DEFAULT_SETTINGS } from '../types';
-
-/** The STT model, fixed in code (supports verbose_json with word timestamps). The old `transcriptionModel` setting is ignored. */
-const transcriptionModel = DEFAULT_SETTINGS.transcriptionModel;
+import { TRANSCRIPTION_MODEL } from '../types';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/audio/transcriptions';
 /** Dev/test only: a fake endpoint URL in storage.local under this key replaces OpenRouter. */
@@ -38,11 +35,11 @@ interface VerboseResponse {
   words?: { word: string; start: number; end: number }[];
 }
 
-async function transcribeChunk(chunk: AudioChunkRow, apiKey: string, model: string) {
+async function transcribeChunk(chunk: AudioChunkRow, apiKey: string) {
   const form = new FormData();
   const ext = chunk.mimeType.includes('ogg') ? 'ogg' : 'webm';
   form.append('file', new File([chunk.blob], `${String(chunk.index).padStart(3, '0')}.${ext}`, { type: chunk.mimeType.split(';')[0] }));
-  form.append('model', model);
+  form.append('model', TRANSCRIPTION_MODEL);
   form.append('response_format', 'verbose_json');
   form.append('timestamp_granularities[]', 'word');
   form.append('timestamp_granularities[]', 'segment');
@@ -58,7 +55,7 @@ async function transcribeChunk(chunk: AudioChunkRow, apiKey: string, model: stri
   const words: TranscriptWord[] = rel(json.words ?? []).map((w) => ({ word: w.word.trim(), start: toSession(w.start), end: toSession(w.end) }));
   let segments: TranscriptSegment[] = rel(json.segments ?? []).map((s) => ({ text: s.text.trim(), start: toSession(s.start), end: toSession(s.end) }));
   if (!segments.length && json.text?.trim()) {
-    segments = [{ text: json.text.trim(), start: chunk.t, end: chunk.t + (chunk.durationMs ?? 0) }];
+    segments = [{ text: json.text.trim(), start: chunk.t, end: chunk.t + chunk.durationMs }];
   }
   return { words, segments: segments.filter((s) => s.text) };
 }
@@ -104,28 +101,23 @@ function notify(sessionId: SessionId) {
   browser.runtime.sendMessage(msg).catch(() => {}); // no panel open
 }
 
-function isDone(r: TranscriptChunkResult | undefined, model: string) {
-  return !!r && !r.error && r.model === model;
-}
-
-/** Old rows (before per-chunk results) count as complete when the model matches and nothing failed. */
-function legacyComplete(row: TranscriptRow | undefined, model: string) {
-  return !!row && !row.chunks && row.model === model && !row.errors?.length;
+function isDone(r: TranscriptChunkResult | undefined) {
+  return !!r && !r.error;
 }
 
 /** Stores one chunk result and re-merges segments, words and errors. */
-function saveResult(sessionId: SessionId, model: string, result: TranscriptChunkResult): Promise<void> {
+function saveResult(sessionId: SessionId, result: TranscriptChunkResult): Promise<void> {
   const run = async () => {
     const db = await openBlookDB();
-    const row: TranscriptRow = (await db.get('transcripts', sessionId)) ?? { sessionId, model, segments: [], words: [] };
-    const chunks = (row.chunks ?? []).filter((c) => c.index !== result.index);
+    const row = await db.get('transcripts', sessionId);
+    const chunks = (row?.chunks ?? []).filter((c) => c.index !== result.index);
     chunks.push(result);
     chunks.sort((a, b) => a.index - b.index);
     const ok = chunks.filter((c) => !c.error);
     const failed = chunks.filter((c) => c.error);
     const next: TranscriptRow = {
       sessionId,
-      model,
+      model: TRANSCRIPTION_MODEL,
       segments: ok.flatMap((c) => c.segments).sort((a, b) => a.start - b.start),
       words: ok.flatMap((c) => c.words).sort((a, b) => a.start - b.start),
       chunks,
@@ -139,22 +131,21 @@ function saveResult(sessionId: SessionId, model: string, result: TranscriptChunk
 }
 
 /** Transcribes one chunk and stores the result (or its error). Concurrent calls share one run. */
-function runChunk(chunk: AudioChunkRow, apiKey: string, model: string): Promise<void> {
+function runChunk(chunk: AudioChunkRow, apiKey: string): Promise<void> {
   const key = `${chunk.sessionId}:${chunk.index}`;
   let run = inflight.get(key);
   if (run) return run;
   run = (async () => {
-    let result: TranscriptChunkResult;
-    if (chunk.blob.size <= MIN_CHUNK_BYTES) {
-      result = { index: chunk.index, t: chunk.t, model, segments: [], words: [] };
-    } else {
+    const base = { index: chunk.index, t: chunk.t, segments: [], words: [] };
+    let result: TranscriptChunkResult = base;
+    if (chunk.blob.size > MIN_CHUNK_BYTES) {
       try {
-        result = { index: chunk.index, t: chunk.t, model, ...(await transcribeChunk(chunk, apiKey, model)) };
+        result = { ...base, ...(await transcribeChunk(chunk, apiKey)) };
       } catch (err) {
-        result = { index: chunk.index, t: chunk.t, model, segments: [], words: [], error: String((err as Error)?.message ?? err) };
+        result = { ...base, error: String((err as Error)?.message ?? err) };
       }
     }
-    await saveResult(chunk.sessionId, model, result);
+    await saveResult(chunk.sessionId, result);
   })().finally(() => {
     inflight.delete(key);
     notify(chunk.sessionId);
@@ -174,11 +165,11 @@ export async function transcribeChunkSoon(sessionId: SessionId, index: number): 
   const db = await openBlookDB();
   const chunk = await db.get('audioChunks', [sessionId, index]);
   if (!chunk) return;
-  await runChunk(chunk, openRouterApiKey, transcriptionModel);
+  await runChunk(chunk, openRouterApiKey);
 }
 
 /**
- * Transcribes every chunk that has no good result for the current model yet, then returns
+ * Transcribes every chunk that has no good result yet, then returns
  * the stored transcript. Undefined when there's no audio, or no key and nothing stored.
  * Throws only when no chunk could be transcribed at all.
  */
@@ -187,22 +178,21 @@ export async function ensureTranscript(sessionId: SessionId): Promise<Transcript
   const { openRouterApiKey } = await settingsItem.getValue();
   const stored = await db.get('transcripts', sessionId);
   if (!openRouterApiKey) return stored;
-  if (legacyComplete(stored, transcriptionModel)) return stored;
 
   const chunks = (await getBySession('audioChunks', sessionId)).sort((a, b) => a.index - b.index);
   if (!chunks.length) return stored;
   const results = new Map((stored?.chunks ?? []).map((c) => [c.index, c]));
-  const missing = chunks.filter((c) => !isDone(results.get(c.index), transcriptionModel));
+  const missing = chunks.filter((c) => !isDone(results.get(c.index)));
 
   let next = 0;
   await Promise.all(
     Array.from({ length: Math.min(PARALLEL, missing.length) }, async () => {
-      while (next < missing.length) await runChunk(missing[next++]!, openRouterApiKey, transcriptionModel);
+      while (next < missing.length) await runChunk(missing[next++]!, openRouterApiKey);
     }),
   );
 
   const row = await db.get('transcripts', sessionId);
-  const okCount = row?.chunks?.filter((c) => !c.error).length ?? 0;
+  const okCount = row?.chunks.filter((c) => !c.error).length ?? 0;
   if (!row || okCount === 0) throw new Error(row?.errors?.[0]?.error ?? 'transcription failed');
   return row;
 }
@@ -247,11 +237,10 @@ export async function transcriptionStatus(sessionId: SessionId): Promise<Transcr
     db.get('transcripts', sessionId),
     settingsItem.getValue(),
   ]);
-  const model = transcriptionModel;
   if (total === 0) return { state: 'none', done: 0, total };
-  const done = legacyComplete(row, model) ? total : (row?.chunks?.filter((c) => isDone(c, model)).length ?? 0);
+  const done = row?.chunks.filter((c) => isDone(c)).length ?? 0;
   const running = [...inflight.keys()].some((k) => k.startsWith(`${sessionId}:`));
-  const error = row?.chunks?.find((c) => c.error)?.error;
+  const error = row?.chunks.find((c) => c.error)?.error;
   if (running) return { state: 'transcribing', done, total };
   if (done >= total) return { state: 'done', done, total };
   if (!settings.openRouterApiKey) return { state: 'no-key', done, total };

@@ -1,8 +1,7 @@
 // Load a Blook bundle (folder or .zip) and answer pure-data questions
 // about its rrweb events: viewport, URL and mouse position at time t.
-// Only session.json and rrweb.json (or rrweb/<tab>.json before format 4) are read;
-// other files may change shape.
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+// Only session.json and rrweb.json are read.
+import { readFileSync, statSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { unzipSync, strFromU8 } from 'fflate';
 
@@ -15,6 +14,7 @@ export interface RrwebEvent {
 export interface Bundle {
   path: string;
   session: any;
+  /** Tab ids with rrweb events, in session.tabs order. */
   tabIds: string[];
   events(tabId?: string): RrwebEvent[];
   /** Resolve an optional --tab value to a tab id present in the bundle. */
@@ -23,27 +23,12 @@ export interface Bundle {
 
 export function loadBundle(path: string): Bundle {
   if (!existsSync(path)) throw new Error(`Bundle not found: ${path}`);
-  const files = statSync(path).isDirectory() ? readFolder(path) : readZip(path);
-  const sessionRaw = files.get('session.json');
-  const session = sessionRaw ? JSON.parse(sessionRaw()) : {};
-  const byTab = new Map<string, () => RrwebEvent[]>();
-  const rrwebJson = files.get('rrweb.json');
-  if (rrwebJson) {
-    const { tabs = [] } = JSON.parse(rrwebJson()) as { tabs?: { tabId: number; events: RrwebEvent[] }[] };
-    for (const t of tabs) byTab.set(String(t.tabId), () => t.events);
-  }
-  // Bundles before format 4: one rrweb/<tabId>.json per tab.
-  for (const f of files.keys()) {
-    const id = /^rrweb\/([^/]+)\.json$/.exec(f)?.[1];
-    if (id && !byTab.has(id)) byTab.set(id, () => JSON.parse(files.get(f)!()));
-  }
+  const { session, rrweb } = statSync(path).isDirectory() ? readFolder(path) : readZip(path);
+  const { tabs } = JSON.parse(rrweb) as { tabs: { tabId: number; events: RrwebEvent[] }[] };
+  const byTab = new Map(tabs.map((t) => [String(t.tabId), t.events]));
   const tabIds = [...byTab.keys()];
-  if (!tabIds.length) throw new Error(`No rrweb.json in ${path}`);
-  // Prefer session.json tab order, so the first recorded tab is the default.
-  const order: string[] = (session.tabs ?? []).map((t: any) => String(t.tabId));
-  tabIds.sort((a, b) => rank(order, a) - rank(order, b));
+  if (!tabIds.length) throw new Error(`No rrweb events in ${path}`);
 
-  const cache = new Map<string, RrwebEvent[]>();
   const resolveTab = (tabId?: string) => {
     if (tabId == null) return tabIds[0]!;
     if (!tabIds.includes(tabId)) throw new Error(`Unknown tab ${tabId}. Tabs: ${tabIds.join(', ')}`);
@@ -51,59 +36,31 @@ export function loadBundle(path: string): Bundle {
   };
   return {
     path,
-    session,
+    session: JSON.parse(session),
     tabIds,
     resolveTab,
-    events(tabId) {
-      const id = resolveTab(tabId);
-      let ev = cache.get(id);
-      if (!ev) {
-        ev = byTab.get(id)!();
-        ev.sort((a, b) => a.timestamp - b.timestamp);
-        cache.set(id, ev);
-      }
-      return ev;
-    },
+    events: (tabId) => byTab.get(resolveTab(tabId))!,
   };
 }
 
-function rank(order: string[], id: string) {
-  const i = order.indexOf(id);
-  return i < 0 ? Infinity : i;
-}
-
-type Files = Map<string, () => string>;
-
-function readFolder(dir: string): Files {
-  const files: Files = new Map();
-  const walk = (rel: string) => {
-    for (const name of readdirSync(join(dir, rel))) {
-      const r = rel ? `${rel}/${name}` : name;
-      if (statSync(join(dir, r)).isDirectory()) {
-        if (r.split('/').length < 3) walk(r);
-      } else files.set(r, () => readFileSync(join(dir, r), 'utf8'));
-    }
+function readFolder(dir: string) {
+  const read = (name: string) => {
+    const file = join(dir, name);
+    if (!existsSync(file)) throw new Error(`No ${name} in ${dir}`);
+    return readFileSync(file, 'utf8');
   };
-  walk('');
-  return files;
+  return { session: read('session.json'), rrweb: read('rrweb.json') };
 }
 
-function readZip(file: string): Files {
-  // Only unzip what we read: session.json and rrweb (skip audio, network).
-  const raw = unzipSync(readFileSync(file), {
-    filter: (f) => /(^|\/)(session|rrweb)\.json$|(^|\/)rrweb\/[^/]+\.json$/.test(f.name),
-  });
-  // Entries may sit under a top folder ("blook-<id>/..."); strip it.
-  const names = Object.keys(raw);
-  const prefix = names.find((n) => n.endsWith('session.json'))?.slice(0, -'session.json'.length)
-    ?? names[0]?.replace(/rrweb(\/[^/]+)?\.json$/, '') ?? '';
-  const files: Files = new Map();
-  for (const n of names) {
-    const rel = n.startsWith(prefix) ? n.slice(prefix.length) : n;
-    files.set(rel, () => strFromU8(raw[n]!));
-  }
-  if (!files.size) throw new Error(`No session.json or rrweb.json in ${basename(file)}`);
-  return files;
+function readZip(file: string) {
+  // Unzip only the two files we read (skip audio and network).
+  const raw = unzipSync(readFileSync(file), { filter: (f) => /(^|\/)(session|rrweb)\.json$/.test(f.name) });
+  const get = (name: string) => {
+    const entry = Object.keys(raw).find((n) => n === name || n.endsWith('/' + name));
+    if (!entry) throw new Error(`No ${name} in ${basename(file)}`);
+    return strFromU8(raw[entry]!);
+  };
+  return { session: get('session.json'), rrweb: get('rrweb.json') };
 }
 
 /** Parse "12345" (ms), "12.5s", "mm:ss", "mm:ss.mmm" or "hh:mm:ss" into ms. */

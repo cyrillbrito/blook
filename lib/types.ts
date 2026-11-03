@@ -21,11 +21,11 @@ export interface SessionMeta {
   title?: string;
   tabs: TabInfo[];
   /** URL changes of session tabs, including SPA (pushState) navigations. */
-  navigations?: NavigationEntry[];
+  navigations: NavigationEntry[];
   /** Settings in effect for this session (API key left out). */
   settings: Omit<Settings, 'openRouterApiKey'>;
-  /** What happened to the mic. Missing in sessions recorded before this field existed. */
-  mic?: MicInfo;
+  /** What happened to the mic. */
+  mic: MicInfo;
   /**
    * Transcription progress. Not stored: the background fills it in for `sessions/list`
    * from the transcripts store (see lib/transcribe/openrouter.ts transcriptionStatus).
@@ -44,7 +44,7 @@ export interface TranscriptionStatus {
    * failed: every attempted chunk failed.
    */
   state: 'none' | 'no-key' | 'pending' | 'transcribing' | 'done' | 'partial' | 'failed';
-  /** Chunks transcribed with the current model. */
+  /** Chunks transcribed. */
   done: number;
   /** Audio chunks saved so far. */
   total: number;
@@ -55,7 +55,6 @@ export interface TranscriptionStatus {
 export interface TranscriptChunkResult {
   index: number;
   t: SessionTime;
-  model: string;
   segments: TranscriptSegment[];
   words: TranscriptWord[];
   error?: string;
@@ -181,12 +180,12 @@ export interface AudioChunkRow {
   index: number;
   /** When this chunk started. */
   t: SessionTime;
-  durationMs?: number;
+  durationMs: number;
   mimeType: string;
   blob: Blob;
   /**
    * Voiced ranges [start, end] in ms from the chunk start, from an energy VAD in the offscreen
-   * document. Used to pull Whisper word times out of silence. Missing in older chunks.
+   * document. Used to pull Whisper word times out of silence. Missing when the audio didn't decode.
    */
   voiced?: [number, number][];
 }
@@ -211,8 +210,8 @@ export interface TranscriptRow {
   words: TranscriptWord[];
   /** Chunks that failed to transcribe, if any (the rest is still in segments and words). */
   errors?: { chunk: number; t: SessionTime; error: string }[];
-  /** Per-chunk results; `segments`, `words` and `errors` are merged from these. Missing in old rows. */
-  chunks?: TranscriptChunkResult[];
+  /** Per-chunk results; `segments`, `words` and `errors` are merged from these. */
+  chunks: TranscriptChunkResult[];
 }
 
 /** User settings, kept in browser.storage.local (see lib/settings.ts). */
@@ -222,13 +221,8 @@ export interface Settings {
   /** Record the mic in the offscreen document. */
   mic: boolean;
   /** rrweb canvas recording (2 fps WebP snapshots). Off by default: it grows the bundle fast. */
-  canvas?: boolean;
+  canvas: boolean;
   openRouterApiKey: string;
-  /**
-   * OpenRouter STT model. Kept for compatibility only: not shown in the panel, and lib/transcribe
-   * always uses the default below (supports verbose_json with word timestamps).
-   */
-  transcriptionModel: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -236,5 +230,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mic: true,
   canvas: false,
   openRouterApiKey: '',
-  transcriptionModel: 'openai/whisper-large-v3',
 };
+
+/** OpenRouter speech-to-text model. Whisper, because it returns word timestamps with verbose_json. */
+export const TRANSCRIPTION_MODEL = 'openai/whisper-large-v3';

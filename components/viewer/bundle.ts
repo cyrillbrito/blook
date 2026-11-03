@@ -2,58 +2,23 @@
 // Loaders build it from a ZIP, from dropped files or folders, or from a map of paths to bytes.
 import { strFromU8, unzipSync } from 'fflate';
 import type { eventWithTime } from '@rrweb/types';
-import type { ConsoleOut, RequestOut, SegmentOut, SocketOut } from '@/lib/export/bundle';
+import type { AudioChunkOut, ConsoleOut, RequestOut, SegmentOut, SessionOut, SocketOut, TranscriptOut } from '@/lib/export/bundle';
 import type { TimelineEntry } from '@/lib/export/timeline';
 
-export type { ConsoleOut, RequestOut, SegmentOut, SocketOut, TimelineEntry };
+export type { AudioChunkOut, ConsoleOut, RequestOut, SegmentOut, SessionOut, SocketOut, TimelineEntry, TranscriptOut };
 export type FrameOut = SocketOut['frames'][number];
-
-export interface SessionJson {
-  format?: string;
-  version?: number;
-  id: string;
-  url: string;
-  title?: string;
-  status?: string;
-  startedAt: number;
-  endedAt?: number;
-  durationMs?: number;
-  firstSnapshotT?: number;
-  tabs: { tabId: number; t: number; url: string; openerTabId?: number }[];
-  navigations?: { tabId: number; t: number; url: string }[];
-  settings?: { mask?: boolean; mic?: boolean; canvas?: boolean; transcriptionModel?: string };
-  mic?: { state: string; error?: string; chunks?: number };
-  counts?: Record<string, number>;
-}
-
-export interface TranscriptJson {
-  status: string;
-  note?: string;
-  model?: string;
-  errors?: { chunk: number; t: number; error: string }[];
-  segments: SegmentOut[];
-}
-
-export interface AudioChunk {
-  index: number;
-  t: number;
-  endT?: number;
-  durationMs?: number;
-  mimeType?: string;
-  file: string;
-}
 
 export interface Bundle {
   /** Folder name, e.g. `blook-2026-11-03_19-09-02`. */
   name: string;
-  session: SessionJson;
+  session: SessionOut;
   timeline: TimelineEntry[];
   network: RequestOut[];
   websockets: SocketOut[];
   console: ConsoleOut[];
-  transcript: TranscriptJson;
-  audio: AudioChunk[];
-  /** rrweb events per tab, timestamps in session ms, sorted. */
+  transcript: TranscriptOut;
+  audio: AudioChunkOut[];
+  /** rrweb events per tab, in session.tabs order, timestamps in session ms. */
   rrweb: Map<number, eventWithTime[]>;
   /** Session end: durationMs, or the last thing that happened. */
   endT: number;
@@ -72,63 +37,38 @@ export function bundleFromFiles(input: Map<string, Uint8Array>, fallbackName = '
   const files = new Map<string, Uint8Array>();
   for (const [p, bytes] of input) if (p.startsWith(prefix)) files.set(p.slice(prefix.length), bytes);
 
-  const json = <T>(path: string, fallback: T): T => {
+  /** A JSON file of the bundle; `fallback` only for files that may be absent. */
+  const json = <T>(path: string, fallback?: T): T => {
     const bytes = files.get(path);
-    if (!bytes) return fallback;
+    if (!bytes) {
+      if (fallback === undefined) throw new Error(`${path} is missing from the bundle`);
+      return fallback;
+    }
     try {
       return JSON.parse(strFromU8(bytes)) as T;
     } catch (e) {
       throw new Error(`${path} is not valid JSON: ${(e as Error).message}`);
     }
   };
-  const arr = <T>(path: string): T[] => {
-    const v = json<unknown>(path, []);
-    // Old bundles (format 1) had other shapes; show what we can.
-    return Array.isArray(v) ? (v as T[]) : [];
-  };
 
-  const session = json<SessionJson>('session.json', undefined as never);
-  session.tabs ??= [];
-  const rrweb = new Map<number, eventWithTime[]>();
-  const add = (tabId: number, events: unknown) => {
-    if (Array.isArray(events) && events.length) rrweb.set(tabId, (events as eventWithTime[]).sort((a, b) => a.timestamp - b.timestamp));
-  };
-  const rrwebJson = json<{ tabs?: { tabId: number; events: eventWithTime[] }[] }>('rrweb.json', {});
-  for (const t of rrwebJson.tabs ?? []) add(t.tabId, t.events);
-  // Bundles before format 4: one rrweb/<tabId>.json per tab.
-  for (const [p] of files) {
-    const m = /^rrweb\/(\d+)\.json$/.exec(p);
-    if (m) add(Number(m[1]), arr<eventWithTime>(p));
-  }
-  // Tab order: as in session.tabs, then any other rrweb file.
-  const order = session.tabs.map((t) => t.tabId);
-  const sortedRrweb = new Map(
-    [...rrweb].sort(([a], [b]) => (order.indexOf(a) + 1 || 1e9) - (order.indexOf(b) + 1 || 1e9)),
-  );
-
-  const transcriptRaw = json<Partial<TranscriptJson>>('transcript.json', {});
-  const transcript: TranscriptJson = {
-    ...transcriptRaw,
-    status: transcriptRaw.status ?? 'none',
-    segments: Array.isArray(transcriptRaw.segments) ? transcriptRaw.segments : [],
-  };
-  for (const s of transcript.segments) s.words ??= [];
+  const session = json<SessionOut>('session.json');
+  const { tabs } = json<{ tabs: { tabId: number; events: eventWithTime[] }[] }>('rrweb.json', { tabs: [] });
+  const rrweb = new Map(tabs.filter((t) => t.events.length).map((t) => [t.tabId, t.events]));
 
   const bundle: Omit<Bundle, 'endT'> = {
     name: prefix.replace(/\/$/, '').split('/').pop() || fallbackName,
     session,
-    timeline: arr<TimelineEntry>('timeline.json'),
-    network: arr<RequestOut>('network.json'),
-    websockets: arr<SocketOut>('websockets.json'),
-    console: arr<ConsoleOut>('console.json'),
-    transcript,
-    audio: arr<AudioChunk>('audio/chunks.json'),
-    rrweb: sortedRrweb,
+    timeline: json('timeline.json'),
+    network: json('network.json'),
+    websockets: json('websockets.json'),
+    console: json('console.json'),
+    transcript: json('transcript.json'),
+    audio: json('audio/chunks.json', []),
+    rrweb,
     file: (path) => files.get(path),
   };
-  for (const s of bundle.websockets) s.frames ??= [];
 
-  const lastRrweb = Math.max(0, ...[...sortedRrweb.values()].map((l) => l.at(-1)!.timestamp));
+  const lastRrweb = Math.max(0, ...[...rrweb.values()].map((l) => l.at(-1)!.timestamp));
   const lastTimeline = Math.max(0, ...bundle.timeline.map((e) => (e.endT as number | undefined) ?? e.t));
   const endT = session.durationMs ?? Math.max(lastRrweb, lastTimeline);
   return { ...bundle, endT: Math.max(endT, lastRrweb) };

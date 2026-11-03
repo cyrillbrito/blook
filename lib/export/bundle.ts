@@ -3,10 +3,9 @@
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { getBySession, openBlookDB } from '../db';
 import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, SessionMeta, TranscriptRow } from '../types';
-import { bodyPolicy } from '../capture/body-policy';
 import { buildTimeline, isNetworkFailureLog } from './timeline';
 
-export const BUNDLE_FORMAT_VERSION = 4;
+export const BUNDLE_FORMAT_VERSION = 1;
 /** Frame payloads up to this many UTF-8 bytes stay inline in the JSON. */
 const INLINE_MAX = 2048;
 
@@ -100,6 +99,33 @@ export interface SegmentOut {
   text: string;
   words: { word: string; t: number; endT: number }[];
 }
+
+/** transcript.json. */
+export interface TranscriptOut {
+  status: TranscriptStatus;
+  note?: string;
+  model?: string;
+  errors?: { chunk: number; t: number; error: string }[];
+  segmentCount: number;
+  wordCount: number;
+  segments: SegmentOut[];
+}
+
+/** One entry of audio/chunks.json. */
+export interface AudioChunkOut {
+  index: number;
+  t: number;
+  endT: number;
+  durationMs: number;
+  /** Voiced ranges in session ms. */
+  voiced?: [number, number][];
+  mimeType: string;
+  size: number;
+  file: string;
+}
+
+/** session.json. */
+export type SessionOut = ReturnType<typeof sessionJson>;
 
 function json(value: unknown): Uint8Array {
   return strToU8(JSON.stringify(value, null, 2));
@@ -240,15 +266,11 @@ export async function buildBundle(
       if (r.requestBodyTruncated) out.requestBodyTruncated = true;
     }
     out.responseBodySize = r.responseBodySize;
-    // Asked again here so sessions captured under an older rule export the same way.
-    const policy = bodyPolicy({ direction: 'response', resourceType: r.resourceType, status: r.status, mimeType: r.mimeType });
-    if (!policy.keep) out.responseBodyNotKept = policy.reason;
-    else if (r.responseBody !== undefined) {
-      const base64 = !!r.responseBodyBase64;
-      const { body, encoding } = encodeBody(r.responseBody, base64, r.mimeType, !!r.truncated);
+    out.responseBodyNotKept = r.responseBodyNotKept;
+    if (r.responseBody !== undefined) {
+      const { body, encoding } = encodeBody(r.responseBody, !!r.responseBodyBase64, r.mimeType, !!r.truncated);
       out.responseBody = body;
       out.responseBodyEncoding = encoding;
-      out.responseBodySize ??= base64 ? base64ToBytes(r.responseBody).length : strToU8(r.responseBody).length;
       if (r.truncated) out.responseBodyTruncated = true;
     }
     requests.push(out);
@@ -274,8 +296,7 @@ export async function buildBundle(
     seg ??= [...segments].reverse().find((s) => s.t <= w.start) ?? segments[0];
     seg?.words.push({ word: w.word, t: w.start, endT: w.end });
   }
-  // Chunks with a stored result; old rows without per-chunk results cover all chunks.
-  const covered = transcript?.chunks ? transcript.chunks.filter((c) => !c.error).length : audio.length;
+  const covered = transcript?.chunks.filter((c) => !c.error).length ?? 0;
   const incomplete = !!transcript && (!!transcript.errors?.length || covered < audio.length);
   const transcriptStatus: TranscriptStatus =
     opts.transcriptStatus ?? (transcript ? (incomplete ? 'partial' : 'ok') : 'none');
@@ -283,9 +304,9 @@ export async function buildBundle(
   if (transcriptStatus === 'partial' && !transcriptNote && covered < audio.length) {
     transcriptNote = `${covered} of ${audio.length} audio chunks transcribed${transcript?.errors?.length ? `; failed: ${transcript.errors[0]!.error}` : ''}`;
   }
-  if (transcriptStatus === 'none' && meta.mic?.error) transcriptNote = `no audio recorded: ${meta.mic.error}`;
+  if (transcriptStatus === 'none' && meta.mic.error) transcriptNote = `no audio recorded: ${meta.mic.error}`;
   if (transcriptStatus === 'partial' && !transcriptNote) transcriptNote = `${transcript!.errors!.length} audio chunk(s) failed to transcribe`;
-  const transcriptOut = clean({
+  const transcriptOut: TranscriptOut = clean({
     status: transcriptStatus,
     note: transcriptNote,
     model: transcript?.model,
@@ -295,12 +316,12 @@ export async function buildBundle(
     segments,
   });
 
-  const audioOut = audio.map((c) => ({
+  const audioOut: AudioChunkOut[] = audio.map((c) => ({
     index: c.index,
     t: c.t,
-    endT: c.durationMs !== undefined ? c.t + c.durationMs : undefined,
+    endT: c.t + c.durationMs,
     durationMs: c.durationMs,
-    voiced: c.voiced?.map(([a, b]) => [Math.round(c.t + a), Math.round(c.t + b)]),
+    voiced: c.voiced?.map(([a, b]): [number, number] => [Math.round(c.t + a), Math.round(c.t + b)]),
     mimeType: c.mimeType,
     size: c.blob.size,
     file: `audio/${String(c.index).padStart(3, '0')}.webm`,
@@ -364,7 +385,7 @@ function sessionJson(
   files: Record<string, string>,
   transcript: { status: TranscriptStatus; note?: string; model?: string },
 ) {
-  const durationMs = meta.durationMs ?? (meta.endedAt ? meta.endedAt - meta.startedAt : undefined);
+  const durationMs = meta.durationMs;
   return clean({
     format: 'blook-bundle',
     version: BUNDLE_FORMAT_VERSION,
@@ -384,9 +405,9 @@ function sessionJson(
     firstSnapshotT: meta.firstSnapshotT,
     pageReadyT: meta.pageReadyT,
     tabs: meta.tabs,
-    navigations: meta.navigations ?? [],
+    navigations: meta.navigations,
     settings: meta.settings,
-    mic: meta.mic ?? { state: meta.settings.mic ? 'unknown' : 'off' },
+    mic: meta.mic,
     transcript: clean(transcript),
     counts,
     files,

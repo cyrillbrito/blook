@@ -50,7 +50,7 @@ async function startMic(msg: Extract<OffscreenMessage, { type: 'mic/start' }>): 
 async function stopMic(): Promise<OffscreenReply> {
   clearTimeout(rotateTimer);
   // Wait for the recorder's final dataavailable + stop events and the IndexedDB write of the
-  // partial last chunk. Without this the background closed this document before the save ran.
+  // partial last chunk, so the background can close this document right after.
   const last = stopChunk();
   recorder = undefined;
   await last;

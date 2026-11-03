@@ -48,7 +48,7 @@ export function getStatus(): RecordingStatus {
 
 function setStatus(next: RecordingStatus) {
   // Mirror the mic state of the session so the panel can show it without digging into meta.
-  status = { ...next, mic: next.session?.mic?.state ?? next.mic };
+  status = { ...next, mic: next.session?.mic.state ?? next.mic };
   const msg: PanelMessage = { type: 'status/update', status };
   browser.runtime.sendMessage(msg).catch(() => {}); // no side panel open
   // Toolbar badge while recording; cleared on stop and failure (both end in idle).
@@ -169,7 +169,7 @@ export async function startSession(tabId: number): Promise<RecordingStatus> {
   persist();
   setStatus({ state: 'recording', phase: 'loading-page', session: meta });
   // Reload so the rrweb snapshot is fresh and every request and socket is seen from the start.
-  // No bypassCache: re-downloading a big SPA (10 MB of Grafana JS) left the page blank for
+  // No bypassCache: re-downloading a big SPA (10 MB of Grafana JS) leaves the page blank for
   // seconds. Cached responses still show up in CDP (fromDiskCache).
   await browser.tabs.reload(tabId).catch(() => {});
   active.readyTimer = setTimeout(() => markPageReady('timeout'), PAGE_READY_TIMEOUT_MS);
@@ -324,7 +324,7 @@ async function doStop(error?: string): Promise<RecordingStatus> {
   await closeOffscreen();
   const chunks = (await getBySession('audioChunks', a.meta.id).catch(() => [])).length;
   if (a.meta.settings.mic) {
-    const prev = a.meta.mic ?? { state: 'starting' };
+    const prev = a.meta.mic;
     const why =
       micStopError ??
       prev.error ??
@@ -344,7 +344,7 @@ async function doStop(error?: string): Promise<RecordingStatus> {
   a.meta.durationMs = endedAt - a.meta.startedAt;
   a.meta.status = 'stopped';
   await putSession(a.meta);
-  const micError = a.meta.mic?.state === 'failed' ? `Microphone: ${a.meta.mic.error}` : undefined;
+  const micError = a.meta.mic.state === 'failed' ? `Microphone: ${a.meta.mic.error}` : undefined;
   setStatus({ state: 'idle', session: a.meta, error: error ?? micError });
   // Transcribe now if a key is set, so Export is quick. Export retries if this fails.
   void ensureTranscript(a.meta.id).catch((err) => console.warn('[blook] transcription', err));
@@ -413,7 +413,7 @@ export function registerListeners() {
     if (info.url) {
       const tab = active.meta.tabs.find((t) => t.tabId === tabId);
       if (tab && !tab.url) tab.url = info.url;
-      const navs = (active.meta.navigations ??= []);
+      const navs = active.meta.navigations;
       if (navs.at(-1)?.url !== info.url || navs.at(-1)?.tabId !== tabId) {
         navs.push({ tabId, t: Date.now() - active.meta.startedAt, url: info.url });
         void putSession(active.meta);

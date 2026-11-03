@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteSession, listSessions } from '@/lib/db';
 import type { PanelMessage, RecordingStatus } from '@/lib/messages';
 import { settingsItem } from '@/lib/settings';
-import { DEFAULT_SETTINGS, type MicState, type SessionMeta, type Settings } from '@/lib/types';
+import { DEFAULT_SETTINGS, TRANSCRIPTION_MODEL, type MicState, type SessionMeta, type Settings } from '@/lib/types';
 import { formatDate, formatDuration, shortUrl, tryBackground } from '@/components/util';
 import { offerFile } from '@/components/handoff';
 import { Alert, Badge, Button, Card, Field, IconButton, Input, LiveDot, SectionTitle, Switch, cx } from '@/components/ui';
@@ -189,7 +189,7 @@ function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: () => v
 
   const elapsed = session ? Math.max(0, now - session.startedAt) : 0;
   const loading = recording && phase === 'loading-page';
-  const micState = status.mic ?? session?.mic?.state;
+  const micState = status.mic ?? session?.mic.state;
   const mic = micState && MIC[micState];
   const label = state === 'starting' ? 'Starting…' : state === 'stopping' ? 'Saving…' : loading ? 'Loading page…' : 'Recording';
 
@@ -201,7 +201,7 @@ function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: () => v
         <span className="text-muted tabular-nums">{formatDuration(recording ? elapsed : (session?.durationMs ?? elapsed))}</span>
         {/* Always rendered so the row doesn't shift when the mic state arrives. */}
         <span
-          title={session?.mic?.error}
+          title={session?.mic.error}
           className={cx(
             'ml-auto flex h-4 items-center gap-1 text-xs',
             mic?.tone === 'warn' ? 'text-warn' : mic?.tone === 'danger' ? 'text-danger' : 'text-muted',
@@ -256,7 +256,7 @@ function SettingsCard({ locked }: { locked: boolean }) {
         <div className="flex flex-1 flex-wrap gap-x-4 gap-y-2 text-xs">
           <Switch label="Microphone" checked={settings.mic} disabled={locked} onChange={(mic) => update({ mic })} />
           <Switch label="Mask inputs and text" checked={settings.mask} disabled={locked} onChange={(mask) => update({ mask })} />
-          <Switch label="Canvas (2 fps)" checked={!!settings.canvas} disabled={locked} onChange={(canvas) => update({ canvas })} />
+          <Switch label="Canvas (2 fps)" checked={settings.canvas} disabled={locked} onChange={(canvas) => update({ canvas })} />
         </div>
         <IconButton label={open ? 'Hide settings' : 'Settings'} onClick={() => setOpen(!open)} className={cx(open && 'bg-surface-sunken text-fg')}>
           <GearIcon className="h-3.5 w-3.5" />
@@ -278,7 +278,7 @@ function SettingsCard({ locked }: { locked: boolean }) {
               onChange={(e) => update({ openRouterApiKey: e.target.value.trim() })}
             />
           </Field>
-          <p className="text-xs text-muted">Narration is transcribed with {DEFAULT_SETTINGS.transcriptionModel} on OpenRouter.</p>
+          <p className="text-xs text-muted">Narration is transcribed with {TRANSCRIPTION_MODEL} on OpenRouter.</p>
         </div>
       )}
     </Card>

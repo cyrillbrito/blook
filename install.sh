@@ -8,8 +8,7 @@ set -eu
 main() {
   url=${BLOOK_DOWNLOAD_URL:-https://github.com/cyrillbrito/blook/releases/latest/download}
   bin_dir=${BLOOK_INSTALL_DIR:-$HOME/.local/bin}
-  ext_dir=$HOME/Blook/extension      # visible and stable: easy to pick in Chrome, keeps its ID and settings
-  old_ext_dir=$HOME/.blook/extension # before v0.1.3
+  ext_dir=$HOME/Blook/extension # visible and stable: easy to pick in Chrome, keeps its ID and settings
 
   # Styles only on a terminal, and not with NO_COLOR.
   if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
@@ -54,12 +53,6 @@ main() {
     mv "$tmp/extension" "$ext_dir"
     rm -rf "$tmp"
     done_ "Chrome extension  $d$(tilde "$ext_dir")$r"
-    if [ -d "$old_ext_dir" ]; then
-      rm -rf "$old_ext_dir"
-      rmdir "$HOME/.blook" 2>/dev/null || true
-      printf '  %s!%s It moved from %s: remove the old Blook in Chrome and load this folder once.\n' \
-        "$y" "$r" "$(tilde "$old_ext_dir")"
-    fi
   fi
 
   case ":$PATH:" in

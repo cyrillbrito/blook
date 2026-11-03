@@ -14,12 +14,8 @@ import type {
 
 export interface BlookDB extends DBSchema {
   sessions: { key: SessionId; value: SessionMeta; indexes: { byStartedAt: number } };
-  /** Auto-increment id keeps arrival order; bySessionTab gives rrweb/<tab>.json. */
-  rrwebEvents: {
-    key: number;
-    value: RrwebEventRow;
-    indexes: { bySession: SessionId; bySessionTab: [SessionId, number] };
-  };
+  /** Auto-increment id keeps arrival order. */
+  rrwebEvents: { key: number; value: RrwebEventRow; indexes: { bySession: SessionId } };
   /** Keyed by [sessionId, requestId] so later CDP events can update the same row. */
   networkRequests: {
     key: [SessionId, string];
@@ -27,11 +23,7 @@ export interface BlookDB extends DBSchema {
     indexes: { bySession: SessionId };
   };
   wsSockets: { key: [SessionId, string]; value: WebSocketRow; indexes: { bySession: SessionId } };
-  wsFrames: {
-    key: number;
-    value: WebSocketFrameRow;
-    indexes: { bySession: SessionId; bySocket: [SessionId, string] };
-  };
+  wsFrames: { key: number; value: WebSocketFrameRow; indexes: { bySession: SessionId } };
   console: { key: number; value: ConsoleRow; indexes: { bySession: SessionId } };
   audioChunks: { key: [SessionId, number]; value: AudioChunkRow; indexes: { bySession: SessionId } };
   transcripts: { key: SessionId; value: TranscriptRow };
@@ -56,9 +48,7 @@ export function openBlookDB(): Promise<BlookDBHandle> {
     upgrade(db) {
       db.createObjectStore('sessions', { keyPath: 'id' }).createIndex('byStartedAt', 'startedAt');
 
-      const rrweb = db.createObjectStore('rrwebEvents', { keyPath: 'id', autoIncrement: true });
-      rrweb.createIndex('bySession', 'sessionId');
-      rrweb.createIndex('bySessionTab', ['sessionId', 'tabId']);
+      db.createObjectStore('rrwebEvents', { keyPath: 'id', autoIncrement: true }).createIndex('bySession', 'sessionId');
 
       db.createObjectStore('networkRequests', { keyPath: ['sessionId', 'requestId'] }).createIndex(
         'bySession',
@@ -69,9 +59,7 @@ export function openBlookDB(): Promise<BlookDBHandle> {
         'sessionId',
       );
 
-      const frames = db.createObjectStore('wsFrames', { keyPath: 'id', autoIncrement: true });
-      frames.createIndex('bySession', 'sessionId');
-      frames.createIndex('bySocket', ['sessionId', 'socketId']);
+      db.createObjectStore('wsFrames', { keyPath: 'id', autoIncrement: true }).createIndex('bySession', 'sessionId');
 
       db.createObjectStore('console', { keyPath: 'id', autoIncrement: true }).createIndex(
         'bySession',
