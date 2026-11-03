@@ -1,10 +1,12 @@
 {
   "name": "blook",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Replay a Blook bundle at time T: screenshot, DOM, pointer",
   "type": "module",
-  "bin": { "blook": "./src/cli.ts" },
+  "bin": {
+    "blook": "./src/cli.ts"
+  },
   "scripts": {
     "replay": "node src/cli.ts",
     "replay:bun": "bun src/cli.ts",
