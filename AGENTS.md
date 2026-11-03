@@ -56,16 +56,17 @@ Details in [cli/README.md](cli/README.md).
 ## Where things are
 
 - `entrypoints/`: extension pages and scripts (side panel, background, recorder, offscreen mic, Replay page)
-- `lib/`: capture, export, transcription, and the shared types and messages
-- `components/viewer/`: the viewer, used by the extension's Replay page
+- `lib/`: capture, export, transcription, IndexedDB. `lib/types.ts` and `lib/messages.ts` are the contracts.
+- `components/viewer/`: the viewer, used by the extension's Replay page; `components/ui/`: shared UI primitives
 - `cli/`: the replay CLI
 - `skills/blook/`: the agent skill
+- `install.sh`, `.github/workflows/release.yml`: the one-line installer and the release build
 
 ## Docs
 
-- [docs/](docs/README.md): architecture, the bundle format, and background research
-- Technical detail lives next to the code: short comments, and READMEs like [cli/README.md](cli/README.md). Keep docs short and high level.
-- Change the bundle and you change [docs/bundle-format.md](docs/bundle-format.md) and the skill with it.
+- [docs/](docs/README.md): architecture, the bundle format, and references
+- Technical detail lives next to the code: short comments, and READMEs like [cli/README.md](cli/README.md). Keep docs short, current and free of history.
+- Change the bundle and you change [docs/bundle-format.md](docs/bundle-format.md) and the skill with it. The bundle format version is `BUNDLE_FORMAT_VERSION` in `lib/export/bundle.ts`.
 
 ## Prior art
 

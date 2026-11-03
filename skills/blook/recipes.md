@@ -8,7 +8,7 @@
 jq '{version, url, title, durationMs, firstSnapshotT, pageReadyT, tabs, settings, mic, transcript, counts}' "$B/session.json"
 ```
 
-`counts.errors` includes Chrome's `[network] Failed to load resource` lines, so it is usually higher than the number of `error` entries in the timeline.
+`counts.errors` leaves out Chrome's `[network] Failed to load resource` lines (`counts.failedRequests` covers those), so it equals the number of `error` entries in the timeline.
 
 ## Timeline
 

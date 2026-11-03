@@ -42,13 +42,13 @@ flowchart TD
 ## Key decisions
 
 - **CDP over patching.** `chrome.debugger` sees every request, including ones made before page scripts run, gets full bodies and WebSocket frames, and needs no code in the page. The cost is Chrome's "debugging this browser" banner, and recording fails if DevTools is already attached to the tab.
-- **rrweb in the MAIN world.** rrweb patches `insertRule`, adopted stylesheets and canvas. Those patches only see the page's calls in the page's own world. Run isolated, CSS-in-JS styles were missing from the replay.
-- **Reload on Record.** After attaching the debugger, the tab reloads. The first snapshot is fresh, and every request and socket is seen from the start (CDP doesn't report sockets that were already open). The recorder snapshots as soon as `<body>` exists instead of waiting for `load`. The reload uses the HTTP cache, so big app bundles don't re-download, and the side panel shows "Loading page…" until the load event (`pageReadyT`).
-- **Bodies only for API calls.** Response bodies are kept for what the app's code asks for (XHR, Fetch, EventSource, …) and for page loads that failed, cut at 1 MB. Scripts, CSS, fonts, images and normal page loads are most of the bytes and rarely the bug, so their bodies aren't even fetched; only their metadata stays. No hash either: it would mean fetching every body again, and URLs and cache headers already tell builds apart. Request bodies are always kept. The rule is one function, `lib/capture/body-policy.ts`, with no setting.
-- **One network.json.** Bodies are inline, and JSON bodies are stored parsed, so jq walks straight into them. Fewer files for an agent to follow, at the cost of a larger `network.json` that must be queried, not read whole.
-- **One clock.** Every `t` is ms since Record, from one `Date.now()` epoch. rrweb timestamps are shifted to the same clock at export.
-- **One MediaRecorder per chunk.** Each ~30 s chunk is its own recorder run, so every file is a standalone WebM. Timeslice chunks aren't: only the first has the header.
-- **Transcription.** Whisper on OpenRouter with `verbose_json` and word timestamps (`gpt-4o-transcribe` rejects that format). Chunks are transcribed as they are saved, and Export fills in any gaps. Word time = chunk start + seconds × 1000, after an energy VAD (`lib/transcribe/vad.ts`, run in the offscreen document per chunk) moves word edges out of silence.
+- **rrweb in the MAIN world.** rrweb patches `insertRule`, adopted stylesheets and canvas, and those patches only see the page's calls in the page's own world. Without it, CSS-in-JS styles would be missing from the replay.
+- **Reload on Record.** The tab reloads after the debugger attaches, so the first snapshot is fresh and every request and socket is seen from the start. The reload uses the HTTP cache. The side panel shows "Loading page…" until the load event (`pageReadyT`).
+- **Bodies only for API calls.** Response bodies are kept for XHR, Fetch, EventSource and failed page loads, cut at 1 MB. Scripts, CSS, fonts, images and normal page loads are most of the bytes and rarely the bug, so their bodies aren't fetched. Request bodies are always kept. One function decides: `lib/capture/body-policy.ts`.
+- **One network.json.** Bodies are inline and JSON bodies are parsed, so jq walks straight into them. The file is queried, not read whole.
+- **One clock.** Every `t` is ms since Record, from one `Date.now()` epoch. rrweb timestamps are shifted to it at export.
+- **One MediaRecorder per chunk.** Each ~30 s chunk is its own recorder run, so every file is a standalone WebM.
+- **Transcription.** Whisper on OpenRouter with word timestamps. Chunks are transcribed as they are saved, and Export fills in gaps. An energy VAD (`lib/transcribe/vad.ts`) moves word edges out of silence.
 - **No screenshots or video.** The replay can rebuild any moment, so the bundle stays small and the agent asks for visuals only when it needs them.
 
 ## Known limits

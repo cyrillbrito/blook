@@ -1,6 +1,6 @@
 # Bundle format
 
-What Blook exports, file by file and field by field. Format version **4** (`session.json` `.version`). An agent skill is written from this doc, so it is kept exact. The code that writes it is `lib/export/bundle.ts` and `lib/export/timeline.ts`.
+What Blook exports, file by file and field by field. Format version **1** (`session.json` `.version`). The agent skill is written from this doc, so it stays exact. The code that writes it is `lib/export/bundle.ts` and `lib/export/timeline.ts`.
 
 The export is a ZIP with one folder, `blook-<sessionId>/`. All paths below are relative to that folder.
 
@@ -56,7 +56,7 @@ The entry point. Read it first.
 | Field | Type | Meaning |
 |---|---|---|
 | `format` | `"blook-bundle"` | Constant. |
-| `version` | number | Bundle format version. `4` for this doc. |
+| `version` | number | Bundle format version. `1` for this doc. |
 | `id` | string | Session id, `YYYY-MM-DD_HH-MM-SS` in local time at Record. |
 | `url` | string | URL of the recorded tab at Record. |
 | `title` | string? | Tab title at Record. |
@@ -73,8 +73,8 @@ The entry point. Read it first.
 | `pageReadyT` | number? | `t` when the Record reload of the first tab fired its load event (scripts loaded, app booting). From here the page normally shows real content. If no load event came within 30 s, it's the time Blook gave up waiting. |
 | `tabs` | `{ tabId, t, url, openerTabId? }[]` | Tabs in the session. `[0]` is the recorded tab. The others were opened from a session tab; `t` is when they joined. |
 | `navigations` | `{ tabId, t, url }[]` | URL changes of session tabs, including SPA `pushState` changes, in `t` order. `[0]` is the start URL at `t = 0`. |
-| `settings` | `{ mask, mic, canvas?, transcriptionModel }` | Settings in effect. `mask`: inputs and marked text were masked. `canvas`: canvas content was recorded at 2 fps. |
-| `mic` | `{ state, error?, chunks? }` | What happened to the mic. `state` is `"off"` (setting off), `"stopped"` (recorded fine), `"failed"` (no or partial audio: see `error`), or `"unknown"` (old session). `chunks` is the number of saved audio files. |
+| `settings` | `{ mask, mic, canvas }` (booleans) | Settings in effect. `mask`: inputs and marked text were masked. `mic`: the mic was on. `canvas`: canvas content was recorded at 2 fps. |
+| `mic` | `{ state, error?, chunks? }` | What happened to the mic. After Stop, `state` is `"off"` (setting off), `"stopped"` (recorded fine) or `"failed"` (no or partial audio: see `error`). A bundle built while recording (the Replay page) can show `"starting"`, `"recording"` or `"needs-permission"`. `chunks` is the number of saved audio files, set at Stop. |
 | `transcript` | `{ status, note?, model? }` | Same as the top of `transcript.json`. |
 | `counts` | object | `rrwebEvents`, `timeline`, `requests`, `failedRequests`, `webSockets`, `webSocketFrames`, `console`, `errors` (console entries with level `error`, minus Chrome's `[network]` failed-resource lines; equals the number of timeline `error` entries), `audioChunks`, `transcriptSegments`. |
 | `files` | `{ [path]: string }` | Every file or folder in the bundle, with a one-line description. Folder keys end with `/`. |
@@ -84,7 +84,7 @@ Example (shortened):
 ```json
 {
   "format": "blook-bundle",
-  "version": 4,
+  "version": 1,
   "id": "2026-11-03_19-09-02",
   "url": "http://localhost:4791/",
   "title": "Blook test",
@@ -101,7 +101,7 @@ Example (shortened):
   "pageReadyT": 4060,
   "tabs": [{ "tabId": 1653097249, "t": 0, "url": "http://localhost:4791/" }],
   "navigations": [{ "tabId": 1653097249, "t": 0, "url": "http://localhost:4791/" }],
-  "settings": { "mask": false, "mic": true, "canvas": true, "transcriptionModel": "openai/whisper-large-v3" },
+  "settings": { "mask": false, "mic": true, "canvas": true },
   "mic": { "state": "stopped", "chunks": 1 },
   "transcript": { "status": "skipped", "note": "skipped: no OpenRouter API key set" },
   "counts": { "rrwebEvents": 61, "timeline": 33, "requests": 7, "failedRequests": 1, "webSockets": 1, "webSocketFrames": 5, "console": 9, "errors": 3, "audioChunks": 1, "transcriptSegments": 0 },
@@ -136,7 +136,7 @@ Optional fields are left out when they don't apply. They are never `null`.
 | `tab-open` | `url`, `openerTabId` | `{ file: "session.json", tab: i }`: index into `.tabs` |
 | `snapshot` | `url?` | `{ file: "rrweb.json", tabId, event: i }`. A full DOM snapshot (page load or rrweb re-snapshot). The DOM is replayable from here. |
 | `click` | `target`, `nodeId`, `x`, `y`, `double?` | `{ file: "rrweb.json", tabId, event: i }`. `x`/`y` are viewport CSS px. `nodeId` is the rrweb node id. `target` describes the element (tag, accessible name, `#id` or `.class`). |
-| `input` | `target`, `nodeId`, `value` or `checked`, `endT` | rrweb ref to the **last** input event of the burst. Typing into one field with gaps under 5 s is one entry. `value` is the final text (at most 200 chars; masked as `*` when `mask` was on). Checkboxes and radios have `checked` (boolean) instead of `value`, and the summary says `checked` or `unchecked`. Only user input is listed: programmatic value and checked changes (the app rendering form state, radios unchecked because a sibling was picked) and nodes rrweb never serialized (id -1) are dropped. Recordings from before rrweb's `userTriggered` flag fall back to requiring a click on, or focus in, the field first. The raw events, programmatic ones included, stay in the rrweb file. |
+| `input` | `target`, `nodeId`, `value` or `checked`, `endT` | rrweb ref to the **last** input event of the burst. Typing into one field with gaps under 5 s is one entry. `value` is the final text (at most 200 chars; masked as `*` when `mask` was on). Checkboxes and radios have `checked` (boolean) instead of `value`, and the summary says `checked` or `unchecked`. Only user input is listed: programmatic value and checked changes (the app rendering form state, radios unchecked because a sibling was picked) and nodes rrweb never serialized (id -1) are dropped, using rrweb's `userTriggered` flag. The raw events, programmatic ones included, stay in the rrweb file. |
 | `scroll` | `target`, `nodeId`, `x`, `y`, `endT` | rrweb ref to the **first** scroll event. Scrolls of one element with gaps under 1 s are one entry; `x`/`y` are the final scroll offset. `target` is `document` for the page. |
 | `request` | `method`, `url`, `status?`, `resourceType?`, `endT?`, `durationMs?` | `{ file: "network.json", requestId }`. Every HTTP request that didn't fail. |
 | `request-failed` | as `request`, plus `errorText?` | Same. The request had a network error (not a cancel) or HTTP status ≥ 400. |
@@ -213,7 +213,7 @@ Which response bodies are kept (one rule, `lib/capture/body-policy.ts`):
 - Kept: a `Document` (page load) with `status >= 400`.
 - Not kept: everything else the browser loads by itself: `Document` that didn't fail, `Script`, `Stylesheet`, `Font`, `Image`, `Media`, `Manifest`, `TextTrack`, `Prefetch`, …. These keep `url`, `method`, `status`, headers, timing, `mimeType` and `responseBodySize`, plus `responseBodyNotKept`. There is no hash of them.
 
-Without `responseBody` and without `responseBodyNotKept`, there was no body, or Chrome didn't keep it (204, redirect, evicted, or the tab navigated away).
+Without `responseBody` and without `responseBodyNotKept`, there was no body: the request failed or was still running at Stop, or Chrome had none to give (204, redirect, evicted, or the tab navigated away).
 
 `network.json` can be large, since it holds every kept body. Query it with jq; don't read it whole.
 
@@ -379,7 +379,7 @@ Only present when the mic recorded something. `audio/NNN.webm` are standalone We
 [{ "index": 0, "t": 127, "endT": 12867, "durationMs": 12740, "voiced": [[5167, 5707], [6787, 11127]], "mimeType": "audio/webm;codecs=opus", "size": 50026, "file": "audio/000.webm" }]
 ```
 
-`t` is when that chunk's recorder started. A word at `s` seconds into the file is at session time `t + s × 1000`. `voiced` (when present) lists `[t, endT]` ranges in session ms where the chunk has speech-level energy, from a simple energy detector run when the chunk was saved. Outside them the mic was quiet.
+Fields: `index`, `t`, `endT`, `durationMs`, `voiced?`, `mimeType`, `size` (bytes) and `file`. `t` is when that chunk's recorder started. A word at `s` seconds into the file is at session time `t + s × 1000`. `voiced` (missing when the audio didn't decode) lists `[t, endT]` ranges in session ms where the chunk has speech-level energy, from a simple energy detector run when the chunk was saved. Outside them the mic was quiet.
 
 ## jq recipes
 
