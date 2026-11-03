@@ -148,7 +148,7 @@ export function Field({ label, children }: { label: ReactNode; children: ReactNo
 export function LiveDot({ className }: { className?: string }) {
   return (
     <span className={cx('relative inline-flex h-2.5 w-2.5 shrink-0', className)}>
-      <span className="absolute inset-0 animate-ping rounded-full bg-recording opacity-60" />
+      <span className="absolute inset-0 animate-ping rounded-full motion-reduce:hidden bg-recording opacity-60" />
       <span className="relative h-2.5 w-2.5 rounded-full bg-recording" />
     </span>
   );

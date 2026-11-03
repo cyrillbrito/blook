@@ -151,16 +151,25 @@ function IdleCard({ onRecord }: { onRecord: () => void }) {
   );
 }
 
-const MIC: Record<MicState, { label: string; tone: 'neutral' | 'ok' | 'warn' | 'danger'; on: boolean }> = {
-  off: { label: 'Mic off', tone: 'neutral', on: false },
-  starting: { label: 'Mic starting…', tone: 'neutral', on: true },
-  recording: { label: 'Mic on', tone: 'ok', on: true },
+// Mic state as quiet muted text; colour only when something is wrong.
+const MIC: Record<MicState, { label: string; tone?: 'warn' | 'danger'; on: boolean }> = {
+  off: { label: 'Mic off', on: false },
+  starting: { label: 'Mic starting…', on: true },
+  recording: { label: 'Mic on', on: true },
   'needs-permission': { label: 'Mic needs permission', tone: 'warn', on: false },
   failed: { label: 'Mic failed', tone: 'danger', on: false },
-  stopped: { label: 'Mic stopped', tone: 'neutral', on: false },
+  stopped: { label: 'Mic stopped', on: false },
 };
 
-/** While starting, recording or stopping: the live state and Stop. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
+}
+
+/** While starting, recording or stopping: a calm status line, the page, and Stop. */
 function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: () => void }) {
   const { state, session, phase } = status;
   const recording = state === 'recording';
@@ -174,43 +183,46 @@ function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: () => v
 
   const elapsed = session ? Math.max(0, now - session.startedAt) : 0;
   const loading = recording && phase === 'loading-page';
-  const mic = MIC[status.mic ?? session?.mic?.state ?? 'off'];
+  const micState = status.mic ?? session?.mic?.state;
+  const mic = micState && MIC[micState];
   const label = state === 'starting' ? 'Starting…' : state === 'stopping' ? 'Saving…' : loading ? 'Loading page…' : 'Recording';
 
   return (
-    <Card className="space-y-3 border-red-200 p-3 shadow-sm ring-1 ring-red-100">
+    <Card className="space-y-3 p-3">
       <div className="flex items-center gap-2">
         {recording ? <LiveDot /> : <SpinnerIcon className="h-3.5 w-3.5 text-muted" />}
-        <span className={cx('text-xs font-semibold tracking-wide uppercase', recording ? 'text-recording-strong' : 'text-muted')}>{label}</span>
-        {status.mic || session?.mic ? (
-          <span className="ml-auto">
-            <Badge tone={mic.tone} title={session?.mic?.error}>
-              {mic.on ? <MicIcon className="h-3 w-3" /> : <MicOffIcon className="h-3 w-3" />}
-              {mic.label}
-            </Badge>
-          </span>
-        ) : null}
+        <span className="font-medium">{label}</span>
+        <span className="text-muted tabular-nums">{formatDuration(recording ? elapsed : (session?.durationMs ?? elapsed))}</span>
+        {/* Always rendered so the row doesn't shift when the mic state arrives. */}
+        <span
+          title={session?.mic?.error}
+          className={cx(
+            'ml-auto flex h-4 items-center gap-1 text-xs',
+            mic?.tone === 'warn' ? 'text-warn' : mic?.tone === 'danger' ? 'text-danger' : 'text-muted',
+          )}
+        >
+          {mic && (mic.on ? <MicIcon className="h-3.5 w-3.5" /> : <MicOffIcon className="h-3.5 w-3.5" />)}
+          {mic?.label}
+        </span>
       </div>
 
-      <div className="font-mono text-4xl leading-none font-semibold tabular-nums">{formatDuration(recording ? elapsed : (session?.durationMs ?? elapsed))}</div>
-
-      {session && (
-        <div className="min-w-0 space-y-0.5">
-          <div className="truncate font-medium" title={session.title}>
-            {session.title || shortUrl(session.url)}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted">
-            <span className="min-w-0 truncate" title={session.url}>
-              {shortUrl(session.url)}
-            </span>
-            {session.tabs.length > 1 && <Badge>{session.tabs.length} tabs</Badge>}
-          </div>
-          {loading && <p className="pt-1 text-xs text-warn">Waiting for the page: no DOM captured yet.</p>}
+      {/* Fixed-height lines so starting → loading → recording doesn't jump. */}
+      <div className="min-w-0 space-y-0.5 text-xs leading-4 text-muted">
+        <div className="h-4 truncate text-fg" title={session?.title}>
+          {session ? session.title || hostOf(session.url) : ''}
         </div>
-      )}
+        <div className="flex h-4 items-center gap-1.5">
+          {session && (
+            <span className="min-w-0 truncate" title={session.url}>
+              {hostOf(session.url)}
+            </span>
+          )}
+          {session && session.tabs.length > 1 && <Badge>{session.tabs.length} tabs</Badge>}
+        </div>
+      </div>
 
-      <Button variant="primary" size="lg" className="w-full" disabled={!recording} onClick={onStop}>
-        {recording ? <StopIcon className="h-4 w-4" /> : <SpinnerIcon className="h-4 w-4" />}
+      <Button variant="secondary" className="h-10 w-full" disabled={!recording} onClick={onStop}>
+        {recording ? <StopIcon className="h-3.5 w-3.5" /> : <SpinnerIcon className="h-3.5 w-3.5" />}
         {recording ? 'Stop recording' : state === 'starting' ? 'Starting…' : 'Stopping…'}
       </Button>
     </Card>
