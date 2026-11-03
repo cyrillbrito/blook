@@ -52,18 +52,18 @@ Large files: never `cat` or read `network.json` or rrweb files whole. List with 
 
 If `blook` isn't installed, install it (macOS, Linux x64; puts it in `~/.local/bin`) with `curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | BLOOK_NO_EXTENSION=1 BLOOK_NO_SKILL=1 sh`.
 
-`<t>` is ms (`9648`), seconds (`9.6s`) or `mm:ss.mmm` (`00:09.648`). Output is JSON, except `screenshot`, which prints a PNG path.
+`<t>` is ms (`9648`), seconds (`9.6s`) or `mm:ss.mmm` (`00:09.648`); a bare decimal like `9.6` is refused. Output is JSON on stdout; errors go to stderr with a next step and an exit code (2 usage, 3 bundle not found or invalid, 4 time after the end, 5 no browser). `blook <command> --help` shows each output shape.
 
 ```bash
-blook info       "$B"        # tabs, snapshot range, viewport, clicks; no browser, fast
+blook info       "$B"        # duration, tabs, snapshot range, viewport, clicks with their targets; no browser, fast
 blook pointer    "$B" <t>    # mouse x/y, element under it (tag, id, text, attributes, rect, css path), ancestry, interactions within ±1 s
 blook dom        "$B" <t> [--selector css] [--raw]   # replayed HTML at t, with form values filled in
-blook screenshot "$B" <t> [--out f.png]              # PNG with the cursor marked
+blook screenshot "$B" <t> [--out f.png]              # PNG with the cursor marked; JSON with its .path
 ```
 
 Options: `--tab <id>` (default: the first tab), `--offline` when the app's server is gone.
 
-- Prefer `pointer` and `dom --selector` to `screenshot`: text is cheaper and exact. Take a screenshot when the question is visual. View it with the read tool.
+- Prefer `pointer` and `dom --selector` to `screenshot`: text is cheaper and exact. Take a screenshot when the question is visual. View the file at `.path` with the read tool.
 - When the user says "this", "here" or "that button", run `pointer` at that word's `t`. The cursor is how they point.
 - To see the effect of an action, use a `t` about 500 ms after it. For the state that caused it, use a `t` just before it.
 - Before `firstSnapshotT` there's no DOM, and until `pageReadyT` (the load event) the page may still be an empty shell. Check `warnings` and `replayedT` in the output.

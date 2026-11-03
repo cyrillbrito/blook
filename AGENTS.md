@@ -48,6 +48,7 @@ The replay CLI lives in `cli/`, with its own `bun install`:
 ```sh
 cd cli
 bun src/cli.ts pointer <bundle.zip> 00:18.5   # also: info, screenshot, dom, install-browser
+bun run test                                  # tests, with a small synthetic bundle
 bun run build:bin                             # single binary: dist/blook
 ```
 
