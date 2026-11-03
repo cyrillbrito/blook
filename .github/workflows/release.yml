@@ -62,7 +62,7 @@ jobs:
           cat > notes.md <<NOTES
           ## Install
 
-          macOS (arm64, x64) and Linux (x64). Installs the CLI, the extension folder and the agent skill; re-run to update.
+          macOS (arm64, x64) and Linux (x64). Installs the CLI and the extension folder, and offers the agent skill; re-run to update.
 
           \`\`\`sh
           curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh

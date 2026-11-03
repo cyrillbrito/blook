@@ -23,7 +23,7 @@ On macOS or Linux (x64), run:
 curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh
 ```
 
-It installs the `blook` command-line tool to `~/.local/bin`, unpacks the extension to `~/.blook/extension`, and adds the `blook` skill to your coding agents. Run it again, or `blook update`, to update.
+It installs the `blook` command-line tool to `~/.local/bin`, unpacks the extension to `~/.blook/extension`, and offers to add the `blook` skill to your coding agents. Run it again, or `blook update`, to update.
 
 Blook isn't on the Chrome Web Store, so you load the extension by hand, once:
 

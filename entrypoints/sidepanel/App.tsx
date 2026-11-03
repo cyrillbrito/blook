@@ -39,10 +39,16 @@ export default function App() {
       if (message?.type === 'sessions/changed') return void refreshSessions();
       if (message?.type !== 'status/update') return;
       setStatus(message.status);
-      if (message.status.state === 'idle') refreshSessions();
+      refreshSessions();
     };
+    // Other pages (Replay) can change the list too; reread when the panel comes back.
+    const onVisible = () => document.visibilityState === 'visible' && refreshSessions();
     browser.runtime.onMessage.addListener(onMessage);
-    return () => browser.runtime.onMessage.removeListener(onMessage);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      browser.runtime.onMessage.removeListener(onMessage);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [refreshSessions]);
 
   const record = async () => {
@@ -282,13 +288,7 @@ function SettingsCard({ locked }: { locked: boolean }) {
 function SessionList({ sessions, activeId, onChanged }: { sessions: SessionMeta[]; activeId?: string; onChanged: () => void }) {
   return (
     <section className="space-y-1.5">
-      <SectionTitle
-        actions={
-          <Button variant="ghost" size="sm" onClick={onChanged}>
-            Refresh
-          </Button>
-        }
-      >
+      <SectionTitle>
         Recordings {sessions.length > 0 && <span className="font-normal">({sessions.length})</span>}
       </SectionTitle>
       {sessions.length === 0 ? (
@@ -343,19 +343,21 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
   };
 
   const t = session.transcription;
+  const tLabel = t && t.state !== 'none' ? transcriptionLabel(t) : '';
+  const tTone = t ? TRANSCRIPTION_TONE[t.state] : undefined;
+  // Row actions stay quiet until hover or keyboard focus; busy or confirming keeps them shown.
+  const actionsShown = !!busy || confirming;
   return (
-    <div className={cx('px-3 py-2', live && 'bg-recording-soft/60')}>
+    <div className={cx('group px-3 py-2', live ? 'bg-recording-soft/60' : 'hover:bg-surface-muted')}>
       <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-medium" title={session.url}>
-            {session.title || shortUrl(session.url)}
-          </div>
-          {session.title && (
-            <div className="truncate text-xs text-muted" title={session.url}>
-              {shortUrl(session.url)}
-            </div>
-          )}
-        </div>
+        <button
+          className="min-w-0 flex-1 cursor-pointer truncate rounded-control text-left font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-default disabled:no-underline"
+          onClick={openReplay}
+          disabled={live}
+          title={live ? 'Stop the recording to open it' : `Open in the viewer: ${session.url}`}
+        >
+          {session.title || shortUrl(session.url)}
+        </button>
         {confirming ? (
           <div className="flex shrink-0 items-center gap-1">
             <Button variant="danger" size="sm" onClick={remove}>
@@ -366,10 +368,12 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
             </Button>
           </div>
         ) : (
-          <div className="flex shrink-0 items-center gap-0.5">
-            <Button size="sm" onClick={openReplay} disabled={live} title="Open in the viewer">
-              Open
-            </Button>
+          <div
+            className={cx(
+              'flex shrink-0 items-center gap-0.5 transition-opacity',
+              !actionsShown && 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
+            )}
+          >
             <IconButton label="Download bundle .zip" onClick={exportZip} disabled={!!busy || live}>
               {busy === 'export' ? <SpinnerIcon className="h-3.5 w-3.5" /> : <DownloadIcon className="h-3.5 w-3.5" />}
             </IconButton>
@@ -379,20 +383,27 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
           </div>
         )}
       </div>
-      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
+        <span className="max-w-[45%] truncate" title={session.url}>
+          {hostOf(session.url)}
+        </span>
+        <span>·</span>
         <span>{formatDate(session.startedAt)}</span>
         <span>·</span>
-        <span className="tabular-nums">{live ? 'recording' : duration != null ? formatDuration(duration) : '—'}</span>
-        {live && <Badge tone="recording">recording</Badge>}
-        {!live && session.status === 'recording' && <Badge tone="warn">ended without Stop</Badge>}
-        {t && t.state !== 'none' && (
-          <Badge tone={TRANSCRIPTION_TONE[t.state]} title={t.error}>
-            {transcriptionLabel(t)}
-          </Badge>
+        {live ? (
+          <span className="text-recording-strong">recording</span>
+        ) : (
+          <span className="tabular-nums">{duration != null ? formatDuration(duration) : '—'}</span>
         )}
-        {session.tabs.length > 1 && <Badge>{session.tabs.length} tabs</Badge>}
-        {busy === 'export' && <span>preparing download…</span>}
+        {session.tabs.length > 1 && <span>· {session.tabs.length} tabs</span>}
+        {tLabel && (
+          <span title={t?.error} className={cx(tTone === 'danger' ? 'text-danger' : tTone === 'warn' ? 'text-warn' : tTone === 'accent' && 'text-accent')}>
+            · {tLabel}
+          </span>
+        )}
+        {busy === 'export' && <span>· preparing download…</span>}
       </div>
+      {!live && session.status === 'recording' && <div className="mt-0.5 text-xs text-warn">Ended without Stop.</div>}
       {confirming && <div className="mt-1 text-xs text-danger">Delete this recording? This can't be undone.</div>}
       {note && <div className={cx('mt-1 text-xs', note.tone === 'danger' ? 'text-danger' : 'text-warn')}>{note.text}</div>}
     </div>

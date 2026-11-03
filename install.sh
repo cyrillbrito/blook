@@ -45,12 +45,17 @@ main() {
     echo "Unpacked the extension to $ext_dir"
   fi
 
-  # The agent skill. npx asks which agents; it reads the terminal, not this piped script.
+  # The agent skill, if wanted. Questions read the terminal, not this piped script.
   if [ -z "${BLOOK_NO_SKILL:-}" ]; then
     if (: </dev/tty) 2>/dev/null; then
-      "$bin_dir/blook" skill install </dev/tty || echo "Skill install failed; run: blook skill install"
+      printf 'Install the blook skill for your coding agents? [Y/n] '
+      read -r answer </dev/tty || answer=n
+      case "$answer" in
+        n* | N*) echo "Skipped. Later: blook skill install" ;;
+        *) "$bin_dir/blook" skill install </dev/tty || echo "Skill install failed; run: blook skill install" ;;
+      esac
     else
-      "$bin_dir/blook" skill install -y || echo "Skill install failed; run: blook skill install"
+      echo "No terminal to ask; skipped the agent skill. Later: blook skill install"
     fi
   fi
 
