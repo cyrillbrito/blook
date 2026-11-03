@@ -42,6 +42,7 @@ jobs:
         run: |
           bun install --frozen-lockfile
           bun run compile
+          bun run test
           for t in darwin-arm64 darwin-x64 linux-x64; do
             bun run build:bin --target=bun-$t --outfile dist/blook-$t
           done
