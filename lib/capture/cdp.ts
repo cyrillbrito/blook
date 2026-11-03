@@ -1,12 +1,9 @@
 // Turns chrome.debugger (CDP) events into stored rows: HTTP requests with bodies,
 // WebSocket sockets and frames, console calls, exceptions and browser log entries.
 import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, WebSocketRow } from '../types';
+import { bodyPolicy, capBase64, capText } from './body-policy';
 import type { BatchWriter } from './writer';
 
-/** Text bodies above this are cut. */
-const TEXT_BODY_CAP = 1_000_000;
-/** Binary (base64) bodies above this are dropped, since a cut base64 file is useless. */
-const BINARY_BODY_CAP = 300_000;
 /** WebSocket payloads above this are cut. */
 const FRAME_CAP = 256_000;
 
@@ -59,6 +56,11 @@ export class CdpCapture {
         return this.onRequest(tabId, p);
       case 'Network.responseReceived':
         return this.onResponse(p);
+      case 'Network.dataReceived': {
+        const row = this.requests.get(p.requestId);
+        if (row) row.responseBodySize = (row.responseBodySize ?? 0) + (p.dataLength ?? 0);
+        return;
+      }
       case 'Network.loadingFinished':
         return void this.onFinished(tabId, p);
       case 'Network.loadingFailed':
@@ -147,19 +149,28 @@ export class CdpCapture {
       url: url + (p.request?.urlFragment ?? ''),
       resourceType: p.type,
       requestHeaders: normHeaders(p.request?.headers),
-      requestBody: p.request?.postData,
     };
+    this.setRequestBody(row, p.request?.postData);
     this.requests.set(p.requestId, row);
     this.writer.upsertRequest(row);
 
     if (p.request?.hasPostData && row.requestBody === undefined) {
       this.send(tabId, 'Network.getRequestPostData', { requestId: p.requestId })
         .then((r) => {
-          row.requestBody = r?.postData;
+          this.setRequestBody(row, r?.postData);
           this.writer.upsertRequest(row);
         })
         .catch(() => {});
     }
+  }
+
+  private setRequestBody(row: NetworkRequestRow, body: string | undefined) {
+    if (body === undefined) return;
+    const policy = bodyPolicy({ direction: 'request', resourceType: row.resourceType });
+    if (!policy.keep) return;
+    const cut = capText(body, policy.maxBytes);
+    row.requestBody = cut.text;
+    if (cut.truncated) Object.assign(row, { requestBodyTruncated: true, requestBodySize: cut.size });
   }
 
   private onResponse(p: any) {
@@ -175,19 +186,25 @@ export class CdpCapture {
     if (!row) return;
     row.endT = this.mono(p.timestamp);
     this.requests.delete(p.requestId);
+    const policy = bodyPolicy({ direction: 'response', resourceType: row.resourceType, status: row.status, mimeType: row.mimeType });
+    if (!policy.keep) {
+      // Don't fetch what we drop: no CDP transfer, nothing stored.
+      row.responseBodyNotKept = policy.reason;
+      this.writer.upsertRequest(row);
+      return;
+    }
     try {
       // Ask right away: Chrome may evict the body from its buffer later.
       const r = await this.send(tabId, 'Network.getResponseBody', { requestId: p.requestId });
       const body: string = r?.body ?? '';
-      if (r?.base64Encoded) {
-        row.responseBodyBase64 = true;
-        if (body.length > BINARY_BODY_CAP) row.truncated = true;
-        else row.responseBody = body;
-      } else if (body.length > TEXT_BODY_CAP) {
-        row.responseBody = body.slice(0, TEXT_BODY_CAP);
-        row.truncated = true;
-      } else {
-        row.responseBody = body;
+      // Empty is kept as no body: Chrome returns '' for a fetch read as a blob, and the
+      // dataReceived size is then the better number.
+      if (body) {
+        const cut = r?.base64Encoded ? capBase64(body, policy.maxBytes) : capText(body, policy.maxBytes);
+        row.responseBody = 'b64' in cut ? cut.b64 : cut.text;
+        if (r?.base64Encoded) row.responseBodyBase64 = true;
+        if (cut.truncated) row.truncated = true;
+        row.responseBodySize = cut.size;
       }
     } catch {
       // No body (204, redirect, evicted, or the tab navigated away).

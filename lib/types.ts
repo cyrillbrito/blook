@@ -113,6 +113,9 @@ export interface NetworkRequestRow {
   resourceType?: string;
   requestHeaders: Headers;
   requestBody?: string;
+  /** Original request body size in UTF-8 bytes, set when requestBody was cut. */
+  requestBodySize?: number;
+  requestBodyTruncated?: boolean;
   status?: number;
   statusText?: string;
   responseHeaders?: Headers;
@@ -120,8 +123,12 @@ export interface NetworkRequestRow {
   responseBody?: string;
   /** True when responseBody is base64 (binary content). */
   responseBodyBase64?: boolean;
-  /** True when a body was cut to the size cap. */
+  /** True when responseBody was cut to the size cap. */
   truncated?: boolean;
+  /** Decoded response size in bytes, summed from Network.dataReceived, kept body or not. */
+  responseBodySize?: number;
+  /** Why the response body wasn't kept (lib/capture/body-policy.ts). */
+  responseBodyNotKept?: string;
   errorText?: string;
 }
 

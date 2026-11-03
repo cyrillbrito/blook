@@ -79,7 +79,7 @@ function readFolder(dir: string): Files {
 }
 
 function readZip(file: string): Files {
-  // Only unzip what we read: session.json and rrweb/*.json (skip audio, bodies).
+  // Only unzip what we read: session.json and rrweb/*.json (skip audio, network).
   const raw = unzipSync(readFileSync(file), {
     filter: (f) => /(^|\/)session\.json$|(^|\/)rrweb\/[^/]+\.json$/.test(f.name),
   });

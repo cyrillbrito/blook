@@ -163,7 +163,7 @@ export async function startSession(tabId: number): Promise<RecordingStatus> {
   setStatus({ state: 'recording', phase: 'loading-page', session: meta });
   // Reload so the rrweb snapshot is fresh and every request and socket is seen from the start.
   // No bypassCache: re-downloading a big SPA (10 MB of Grafana JS) left the page blank for
-  // seconds. Cached responses still show up in CDP (fromDiskCache) with their bodies.
+  // seconds. Cached responses still show up in CDP (fromDiskCache).
   await browser.tabs.reload(tabId).catch(() => {});
   active.readyTimer = setTimeout(() => markPageReady('timeout'), PAGE_READY_TIMEOUT_MS);
   if (settings.mic) void startMic();

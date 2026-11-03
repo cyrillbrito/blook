@@ -58,7 +58,7 @@ export interface Bundle {
   rrweb: Map<number, eventWithTime[]>;
   /** Session end: durationMs, or the last thing that happened. */
   endT: number;
-  /** Raw bytes of any file in the bundle (bodies, frame payloads, audio). */
+  /** Raw bytes of any file in the bundle (frame payloads, audio). */
   file(path: string): Uint8Array | undefined;
 }
 

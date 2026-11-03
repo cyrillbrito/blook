@@ -38,14 +38,13 @@ Stop once you have the answer.
 | File | Holds | Key fields |
 |---|---|---|
 | `transcript.json` | Narration | `status` (`ok`, `partial`, `pending`, `none`, `skipped`, `failed`) and `note`; `segments[]`: `index`, `t`, `endT`, `text`, `words[]` (`word`, `t`, `endT`) |
-| `network.json` | HTTP requests | `id`, `t`, `endT`, `durationMs`, `method`, `url`, `resourceType`, `status`, `failed`, `errorText`, headers, bodies (below) |
-| `network/bodies/` | Bodies over 2 KB, and binary bodies | Named by `requestBodyFile` / `responseBodyFile`. Static resources (Script, Stylesheet, Font, Image, Media) have only `responseBodySize` and `responseBodySha256`, no body |
+| `network.json` | HTTP requests | `id`, `t`, `endT`, `durationMs`, `method`, `url`, `resourceType`, `status`, `failed`, `errorText`, headers, inline bodies (JSON parsed; only API calls and failed page loads keep a response body, others have `responseBodyNotKept`) |
 | `websockets.json` | Sockets with all frames | `id`, `url`, `t`, `endT`, `status`, counts; `frames[]`: `index`, `t`, `direction`, `opcode`, `size`, `payload` or `payloadFile` |
 | `console.json` | Console calls, uncaught exceptions, browser log entries | `index`, `t`, `source` (`console`, `exception`, `log`), `level`, `text`, `url`, `line`, `stack` |
 | `rrweb/<tabId>.json` | rrweb events, one line of JSON | Use the CLI. Event types: [rrweb.md](rrweb.md) |
 | `audio/` | Raw mic chunks (WebM) and `chunks.json` | Only present with audio. A `skipped` transcript means audio exists but wasn't transcribed |
 
-Large files: never `cat` or read `network.json`, body files or rrweb files whole. List with jq, then fetch one record by id. Always follow the `*File` fields instead of building file names. A cut body has `responseBodyTruncated` (at 1 MB), a cut frame `truncated` (at 256 KB). With `settings.mask` on, inputs and some text show as `*`: that's expected, not a bug.
+Large files: never `cat` or read `network.json` or rrweb files whole. List with jq, then fetch one record by id. Always follow the `*File` fields instead of building file names. A cut body has `responseBodyTruncated` / `requestBodyTruncated` (at 1 MB), a cut frame `truncated` (at 256 KB). With `settings.mask` on, inputs and some text show as `*`: that's expected, not a bug.
 
 ## Replay CLI
 

@@ -1,6 +1,6 @@
 # Bundle format
 
-What Blook exports, file by file and field by field. Format version **2** (`session.json` `.version`). An agent skill is written from this doc, so it is kept exact. The code that writes it is `lib/export/bundle.ts` and `lib/export/timeline.ts`.
+What Blook exports, file by file and field by field. Format version **3** (`session.json` `.version`). An agent skill is written from this doc, so it is kept exact. The code that writes it is `lib/export/bundle.ts` and `lib/export/timeline.ts`.
 
 The export is a ZIP with one folder, `blook-<sessionId>/`. All paths below are relative to that folder.
 
@@ -28,7 +28,7 @@ The export is a ZIP with one folder, `blook-<sessionId>/`. All paths below are r
 
 - A redirect reuses the CDP requestId. Each earlier hop gets its own record with id `<requestId>#redirect<N>`, where N = 1, 2, ….
 - `console.json[i].index == i` and `transcript.json.segments[i].index == i`, so `.[i]` and `select(.index == i)` give the same record.
-- File names built from ids replace every character outside `[A-Za-z0-9_-]` with `_`. For example, request `64397.23` has its body in `network/bodies/64397_23.json`. Always follow the `*File` path fields instead of building names yourself.
+- File names built from ids replace every character outside `[A-Za-z0-9_-]` with `_`. For example, frame 3 of socket `64397.5` is `websockets/frames/64397_5-3.txt`. Always follow the `*File` path fields instead of building names yourself.
 
 ## Files
 
@@ -36,8 +36,7 @@ The export is a ZIP with one folder, `blook-<sessionId>/`. All paths below are r
 session.json                  entry point: meta, counts, mic outcome, files map
 timeline.json                 every event in one array sorted by t, with refs
 rrweb/<tabId>.json            rrweb events per tab (DOM replay source of truth)
-network.json                  HTTP requests
-network/bodies/               bodies over 2 KB and all binary bodies
+network.json                  HTTP requests, with kept bodies inline
 websockets.json               WebSocket connections with their frames
 websockets/frames/            frame payloads over 2 KB and all binary payloads
 console.json                  console calls, uncaught exceptions, browser log entries
@@ -46,7 +45,7 @@ audio/chunks.json             mic chunk index (only when there is audio)
 audio/NNN.webm                raw mic audio, WebM/Opus, ~30 s each
 ```
 
-Every file except `audio/chunks.json`, `network/bodies/`, `websockets/frames/` and `audio/*.webm` is always present, even when empty (`[]`). The `rrweb/` files are present when the page was recorded. `session.json` `.files` lists exactly the files and folders in this bundle.
+Every file except `audio/chunks.json`, `websockets/frames/` and `audio/*.webm` is always present, even when empty (`[]`). The `rrweb/` files are present when the page was recorded. `session.json` `.files` lists exactly the files and folders in this bundle.
 
 JSON files are pretty-printed, except `rrweb/<tabId>.json`, which is one line.
 
@@ -57,7 +56,7 @@ The entry point. Read it first.
 | Field | Type | Meaning |
 |---|---|---|
 | `format` | `"blook-bundle"` | Constant. |
-| `version` | number | Bundle format version. `2` for this doc. |
+| `version` | number | Bundle format version. `3` for this doc. |
 | `id` | string | Session id, `YYYY-MM-DD_HH-MM-SS` in local time at Record. |
 | `url` | string | URL of the recorded tab at Record. |
 | `title` | string? | Tab title at Record. |
@@ -85,7 +84,7 @@ Example (shortened):
 ```json
 {
   "format": "blook-bundle",
-  "version": 2,
+  "version": 3,
   "id": "2026-11-03_19-09-02",
   "url": "http://localhost:4791/",
   "title": "Blook test",
@@ -195,22 +194,25 @@ Array of HTTP requests sorted by `t`. `data:` and `blob:` URLs are not recorded.
 | `socketId` | string? | Set when this request is a WebSocket handshake that also appears in `websockets.json` (usually it doesn't, because CDP reports handshakes only as socket events). |
 | `requestHeaders` | `{ [name]: string }` | Request headers as Chrome sent them. |
 | `responseHeaders` | `{ [name]: string }`? | Response headers. |
-| `requestBody` | string? | Request body text, when it's at most 2048 UTF-8 bytes. |
-| `requestBodyFile` | string? | Path of the request body (`network/bodies/<id>.request.<ext>`) when it's over 2048 bytes. |
-| `requestBodySize` | number? | Request body size in bytes. Present whenever there was a body. |
-| `responseBody` | string? | Response body text, when it's text and at most 2048 UTF-8 bytes. |
-| `responseBodyFile` | string? | Path of the response body (`network/bodies/<id>.<ext>`) when it's over 2048 bytes or binary. Binary bodies are written as raw bytes, not base64. |
-| `responseBodySize` | number? | Response body size in bytes (decoded). |
-| `responseBodyBinary` | `true`? | The body is binary (image, font, …). |
-| `responseBodyTruncated` | `true`? | The text body was cut at 1 MB during capture. |
-| `responseBodyOmitted` | string? | Why there's no body: `static resource (<resourceType>): sha256 only` (see below), or a binary body over 300 KB that wasn't captured. |
-| `responseBodySha256` | string? | Hex sha256 of the response body, for static resources whose body is left out. |
+| `requestBody` | any? | Request body (POST data). Parsed JSON when `requestBodyEncoding` is `json`, else a string. Always kept when the request had one. |
+| `requestBodyEncoding` | `"json"` \| `"text"`? | `json`: the `Content-Type` is JSON, the body parsed, and it wasn't cut. `text`: anything else. |
+| `requestBodySize` | number? | Request body size in UTF-8 bytes, before any cut. |
+| `requestBodyTruncated` | `true`? | The body was cut at 1 MB (1,000,000 bytes) during capture. It's then always a `text` string. |
+| `responseBody` | any? | Response body, when kept (see below). Parsed JSON when `responseBodyEncoding` is `json`, a string otherwise. |
+| `responseBodyEncoding` | `"json"` \| `"text"` \| `"base64"`? | `json`: `mimeType` contains `json`, the body parsed, and it wasn't cut. `text`: other text, including HTML or XML. `base64`: binary, as Chrome sent it. |
+| `responseBodySize` | number? | Decoded response size in bytes, before any cut. Present for dropped bodies too, when Chrome reported data. |
+| `responseBodyTruncated` | `true`? | The body was cut at 1 MB during capture (a `text` or `base64` prefix). |
+| `responseBodyNotKept` | string? | Why there's no `responseBody`, e.g. `static resource (Script)`, `page load (Document) that did not fail`, `static asset (image/png)`. |
 
-Static resources (`resourceType` `Script`, `Stylesheet`, `Font`, `Image` or `Media`) keep `responseBodySize`, `mimeType` and `responseBodySha256`, but no `responseBody` or `responseBodyFile`: app bundles are most of the bytes and rarely the bug. Compare hashes to tell builds apart. Bodies of every other type (`Document`, `XHR`, `Fetch`, `Other`, …) are kept.
+Which response bodies are kept (one rule, `lib/capture/body-policy.ts`):
 
-A request has at most one of `requestBody` and `requestBodyFile`, and at most one of `responseBody` and `responseBodyFile`. With neither, there was no body, or Chrome didn't keep it (204, redirect, evicted, or the tab navigated away).
+- Kept: API calls, meaning `resourceType` `XHR`, `Fetch` or `EventSource`, whatever the content type (JSON, XML, text, or HTML such as htmx fragments or a proxy's 502 page). `Other`, `Ping`, `Preflight`, `CSPViolationReport` and a missing type count as API calls too, unless `mimeType` is an image, font, audio or video.
+- Kept: a `Document` (page load) with `status >= 400`.
+- Not kept: everything else the browser loads by itself: `Document` that didn't fail, `Script`, `Stylesheet`, `Font`, `Image`, `Media`, `Manifest`, `TextTrack`, `Prefetch`, …. These keep `url`, `method`, `status`, headers, timing, `mimeType` and `responseBodySize`, plus `responseBodyNotKept`. There is no hash of them.
 
-`<ext>` comes from the MIME type (`json`, `html`, `js`, `css`, `svg`, `xml`, `png`, `jpg`, `gif`, `webp`, `woff2`, `txt`, …), then from the URL's file extension, and falls back to `txt` or `bin`.
+Without `responseBody` and without `responseBodyNotKept`, there was no body, or Chrome didn't keep it (204, redirect, evicted, or the tab navigated away).
+
+`network.json` can be large, since it holds every kept body. Query it with jq; don't read it whole.
 
 Example:
 
@@ -230,7 +232,8 @@ Example:
   "failed": false,
   "requestHeaders": { "Accept": "*/*", "User-Agent": "Mozilla/5.0 …" },
   "responseHeaders": { "content-type": "application/json", "Content-Length": "8191" },
-  "responseBodyFile": "network/bodies/64397_23.json",
+  "responseBody": { "items": [{ "id": 1, "name": "first" }], "total": 1 },
+  "responseBodyEncoding": "json",
   "responseBodySize": 8191
 }
 ```

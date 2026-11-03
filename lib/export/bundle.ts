@@ -3,17 +3,25 @@
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { getBySession, openBlookDB } from '../db';
 import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, SessionMeta, TranscriptRow } from '../types';
+import { bodyPolicy } from '../capture/body-policy';
 import { buildTimeline, isNetworkFailureLog } from './timeline';
 
-export const BUNDLE_FORMAT_VERSION = 2;
-/** Text bodies and frame payloads up to this many UTF-8 bytes stay inline in the JSON. */
+export const BUNDLE_FORMAT_VERSION = 3;
+/** Frame payloads up to this many UTF-8 bytes stay inline in the JSON. */
 const INLINE_MAX = 2048;
-/** Resource types whose response bodies are replaced by a sha256 (see docs/bundle-format.md). */
-const STATIC_TYPES = new Set(['Script', 'Stylesheet', 'Font', 'Image', 'Media']);
 
-async function sha256(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+/** How a body is stored in network.json: parsed JSON, a text string, or base64 bytes. */
+export type BodyEncoding = 'json' | 'text' | 'base64';
+
+/** JSON bodies that parse (and weren't cut) become JSON values, so jq can walk into them. */
+function encodeBody(body: string, base64: boolean, mime: string | undefined, truncated: boolean) {
+  if (base64) return { body, encoding: 'base64' as const };
+  if (!truncated && /json/i.test(mime ?? '')) {
+    try {
+      return { body: JSON.parse(body) as unknown, encoding: 'json' as const };
+    } catch {}
+  }
+  return { body, encoding: 'text' as const };
 }
 
 /** Console entries from Blook's own scripts (rrweb's canvas readback warning, …). */
@@ -41,17 +49,17 @@ export interface RequestOut {
   errorText?: string;
   socketId?: string;
   requestHeaders: Headers;
-  requestBody?: string;
-  requestBodyFile?: string;
+  /** Parsed JSON when requestBodyEncoding is `json`, else a string. */
+  requestBody?: unknown;
+  requestBodyEncoding?: BodyEncoding;
   requestBodySize?: number;
+  requestBodyTruncated?: boolean;
   responseHeaders?: Headers;
-  responseBody?: string;
-  responseBodyFile?: string;
+  responseBody?: unknown;
+  responseBodyEncoding?: BodyEncoding;
   responseBodySize?: number;
-  responseBodyBinary?: boolean;
   responseBodyTruncated?: boolean;
-  responseBodyOmitted?: string;
-  responseBodySha256?: string;
+  responseBodyNotKept?: string;
 }
 
 export interface FrameOut {
@@ -114,43 +122,7 @@ function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
-const MIME_EXT: [RegExp, string][] = [
-  [/json/, 'json'],
-  [/html/, 'html'],
-  [/javascript|ecmascript/, 'js'],
-  [/css/, 'css'],
-  [/svg/, 'svg'],
-  [/xml/, 'xml'],
-  [/png/, 'png'],
-  [/jpe?g/, 'jpg'],
-  [/gif/, 'gif'],
-  [/webp/, 'webp'],
-  [/avif/, 'avif'],
-  [/icon/, 'ico'],
-  [/woff2/, 'woff2'],
-  [/woff/, 'woff'],
-  [/ttf|truetype/, 'ttf'],
-  [/otf|opentype/, 'otf'],
-  [/wasm/, 'wasm'],
-  [/pdf/, 'pdf'],
-  [/form-urlencoded/, 'txt'],
-  [/^text\//, 'txt'],
-];
-
-function extFor(mime: string | undefined, binary: boolean, fallback?: string): string {
-  const m = (mime ?? '').toLowerCase();
-  for (const [re, ext] of MIME_EXT) if (re.test(m)) return ext;
-  if (fallback) {
-    try {
-      const last = new URL(fallback).pathname.split('/').pop() ?? '';
-      const ext = last.includes('.') ? last.split('.').pop()!.toLowerCase() : '';
-      if (/^[a-z0-9]{1,5}$/.test(ext)) return ext;
-    } catch {}
-  }
-  return binary ? 'bin' : 'txt';
-}
-
-function contentType(headers: Headers | undefined): string | undefined {
+export function contentType(headers: Headers | undefined): string | undefined {
   for (const [k, v] of Object.entries(headers ?? {})) if (k.toLowerCase() === 'content-type') return v;
   return undefined;
 }
@@ -232,10 +204,9 @@ export async function buildBundle(
     });
   });
 
-  // network.json, with bodies over INLINE_MAX in network/bodies/.
+  // network.json, bodies inline.
   const requests: RequestOut[] = [];
   for (const r of requestRows as NetworkRequestRow[]) {
-    const fid = fileId(r.requestId);
     const out: RequestOut = clean({
       id: r.requestId,
       tabId: r.tabId,
@@ -255,34 +226,23 @@ export async function buildBundle(
       responseHeaders: r.responseHeaders,
     });
     if (r.requestBody !== undefined) {
-      const bytes = strToU8(r.requestBody);
-      out.requestBodySize = bytes.length;
-      if (bytes.length <= INLINE_MAX) out.requestBody = r.requestBody;
-      else {
-        out.requestBodyFile = `network/bodies/${fid}.request.${extFor(contentType(r.requestHeaders), false)}`;
-        put(out.requestBodyFile, bytes);
-      }
+      const { body, encoding } = encodeBody(r.requestBody, false, contentType(r.requestHeaders), !!r.requestBodyTruncated);
+      out.requestBody = body;
+      out.requestBodyEncoding = encoding;
+      out.requestBodySize = r.requestBodySize ?? strToU8(r.requestBody).length;
+      if (r.requestBodyTruncated) out.requestBodyTruncated = true;
     }
-    if (r.responseBody !== undefined) {
-      const binary = !!r.responseBodyBase64;
-      const bytes = binary ? base64ToBytes(r.responseBody) : strToU8(r.responseBody);
-      out.responseBodySize = bytes.length;
-      if (binary) out.responseBodyBinary = true;
-      if (STATIC_TYPES.has(r.resourceType ?? '')) {
-        // App bundles, CSS, fonts and images are most of the bytes and rarely the bug:
-        // keep size, type and a hash to tell versions apart, not the body.
-        out.responseBodySha256 = await sha256(bytes);
-        out.responseBodyOmitted = `static resource (${r.resourceType}): sha256 only`;
-      } else if (!binary && bytes.length <= INLINE_MAX) out.responseBody = r.responseBody;
-      else {
-        out.responseBodyFile = `network/bodies/${fid}.${extFor(r.mimeType, binary, r.url)}`;
-        // Already-compressed formats gain nothing from deflate.
-        put(out.responseBodyFile, bytes, binary ? 0 : 6);
-      }
+    out.responseBodySize = r.responseBodySize;
+    // Asked again here so sessions captured under an older rule export the same way.
+    const policy = bodyPolicy({ direction: 'response', resourceType: r.resourceType, status: r.status, mimeType: r.mimeType });
+    if (!policy.keep) out.responseBodyNotKept = policy.reason;
+    else if (r.responseBody !== undefined) {
+      const base64 = !!r.responseBodyBase64;
+      const { body, encoding } = encodeBody(r.responseBody, base64, r.mimeType, !!r.truncated);
+      out.responseBody = body;
+      out.responseBodyEncoding = encoding;
+      out.responseBodySize ??= base64 ? base64ToBytes(r.responseBody).length : strToU8(r.responseBody).length;
       if (r.truncated) out.responseBodyTruncated = true;
-    } else if (r.truncated) {
-      out.responseBodyBinary = true;
-      out.responseBodyOmitted = 'binary body over the 300 KB capture cap';
     }
     requests.push(out);
   }
@@ -358,10 +318,8 @@ export async function buildBundle(
   for (const tabId of rrwebByTab.keys()) {
     fileMap[`rrweb/${tabId}.json`] = `rrweb events of tab ${tabId} (timestamp = ms since start); feed to the replay tool for DOM, screenshots and pointer at any t.`;
   }
-  fileMap['network.json'] = 'HTTP requests sorted by t, with headers; bodies up to 2 KB inline, larger ones in *BodyFile.';
-  if (Object.keys(files).some((k) => k.includes('/network/bodies/'))) {
-    fileMap['network/bodies/'] = 'Request and response bodies over 2 KB and all binary bodies, named <requestId>[.request].<ext>.';
-  }
+  fileMap['network.json'] =
+    'HTTP requests sorted by t, with headers and inline bodies (JSON bodies parsed). Can be large: query with jq, never read whole. Bodies of static files and page loads are not kept.';
   fileMap['websockets.json'] = 'WebSocket connections sorted by t, each with all its frames (t, direction, payload).';
   if (Object.keys(files).some((k) => k.includes('/websockets/frames/'))) {
     fileMap['websockets/frames/'] = 'WebSocket frame payloads over 2 KB and all binary payloads, named <socketId>-<frameIndex>.<txt|bin>.';

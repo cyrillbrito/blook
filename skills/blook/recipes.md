@@ -64,7 +64,12 @@ jq -r --argjson t $T '.segments[] | select(.t <= $t and .endT >= $t) | "\(.t)-\(
 
 ## HTTP requests (`network.json`)
 
+`network.json` holds every kept body inline, so it can be large. Never read it whole: always go through jq.
+
 ```bash
+# Every request without its bodies: a small index to start from
+jq -c '.[] | del(.requestBody, .responseBody)' "$B/network.json" | head -50
+
 # Summary without static assets
 jq -r '.[] | select(.resourceType | IN("Image", "Stylesheet", "Font", "Script", "Media") | not)
   | "\(.t)\t\(.method) \(.status // "-") \(.durationMs // "-")ms\t\(.url[0:120])\tid=\(.id)"' "$B/network.json"
@@ -85,33 +90,33 @@ jq -r '[.[] | select(.durationMs and (.resourceType | IN("XHR", "Fetch", "Docume
 Q='/api/'
 jq -r --arg q "$Q" '.[] | select(.url | test($q)) | "\(.t)\t\(.method) \(.status // "-")\t\(.url[0:120])\tid=\(.id)"' "$B/network.json"
 
-# One request, without its inline bodies
+# One request, without its bodies
 ID=75559.10
 jq --arg id "$ID" '.[] | select(.id == $id) | del(.requestBody, .responseBody)' "$B/network.json"
 ```
 
 ### Bodies
 
-Small text bodies are inline (`requestBody`, `responseBody`, at most 2 KB). Larger or binary ones are files named by `requestBodyFile` and `responseBodyFile`. Always follow those fields; don't build file names yourself.
+Bodies are inline. `requestBodyEncoding` / `responseBodyEncoding` say how: `json` is a parsed JSON value (jq walks into it), `text` a string (HTML, XML, a cut body), `base64` binary. Only API calls (XHR, Fetch, EventSource, …) and failed page loads keep a response body; scripts, CSS, images, fonts and normal page loads have `responseBodyNotKept` with the reason. A cut body has `*BodyTruncated` (at 1 MB) and the original `*BodySize`.
 
 ```bash
 ID=75559.8
-# Inline body, or the file path
-jq -r --arg id "$ID" '.[] | select(.id == $id) | {responseBodySize, responseBodyFile, responseBodyTruncated, responseBodyOmitted, inline: (.responseBody // "" | .[0:500])}' "$B/network.json"
+# What's there
+jq -c --arg id "$ID" '.[] | select(.id == $id) | {responseBodyEncoding, responseBodySize, responseBodyTruncated, responseBodyNotKept}' "$B/network.json"
 
-# A JSON body file: look at its shape, then pull one path
-F="$B/$(jq -r --arg id "$ID" '.[] | select(.id == $id) | .responseBodyFile // empty' "$B/network.json")"
-jq -r '[paths | map(if type == "number" then "[]" else . end) | join(".")] | unique[]' "$F" | head -40
-jq -c '.items[0:2]' "$F"
+# A JSON body: look at its shape, then pull one path
+jq -r --arg id "$ID" '.[] | select(.id == $id) | .responseBody | [paths | map(if type == "number" then "[]" else . end) | join(".")] | unique[]' "$B/network.json" | head -40
+jq -c --arg id "$ID" '.[] | select(.id == $id) | .responseBody.items[0:2]' "$B/network.json"
 
-# Request body (POST/PUT payload), inline or file
+# A text body (HTML error page, XML, …): the first 2000 characters
+jq -r --arg id "$ID" '.[] | select(.id == $id) | .responseBody | strings | .[0:2000]' "$B/network.json"
+
+# Request body (POST/PUT payload)
 ID=75559.10
-jq -r --arg id "$ID" '.[] | select(.id == $id) | .requestBody // empty' "$B/network.json" | head -c 500
-F=$(jq -r --arg id "$ID" '.[] | select(.id == $id) | .requestBodyFile // empty' "$B/network.json")
-[ -n "$F" ] && head -c 500 "$B/$F"; echo
+jq -c --arg id "$ID" '.[] | select(.id == $id) | .requestBody' "$B/network.json" | head -c 500; echo
 ```
 
-For non-JSON bodies use `head -c 2000 "$F"`. Binary bodies (`responseBodyBinary`) are raw bytes; images can be opened with the read tool.
+Binary bodies (`base64`): decode to a file, e.g. `jq -r ... | .responseBody' | base64 -d > /tmp/body.png`, then open images with the read tool.
 
 ## WebSocket (`websockets.json`)
 

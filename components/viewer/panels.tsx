@@ -6,6 +6,13 @@ import { cx, formatBytes, formatMs, formatTime, urlName, useNow } from './util';
 
 export type PanelId = 'timeline' | 'transcript' | 'network' | 'websockets' | 'console';
 
+/** Body props for an inline network.json body: JSON values back to text, base64 as bytes. */
+function bodyProps(body: unknown, encoding?: string): { text?: string; base64?: string } {
+  if (body === undefined) return {};
+  if (encoding === 'base64') return { base64: String(body) };
+  return { text: encoding === 'json' ? JSON.stringify(body) : String(body) };
+}
+
 /** What a panel should select when opened from another panel. */
 export interface Focus {
   panel: PanelId;
@@ -239,7 +246,6 @@ export function NetworkPanel({ bundle, tabs, clock, follow, seek, focus }: Props
   );
 
   const r = sel != null ? bundle.network.find((x) => x.id === sel) : undefined;
-  const file = useCallback((path: string) => () => bundle.file(path), [bundle]);
 
   return (
     <>
@@ -308,27 +314,29 @@ export function NetworkPanel({ bundle, tabs, clock, follow, seek, focus }: Props
           {tab === 'payload' && (
             <Body
               key={`${r.id}-req`}
-              text={r.requestBody}
-              file={r.requestBodyFile}
-              bytes={r.requestBodyFile ? file(r.requestBodyFile) : undefined}
-              note={r.requestBody === undefined && !r.requestBodyFile ? 'No request body.' : undefined}
+              {...bodyProps(r.requestBody, r.requestBodyEncoding)}
+              note={
+                r.requestBody === undefined
+                  ? 'No request body.'
+                  : r.requestBodyTruncated
+                    ? `Cut at 1 MB during capture (was ${formatBytes(r.requestBodySize)}).`
+                    : undefined
+              }
             />
           )}
           {tab === 'response' && (
             <Body
               key={`${r.id}-res`}
-              text={r.responseBody}
-              file={r.responseBodyFile}
-              bytes={r.responseBodyFile ? file(r.responseBodyFile) : undefined}
+              {...bodyProps(r.responseBody, r.responseBodyEncoding)}
               mime={r.mimeType}
-              binary={r.responseBodyBinary}
               note={
-                r.responseBodyOmitted ??
-                (r.responseBodyTruncated
-                  ? 'Cut at 1 MB during capture.'
-                  : r.responseBody === undefined && !r.responseBodyFile
-                    ? 'No body (none sent, or Chrome did not keep it).'
-                    : undefined)
+                r.responseBodyNotKept
+                  ? `Body not kept: ${r.responseBodyNotKept}${r.responseBodySize !== undefined ? ` (${formatBytes(r.responseBodySize)})` : ''}.`
+                  : r.responseBodyTruncated
+                    ? `Cut at 1 MB during capture (was ${formatBytes(r.responseBodySize)}).`
+                    : r.responseBody === undefined
+                      ? 'No body (none sent, or Chrome did not keep it).'
+                      : undefined
               }
             />
           )}

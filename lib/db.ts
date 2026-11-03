@@ -52,8 +52,7 @@ export const SESSION_STORES = [
 let dbPromise: Promise<BlookDBHandle> | undefined;
 
 export function openBlookDB(): Promise<BlookDBHandle> {
-  // 'overseer' is the name from before the rename to Blook, kept so existing local sessions survive.
-  dbPromise ??= openDB<BlookDB>('overseer', 1, {
+  dbPromise ??= openDB<BlookDB>('blook', 1, {
     upgrade(db) {
       db.createObjectStore('sessions', { keyPath: 'id' }).createIndex('byStartedAt', 'startedAt');
 
