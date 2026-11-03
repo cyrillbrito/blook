@@ -1,0 +1,2 @@
+/* Scan the whole project (like the extension build), so the viewer's classes are found. */
+@import "tailwindcss" source("../../..");

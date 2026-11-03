@@ -1,0 +1,23 @@
+{
+  "name": "overseer-replay",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Replay an Overseer bundle at time T: screenshot, DOM, pointer",
+  "type": "module",
+  "bin": { "overseer-replay": "./src/cli.ts" },
+  "scripts": {
+    "replay": "node src/cli.ts",
+    "replay:bun": "bun src/cli.ts",
+    "build:bin": "bun build --compile --minify src/cli.ts --external chromium-bidi --external 'chromium-bidi/*' --outfile dist/overseer-replay",
+    "compile": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rrweb/replay": "^2.2.0",
+    "fflate": "^0.8.3",
+    "playwright-core": "^1.64.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.3"
+  }
+}

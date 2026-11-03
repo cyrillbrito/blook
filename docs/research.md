@@ -4,6 +4,8 @@
 **Scope:** Free or open-source tools that record a browser session (narration, network, WebSocket messages, console, screenshots, element pointing) into a local bundle an AI agent can turn into tests
 **Investigated by:** pi (agent session)
 
+Background only. This was written before Overseer existed, to pick between using Proofline and building our own. What was built is in [architecture.md](architecture.md).
+
 ---
 
 ## Summary
