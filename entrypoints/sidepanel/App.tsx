@@ -16,6 +16,7 @@ import {
   SpinnerIcon,
   StopIcon,
   TrashIcon,
+  BlookIcon,
 } from '@/components/ui/icons';
 
 const NO_ANSWER = 'The background worker did not answer.';
@@ -88,7 +89,7 @@ function Header() {
   return (
     <header className="flex items-center gap-2">
       <span className="flex items-center gap-1.5 font-semibold">
-        <span className="h-2 w-2 rounded-full bg-recording" />
+        <BlookIcon />
         Blook
       </span>
       <input
@@ -180,7 +181,7 @@ function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: () => v
     <Card className="space-y-3 border-red-200 p-3 shadow-sm ring-1 ring-red-100">
       <div className="flex items-center gap-2">
         {recording ? <LiveDot /> : <SpinnerIcon className="h-3.5 w-3.5 text-muted" />}
-        <span className={cx('text-xs font-semibold tracking-wide uppercase', recording ? 'text-recording' : 'text-muted')}>{label}</span>
+        <span className={cx('text-xs font-semibold tracking-wide uppercase', recording ? 'text-recording-strong' : 'text-muted')}>{label}</span>
         {status.mic || session?.mic ? (
           <span className="ml-auto">
             <Badge tone={mic.tone} title={session?.mic?.error}>

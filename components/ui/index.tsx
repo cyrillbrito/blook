@@ -13,7 +13,7 @@ const VARIANT: Record<Variant, string> = {
   secondary: 'border border-line-strong bg-surface text-fg hover:bg-surface-sunken',
   ghost: 'text-muted hover:bg-surface-sunken hover:text-fg',
   danger: 'bg-danger text-white hover:bg-red-700',
-  record: 'bg-recording text-white shadow-sm hover:bg-red-700',
+  record: 'bg-recording-strong text-white shadow-sm hover:bg-[#b8361a]',
 };
 
 const SIZE: Record<Size, string> = {
@@ -58,11 +58,11 @@ type Tone = 'neutral' | 'accent' | 'danger' | 'warn' | 'ok' | 'recording';
 
 const TONE: Record<Tone, string> = {
   neutral: 'bg-surface-sunken text-gray-600',
-  accent: 'bg-accent-soft text-blue-700',
+  accent: 'bg-accent-soft text-accent-strong',
   danger: 'bg-danger-soft text-red-700',
   warn: 'bg-amber-50 text-amber-700',
   ok: 'bg-green-50 text-green-700',
-  recording: 'bg-recording-soft text-red-700',
+  recording: 'bg-recording-soft text-recording-strong',
 };
 
 /** Small status pill. */

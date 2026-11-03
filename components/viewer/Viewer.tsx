@@ -4,7 +4,7 @@ import { AudioSync, Clock, TabReplay, lastAtOrBefore } from './playback';
 import { ConsolePanel, NetworkPanel, TimelinePanel, TranscriptPanel, WebSocketsPanel, type Focus, type PanelId } from './panels';
 import { cx, formatDuration, formatTime, shortUrl, useNow, usePlaying } from './util';
 import { Badge, Button, Switch } from '@/components/ui';
-import { DownloadIcon, PauseIcon, PlayIcon, SpinnerIcon, VolumeIcon } from '@/components/ui/icons';
+import { BlookIcon, DownloadIcon, PauseIcon, PlayIcon, SpinnerIcon, VolumeIcon } from '@/components/ui/icons';
 
 const SPEEDS = [0.5, 1, 2, 4, 8];
 
@@ -85,7 +85,7 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
     <div className="flex h-screen flex-col bg-surface text-xs text-fg">
       <header className="flex h-10 shrink-0 items-center gap-3 border-b border-line bg-surface-muted px-3">
         <span className="flex shrink-0 items-center gap-1.5 font-semibold">
-          <span className="h-2 w-2 rounded-full bg-recording" />
+          <BlookIcon />
           Blook
         </span>
         <span className="h-4 w-px shrink-0 bg-line" />
@@ -158,7 +158,11 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
                   panel === id ? 'border-gray-200 bg-white font-medium' : 'border-transparent text-gray-600 hover:text-gray-900',
                 )}
               >
-                {label} <span className={cx('text-gray-400', id === 'console' && errors > 0 && 'text-red-600')}>{c[id]}</span>
+                {label}{' '}
+                <span className={cx('text-gray-400', id === 'console' && errors > 0 && 'text-red-600')}>
+                  {id === 'console' && errors > 0 && '✖ '}
+                  {c[id]}
+                </span>
               </button>
             ))}
             <span className="mb-1.5 ml-auto px-2 text-gray-600">
@@ -385,6 +389,7 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
             {speech && <div className="truncate text-blue-200">🗣 {speech.label}</div>}
             {near.map((m, i) => (
               <div key={i} className={cx('truncate', m.kind === 'error' || m.kind === 'failed' ? 'text-red-300' : 'text-gray-300')}>
+                {(m.kind === 'error' || m.kind === 'failed') && '✖ '}
                 {m.label}
               </div>
             ))}

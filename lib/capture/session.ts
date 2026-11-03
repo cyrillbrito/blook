@@ -51,6 +51,13 @@ function setStatus(next: RecordingStatus) {
   status = { ...next, mic: next.session?.mic?.state ?? next.mic };
   const msg: PanelMessage = { type: 'status/update', status };
   browser.runtime.sendMessage(msg).catch(() => {}); // no side panel open
+  // Toolbar badge while recording; cleared on stop and failure (both end in idle).
+  const rec = status.state !== 'idle';
+  void browser.action.setBadgeText({ text: rec ? 'REC' : '' });
+  if (rec) {
+    void browser.action.setBadgeBackgroundColor({ color: '#cc3f1d' });
+    void browser.action.setBadgeTextColor({ color: '#ffffff' });
+  }
 }
 
 function persist() {

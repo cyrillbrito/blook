@@ -3,7 +3,7 @@
 The bare minimum so the side panel, the viewer and the small pages look alike. No component or icon library.
 
 **Tokens** live in `@theme` in [assets/tailwind.css](../../assets/tailwind.css) and become normal Tailwind classes:
-colors `surface`, `surface-muted`, `surface-sunken`, `line`, `line-strong`, `fg`, `muted`, `accent`, `danger`, `warn`, `ok`, `recording` (most with a `-soft` tint), radii `rounded-control` and `rounded-card`, and the font size `text-2xs`. Use them instead of raw grays and reds.
+colors `surface`, `surface-muted`, `surface-sunken`, `line`, `line-strong`, `fg`, `muted`, `accent`, `danger`, `warn`, `ok`, `recording` (most with a `-soft` tint; `accent-strong` and `recording-strong` for text, or under white text), radii `rounded-control` and `rounded-card`, and the font size `text-2xs`. Use them instead of raw grays and reds.
 
 **Primitives** in [index.tsx](index.tsx), icons in [icons.tsx](icons.tsx) (inline SVG, colour follows the text):
 

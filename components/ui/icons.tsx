@@ -20,6 +20,16 @@ function Svg({ className = 'h-4 w-4', children }: { className?: string; children
 
 type P = { className?: string };
 
+/** The app icon (assets/icon/icon.svg), in its own colours. */
+export const BlookIcon = ({ className = 'h-4 w-4' }: P) => (
+  <svg viewBox="0 0 16 16" className={className} aria-hidden>
+    <rect y="1" width="16" height="14" rx="3" fill="#2545c9" />
+    <circle cx="3" cy="4" r="1" fill="#fff" />
+    <circle cx="6" cy="4" r="1" fill="#fff" />
+    <path d="M1.5 9.5Q8 2.5 14.5 9.5Q8 16.5 1.5 9.5Z" fill="#fff" />
+    <circle cx="8" cy="9.5" r="2.25" fill="#f2542d" />
+  </svg>
+);
 export const RecordIcon = ({ className = 'h-4 w-4' }: P) => (
   <svg viewBox="0 0 24 24" className={className} aria-hidden>
     <circle cx="12" cy="12" r="7" fill="currentColor" />
