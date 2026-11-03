@@ -2,7 +2,7 @@
   "name": "blook",
   "description": "Record a narrated browser session into a local bundle for coding agents",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "scripts": {
     "dev": "wxt",
