@@ -68,7 +68,7 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh
           \`\`\`
 
-          Then in Chrome: open \`chrome://extensions\`, turn on Developer mode, click **Load unpacked** and pick \`~/.blook/extension\`. After an update, click the extension's reload icon.
+          Then in Chrome: open \`chrome://extensions\`, turn on Developer mode, click **Load unpacked** and pick the \`~/Blook/extension\` folder (\`blook extension\` shows the steps). After an update, click the extension's reload icon.
 
           NOTES
           gh release create "v$V" --title "v$V" --generate-notes --notes-file notes.md \

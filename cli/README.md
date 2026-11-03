@@ -32,6 +32,7 @@ node src/cli.ts dom        <bundle> <t> [--selector css] [--raw]
 node src/cli.ts pointer    <bundle> <t>
 node src/cli.ts skill install [--copy] [flags]   # the agent skill, via `npx skills add cyrillbrito/blook`
 node src/cli.ts skill path | print               # --copy target (~/.agents/skills/blook) | SKILL.md
+blook extension [--path] [--no-open]             # Chrome setup steps for ~/Blook/extension; macOS opens Chrome and Finder
 blook update                                     # re-run install.sh: latest CLI, extension, skill
 ```
 

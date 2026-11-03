@@ -17,27 +17,28 @@ A recording is one local ZIP file. Nothing is uploaded, and there are no account
 
 ## Install
 
-On macOS or Linux (x64), run:
+On macOS or Linux, run:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh
 ```
 
-It installs the `blook` command-line tool to `~/.local/bin`, unpacks the extension to `~/.blook/extension`, and offers to add the `blook` skill to your coding agents. Run it again, or `blook update`, to update.
+It sets up the `blook` command-line tool and the Chrome extension files in `~/Blook/extension`, and can add the `blook` skill to your coding agents. Run `blook update` to update.
 
-Blook isn't on the Chrome Web Store, so you load the extension by hand, once:
+Blook isn't on the Chrome Web Store, so load the extension once (`blook extension` shows these steps again):
 
 1. Open `chrome://extensions`.
 2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked** and pick `~/.blook/extension` (on macOS, press Cmd+Shift+G in the picker and paste the path).
-4. Pin Blook from the puzzle icon in the toolbar.
-
-After an update, click the reload icon on Blook's card in `chrome://extensions`. Prefer manual downloads? Everything is on the [releases page](https://github.com/cyrillbrito/blook/releases/latest).
+3. Click **Load unpacked** and pick the `~/Blook/extension` folder.
+4. Pin Blook from the puzzle icon in the toolbar, and click it to open the side panel.
 
 ![Blook loaded on chrome://extensions with Developer mode on](docs/images/extensions-page.png)
 
-5. Click the Blook icon to open the side panel.
-6. Optional: to get your voice transcribed, click the gear icon and paste an [OpenRouter API key](https://openrouter.ai/keys). Without a key, Blook still records everything else.
+Prefer to download by hand? Everything is on the [releases page](https://github.com/cyrillbrito/blook/releases/latest).
+
+## Voice transcription (optional)
+
+To get your voice transcribed, click the gear icon in the side panel and paste an [OpenRouter API key](https://openrouter.ai/keys). Without a key, Blook still records everything else.
 
 ![The settings in the side panel, with the OpenRouter API key field](docs/images/sidepanel-settings.png)
 

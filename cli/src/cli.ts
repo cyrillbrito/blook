@@ -7,6 +7,7 @@ import { loadBundle, parseTime, formatTime, pageStateAt, interactionsBetween } f
 import { ReplayEngine } from './replay.ts';
 import { installBrowser } from './browser.ts';
 import { skillCommand } from './skill.ts';
+import { extensionCommand } from './extension.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 const INSTALL_URL = 'https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh';
@@ -24,6 +25,9 @@ Commands:
                                    e.g. -a claude-code -y); --copy, or no npx: write it to
                                    ~/.agents/skills/blook/
   skill path | print               where --copy installs it | print SKILL.md
+  extension [--path] [--no-open]   how to load the Chrome extension, and where its folder is
+                                   (~/Blook/extension); on macOS opens Chrome and Finder.
+                                   --path: print only the folder
   update                           re-run the install script: latest CLI, extension, skill
   --version
 
@@ -52,6 +56,9 @@ async function main() {
   if (argv[0] === 'skill') {
     const rest = argv.slice(2);
     return skillCommand(argv[1], rest.filter((a) => a !== '--copy'), rest.includes('--copy'));
+  }
+  if (argv[0] === 'extension') {
+    return extensionCommand({ pathOnly: argv.includes('--path'), open: !argv.includes('--no-open') });
   }
   if (argv[0] === 'update') {
     // The compiled binary updates itself where it lives; under Node/Bun the script's default applies.
