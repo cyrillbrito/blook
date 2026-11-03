@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { type Bundle, type RrwebEvent, type MouseAt, mouseAt, pageStateAt, interactionsBetween, formatTime } from './bundle.ts';
+import { CliError, EXIT } from './errors.ts';
 
 // Under Bun, text imports embed the rrweb assets in a `bun build --compile` binary
 // (the umd file isn't in the package exports, hence the relative path).
@@ -63,7 +64,7 @@ export class ReplayEngine {
       try {
         browser = await chromium.launch({ headless: true, channel: 'chrome' });
       } catch {
-        throw new Error('No browser found: install Google Chrome, or run `blook install-browser`');
+        throw new CliError('No browser found to replay in.', EXIT.browser, 'Run `blook install-browser` (downloads ~100 MB) or install Google Chrome.');
       }
     }
     return new ReplayEngine(browser, opts);
@@ -155,7 +156,9 @@ export class TabReplay {
     const start = events[0]!.timestamp;
     const end = events[events.length - 1]!.timestamp;
     let rt = t;
-    if (state.firstSnapshotAt == null) throw new Error(`Tab ${this.tab} has no rrweb full snapshot`);
+    if (state.firstSnapshotAt == null) {
+      throw new CliError(`Tab ${this.tab} has no DOM snapshot to replay.`, EXIT.notFound, 'Try another tab with --tab (`blook info` lists them), or read timeline.json.');
+    }
     if (t < state.firstSnapshotAt) {
       warnings.push(`t is before the first DOM snapshot (${formatTime(state.firstSnapshotAt)}); replaying that instead`);
       rt = state.firstSnapshotAt;
@@ -212,6 +215,12 @@ export class TabReplay {
 
   /** Serialized HTML of the replayed document (or of the elements matching selector). */
   async dom(t: number, opts: { selector?: string } = {}): Promise<SeekResult & { html: string | string[] }> {
+    if (opts.selector) {
+      const valid = await this.page.evaluate((s) => {
+        try { document.createDocumentFragment().querySelector(s); return true; } catch { return false; }
+      }, opts.selector);
+      if (!valid) throw new CliError(`Invalid CSS selector: ${opts.selector}`, EXIT.usage, 'Pass a CSS selector such as "#save", "button.primary" or "[data-testid=row]".');
+    }
     const res = await this.seek(t);
     const html = await this.page.evaluate((selector) => {
       const doc = ((window as any).__replayer.iframe as HTMLIFrameElement).contentDocument!;
@@ -245,6 +254,7 @@ export class TabReplay {
       const doctype = dt ? `<!DOCTYPE ${dt.name}${dt.publicId ? ` PUBLIC "${dt.publicId}"` : ''}${dt.systemId ? ` "${dt.systemId}"` : ''}>\n` : '';
       return doctype + withValues(doc.documentElement);
     }, opts.selector ?? null);
+    if (Array.isArray(html) && !html.length) res.warnings.push(`no element matches ${opts.selector} at ${res.time}`);
     return { ...res, html };
   }
 
@@ -254,7 +264,10 @@ export class TabReplay {
     const events = this.bundle.events(this.tab);
     const mouse = mouseAt(events, res.replayedT);
     const nearbyInteractions = interactionsBetween(events, res.replayedT - 1000, res.replayedT + 1000);
-    if (!mouse) return { ...res, mouse, element: null, ancestry: [], nearbyInteractions };
+    if (!mouse) {
+      res.warnings.push('no mouse position recorded at or before t');
+      return { ...res, mouse, element: null, ancestry: [], nearbyInteractions };
+    }
     const hit = await this.page.evaluate(describeAt, { x: mouse.x, y: mouse.y });
     return { ...res, mouse, ...hit, nearbyInteractions };
   }

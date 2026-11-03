@@ -1,48 +1,15 @@
 #!/usr/bin/env node
-// blook: look at a Blook bundle at time t.
-import { parseArgs } from 'node:util';
-import { basename, dirname, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { loadBundle, parseTime, formatTime, pageStateAt, interactionsBetween } from './bundle.ts';
-import { ReplayEngine } from './replay.ts';
-import { installBrowser } from './browser.ts';
-import { skillCommand } from './skill.ts';
-import { extensionCommand } from './extension.ts';
+// blook: look at a Blook bundle at time t. Each command lives in commands/.
+import { Command, CommanderError } from 'commander';
+import { CliError, EXIT, EXIT_CODES_HELP } from './errors.ts';
+import { setQuiet, useColor } from './output.ts';
+import { TIME_FORMATS } from './bundle.ts';
+import { registerInfo } from './commands/info.ts';
+import { registerReplay } from './commands/replay.ts';
+import { registerSetup } from './commands/setup.ts';
+import { registerExtension } from './commands/extension.ts';
+import { registerSkill } from './commands/skill.ts';
 import pkg from '../package.json' with { type: 'json' };
-
-const INSTALL_URL = 'https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh';
-
-const USAGE = `Usage: blook <command> <bundle> [t] [options]
-
-Commands:
-  info       <bundle>              tabs, duration, snapshot range and clicks (no browser)
-  screenshot <bundle> <t>          replay to t, save a PNG with the cursor drawn; prints the path
-  dom        <bundle> <t>          serialized HTML of the replayed document at t
-  pointer    <bundle> <t>          mouse position at t and the element under it
-  install-browser [--force]        download Playwright's Chrome headless shell (~100 MB)
-                                   (only needed without Google Chrome installed)
-  skill install [--copy] [flags]   install the agent skill with \`npx skills add\` (flags go to it,
-                                   e.g. -a claude-code -y); --copy, or no npx: write it to
-                                   ~/.agents/skills/blook/
-  skill path | print               where --copy installs it | print SKILL.md
-  extension [--path] [--no-open]   how to load the Chrome extension, and where its folder is
-                                   (~/Blook/extension); on macOS opens chrome://extensions.
-                                   --path: print only the folder
-  update                           re-run the install script: latest CLI, extension, skill
-  --version
-
-<bundle> is an exported folder or .zip. <t> is ms since session start (12345),
-seconds (12.3s) or mm:ss[.mmm] (00:18.5).
-
-Options:
-  --tab <id>         tab id (default: first tab in session.json)
-  --out <file.png>   screenshot path (default: a temp file)
-  --no-cursor        screenshot without the cursor marker
-  --selector <css>   dom: only the outerHTML of matching elements (JSON array)
-  --raw              dom: print plain HTML instead of JSON
-  --offline          block all http(s) requests from the replay (dead asset server)
-  --wait <ms>        max wait for images and fonts after seeking (default 3000)
-`;
 
 // `... | head` closes stdout early: exit quietly instead of crashing.
 process.stdout.on('error', (e: NodeJS.ErrnoException) => {
@@ -50,97 +17,57 @@ process.stdout.on('error', (e: NodeJS.ErrnoException) => {
   throw e;
 });
 
-async function main() {
-  const argv = process.argv.slice(2);
-  if (argv[0] === '--version' || argv[0] === '-v') return void process.stdout.write(pkg.version + '\n');
-  if (argv[0] === 'skill') {
-    const rest = argv.slice(2);
-    return skillCommand(argv[1], rest.filter((a) => a !== '--copy'), rest.includes('--copy'));
-  }
-  if (argv[0] === 'extension') {
-    return extensionCommand({ pathOnly: argv.includes('--path'), open: !argv.includes('--no-open') });
-  }
-  if (argv[0] === 'update') {
-    // The compiled binary updates itself where it lives; under Node/Bun the script's default applies.
-    const env = { ...process.env };
-    if (basename(process.execPath) === 'blook') env.BLOOK_INSTALL_DIR ??= dirname(process.execPath);
-    const res = spawnSync('sh', ['-c', `curl -fsSL ${INSTALL_URL} | sh`], { stdio: 'inherit', env });
-    process.exit(res.status ?? 1);
-  }
-  const { values, positionals } = parseArgs({
-    allowPositionals: true,
-    options: {
-      tab: { type: 'string' },
-      out: { type: 'string' },
-      'no-cursor': { type: 'boolean' },
-      selector: { type: 'string' },
-      raw: { type: 'boolean' },
-      offline: { type: 'boolean' },
-      wait: { type: 'string' },
-      force: { type: 'boolean' },
-      help: { type: 'boolean', short: 'h' },
-    },
-  });
-  const [cmd, bundlePath, tArg] = positionals;
-  if (cmd === 'install-browser') {
-    const shell = await installBrowser({ force: values.force, log: (m) => process.stderr.write(m + '\n') });
-    process.stdout.write(shell.executable + '\n');
-    return;
-  }
-  if (values.help || !cmd || !bundlePath) {
-    process.stdout.write(USAGE);
-    process.exit(values.help ? 0 : 1);
-  }
-  const bundle = loadBundle(resolve(bundlePath));
-  const print = (v: unknown) => process.stdout.write(JSON.stringify(v, null, 2) + '\n');
+const program = new Command('blook')
+  .description(
+    'Blook bundles: narrated browser recordings (blook-*.zip or folder) with DOM replay, network, voice.\n' +
+      'Flow: `blook info <bundle>` → pick a time (a click, timeline.json) → `blook pointer|dom|screenshot`.',
+  )
+  .version(pkg.version, '-v, --version', 'print the version')
+  .option('-q, --quiet', 'no progress or warnings on stderr (errors still print)')
+  .helpOption('-h, --help', 'show help for a command')
+  .helpCommand('help [command]', 'show help for a command')
+  // Inherited by every command registered below.
+  .showHelpAfterError()
+  .configureHelp({ helpWidth: 100 })
+  .exitOverride()
+  .configureOutput({ getOutHasColors: () => useColor(process.stdout), getErrHasColors: () => useColor(process.stderr) })
+  .hook('preAction', (cmd) => setQuiet(!!cmd.opts().quiet));
 
-  if (cmd === 'info') {
-    const tabs = bundle.tabIds.map((tab) => {
-      const ev = bundle.events(tab);
-      const st = pageStateAt(ev, Infinity);
-      const clicks = interactionsBetween(ev, -Infinity, Infinity)
-        .filter((i) => i.type === 'Click' || i.type === 'DblClick' || i.type === 'ContextMenu')
-        .map((i) => ({ time: formatTime(i.t), ...i }));
-      return {
-        tab,
-        events: ev.length,
-        firstEventAt: ev[0]?.timestamp,
-        firstSnapshotAt: st.firstSnapshotAt,
-        lastEventAt: ev[ev.length - 1]?.timestamp,
-        url: pageStateAt(ev, 0).url ?? st.url,
-        viewport: st.viewport,
-        clicks,
-      };
-    });
-    print({ id: bundle.session.id, durationMs: bundle.session.durationMs, url: bundle.session.url, tabs });
-    return;
-  }
+registerInfo(program);
+registerReplay(program);
+registerExtension(program);
+registerSkill(program);
+registerSetup(program);
 
-  if (!['screenshot', 'dom', 'pointer'].includes(cmd)) throw new Error(`Unknown command "${cmd}"\n\n${USAGE}`);
-  if (tArg == null) throw new Error(`${cmd} needs a time <t>`);
-  const t = parseTime(tArg);
-  const engine = await ReplayEngine.launch({ offline: values.offline, settleMs: values.wait ? Number(values.wait) : undefined });
-  try {
-    const replay = await engine.open(bundle, values.tab);
-    if (cmd === 'screenshot') {
-      const res = await replay.screenshot(t, { out: values.out && resolve(values.out), cursor: !values['no-cursor'] });
-      for (const w of res.warnings) process.stderr.write(`warning: ${w}\n`);
-      process.stdout.write(res.path + '\n');
-    } else if (cmd === 'dom') {
-      const res = await replay.dom(t, { selector: values.selector });
-      if (values.raw) {
-        for (const w of res.warnings) process.stderr.write(`warning: ${w}\n`);
-        process.stdout.write((Array.isArray(res.html) ? res.html.join('\n') : res.html) + '\n');
-      } else print(res);
-    } else {
-      print(await replay.pointer(t));
-    }
-  } finally {
-    await engine.close();
-  }
+program.addHelpText('after', `
+Times (<t>): ${TIME_FORMATS}.\nAll bundle files share this clock.
+Output: JSON on stdout (screenshot: JSON with the PNG path); progress, warnings and errors on stderr.
+
+${EXIT_CODES_HELP}
+
+Examples:
+  blook info blook-2026-11-03_21-12-51.zip              # duration, tabs, clicks
+  blook pointer blook-2026-11-03_21-12-51.zip 00:06.2   # what the mouse was on
+  blook dom blook-2026-11-03_21-12-51.zip 6193 --selector 'dialog'
+  blook screenshot blook-2026-11-03_21-12-51.zip 6.7s   # look at it
+Run \`blook <command> --help\` for its options and output. \`blook skill print\` has the full guide
+for reading a bundle (timeline.json, network, console, transcript).`);
+
+try {
+  await program.parseAsync();
+} catch (e) {
+  process.exitCode = exitCodeFor(e);
 }
 
-main().catch((e) => {
-  process.stderr.write(`error: ${e instanceof Error ? e.message : String(e)}\n`);
-  process.exit(1);
-});
+function exitCodeFor(e: unknown): number {
+  // Commander already printed the message (and the command's help) for its own errors.
+  if (e instanceof CommanderError) return e.exitCode === 0 ? EXIT.ok : EXIT.usage;
+  if (e instanceof CliError) {
+    process.stderr.write(`error: ${e.message}\n${e.hint ? e.hint + '\n' : ''}`);
+    return e.exitCode;
+  }
+  const msg = e instanceof Error ? e.message : String(e);
+  process.stderr.write(`error: ${msg}\n`);
+  if (process.env.BLOOK_DEBUG && e instanceof Error) process.stderr.write(e.stack + '\n');
+  return EXIT.error;
+}
