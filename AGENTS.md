@@ -13,7 +13,7 @@ Blook is a Chrome extension for personal use. I press Record in my web app and t
 
 **Reviewing.** Two kinds of readers open the bundle:
 
-- A person, for example a developer opening a Jira ticket with the ZIP attached. They load it in the viewer (the extension's Replay page or the standalone `viewer.html`) and see the replay, timeline, transcript, network, WebSockets and console in sync.
+- A person, for example a developer opening a Jira ticket with the ZIP attached. They open it from the extension's side panel ("Open bundle…") in the Replay page and see the replay, timeline, transcript, network, WebSockets and console in sync.
 - A coding agent. It uses the `blook` skill: jq over the JSON files, and the replay CLI for a screenshot, the DOM or the element under the mouse at any time T.
 
 The bundle has no screenshots or video. The replay rebuilds the page at any time, so it is the source of truth.
@@ -41,7 +41,6 @@ bun install
 bun run dev            # extension in dev mode, load .output/chrome-mv3-dev unpacked
 bun run build          # .output/chrome-mv3
 bun run compile        # type-check
-bun run build:viewer   # dist/viewer.html, the standalone viewer
 ```
 
 The replay CLI lives in `cli/`, with its own `bun install`:
@@ -58,7 +57,7 @@ Details in [cli/README.md](cli/README.md).
 
 - `entrypoints/`: extension pages and scripts (side panel, background, recorder, offscreen mic, Replay page)
 - `lib/`: capture, export, transcription, and the shared types and messages
-- `components/viewer/`: the viewer, shared by the Replay page and `viewer.html`
+- `components/viewer/`: the viewer, used by the extension's Replay page
 - `cli/`: the replay CLI
 - `skills/blook/`: the agent skill
 

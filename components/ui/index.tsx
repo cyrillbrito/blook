@@ -1,5 +1,4 @@
-// Tiny UI primitives on the theme tokens of assets/tailwind.css. No extension APIs: the
-// standalone viewer.html uses them too. See README.md.
+// Tiny UI primitives on the theme tokens of assets/tailwind.css. See README.md.
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
 
 export function cx(...parts: (string | false | undefined | null)[]): string {

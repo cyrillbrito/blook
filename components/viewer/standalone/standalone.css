@@ -1,3 +1,0 @@
-/* The shared Tailwind entry and theme. Scan the whole project (like the extension build), so the viewer's classes are found. */
-@import "../../../assets/tailwind.css";
-@source "../../..";

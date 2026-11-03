@@ -1,6 +1,5 @@
 // The loaded bundle the viewer works on: the export files of docs/bundle-format.md, parsed.
 // Loaders build it from a ZIP, from dropped files or folders, or from a map of paths to bytes.
-// No extension APIs here: the standalone viewer.html uses this file too.
 import { strFromU8, unzipSync } from 'fflate';
 import type { eventWithTime } from '@rrweb/types';
 import type { ConsoleOut, RequestOut, SegmentOut, SocketOut } from '@/lib/export/bundle';

@@ -2,7 +2,7 @@
 // - /replay.html?session=<id>: loads from IndexedDB, through the same bundle builder as Export,
 //   so it shows exactly what the exported ZIP would hold. Offers "Download bundle".
 // - /replay.html?open=<id>: the side panel's "Open bundle…" hands over the picked file (components/handoff.ts).
-// - /replay.html: the picker, like the standalone viewer.html.
+// - /replay.html: the file picker, the fallback when the handoff is gone.
 import { buildBundle } from '@/lib/export/bundle';
 import { storedTranscriptOptions } from '@/lib/transcribe/openrouter';
 import { bundleFromUserFiles, bundleFromZip, type Bundle } from '@/components/viewer/bundle';

@@ -11,7 +11,7 @@ flowchart TD
   BG --> DB[("IndexedDB")]
   STT["OpenRouter speech-to-text"] --> DB
   DB --> ZIP["Bundle ZIP"]
-  ZIP --> V["Viewer: Replay page or viewer.html"]
+  ZIP --> V["Viewer: Replay page"]
   ZIP --> A["Agent: skill + replay CLI"]
 ```
 
@@ -33,7 +33,7 @@ flowchart TD
 
 ## Reviewing
 
-**Viewer** (`components/viewer/`). A React app that plays the rrweb replay with the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. Two hosts use it: the extension's Replay page (`entrypoints/replay/`, which reads a session straight from IndexedDB), and the standalone `dist/viewer.html` (`bun run build:viewer`), one file that opens from disk and takes a dropped ZIP or folder.
+**Viewer** (`components/viewer/`). A React app that plays the rrweb replay with the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. It runs in the extension's Replay page (`entrypoints/replay/`), which reads a recorded session straight from IndexedDB, or opens a ZIP or folder picked with the side panel's "Open bundle…".
 
 **Agent skill** (`skills/blook/`). Tells an agent how to read a bundle: read order, jq recipes, and workflows for bug triage, task lists and E2E tests.
 
@@ -56,3 +56,7 @@ flowchart TD
 - rrweb doesn't replay video or cross-origin iframes. Canvas replays only with the canvas setting (2 fps).
 - Pointing is the mouse position. There is no "mark this element" hotkey.
 - Images and fonts in the replay load from the original server.
+
+## Later
+
+- If people without the extension need to open bundles: a viewer hosted on GitHub Pages that reads the ZIP locally in the browser.

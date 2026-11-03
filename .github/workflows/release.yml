@@ -29,12 +29,11 @@ jobs:
           jq --arg v "$V" '.version = $v' cli/package.json > cli/package.tmp && mv cli/package.tmp cli/package.json
           echo "v=$V" >> "$GITHUB_OUTPUT"
 
-      - name: Build extension and viewer
+      - name: Build extension
         run: |
           bun install --frozen-lockfile
           bun run compile
           bun run zip
-          bun run build:viewer
 
       - name: Build CLI binaries
         working-directory: cli
@@ -66,9 +65,7 @@ jobs:
           3. Without Google Chrome installed: \`blook install-browser\`.
           4. Agent skill: \`blook skill install\` (or \`blook skill install --copy\` without Node).
 
-          \`viewer.html\` opens a bundle in any browser, no extension needed.
-
           NOTES
           gh release create "v$V" --title "v$V" --generate-notes --notes-file notes.md \
-            .output/blook-$V-chrome.zip dist/viewer.html \
+            .output/blook-$V-chrome.zip \
             cli/dist/blook-darwin-arm64 cli/dist/blook-darwin-x64 cli/dist/blook-linux-x64

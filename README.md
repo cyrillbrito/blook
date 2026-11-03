@@ -7,7 +7,7 @@ A look inside the browser. Blook is a Chrome extension: press Record in your web
 - console logs and errors
 - your voice, transcribed with word-level timestamps (OpenRouter, your own key)
 
-People open the ZIP in the viewer. Coding agents read it with the `blook` skill and the `blook` CLI, which replays the page at any time for a screenshot, the DOM, or the element under the mouse. Typical uses: report a bug to an agent, or have an agent write an E2E test from a narrated flow.
+People open the ZIP in the extension's viewer. Coding agents read it with the `blook` skill and the `blook` CLI, which replays the page at any time for a screenshot, the DOM, or the element under the mouse. Typical uses: report a bug to an agent, or have an agent write an E2E test from a narrated flow.
 
 Personal tool, Chrome only, local first: no accounts, no hosting, no telemetry.
 
@@ -20,7 +20,7 @@ From the [latest release](https://github.com/cyrillbrito/blook/releases/latest):
 3. **Browser for the CLI.** Only without Google Chrome installed: `blook install-browser`.
 4. **Agent skill.** `blook skill install` runs `npx skills add cyrillbrito/blook`. Without Node, `blook skill install --copy` writes it to `~/.agents/skills/blook/`.
 
-`viewer.html` from the release opens a bundle in any browser, without the extension.
+To review a bundle, open it from the side panel's **Open bundle…**.
 
 ## Develop
 
@@ -28,7 +28,6 @@ From the [latest release](https://github.com/cyrillbrito/blook/releases/latest):
 bun install
 bun run dev            # load .output/chrome-mv3-dev unpacked
 bun run build          # .output/chrome-mv3
-bun run build:viewer   # dist/viewer.html
 cd cli && bun install && bun run build:bin   # cli/dist/blook
 ```
 

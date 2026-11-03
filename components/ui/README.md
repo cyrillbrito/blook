@@ -14,4 +14,3 @@ colors `surface`, `surface-muted`, `surface-sunken`, `line`, `line-strong`, `fg`
 - `Card` groups content; `SectionTitle` heads a list. `Alert` shows an error line. `LiveDot` means "recording now".
 
 Dense data views (viewer lists and detail panes) keep their own small helpers in `components/viewer/ui.tsx`.
-No extension APIs here: the standalone `viewer.html` imports these files too.
