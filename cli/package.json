@@ -10,7 +10,7 @@
   "scripts": {
     "replay": "node src/cli.ts",
     "replay:bun": "bun src/cli.ts",
-    "build:bin": "bun build --compile --minify src/cli.ts --external chromium-bidi --external 'chromium-bidi/*' --outfile dist/blook",
+    "build:bin": "bun build.ts",
     "compile": "tsc --noEmit"
   },
   "dependencies": {
