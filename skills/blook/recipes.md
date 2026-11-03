@@ -1,11 +1,11 @@
-# jq recipes for an Overseer bundle
+# jq recipes for a Blook bundle
 
 `B` is the unzipped bundle folder (see SKILL.md). Every time is ms since session start. Each block sets its own inputs (`T`, `W`, `ID`, `Q`) at the top: change them and run. Output is one line per item.
 
 ## Session
 
 ```bash
-jq '{version, url, title, durationMs, firstSnapshotT, tabs, settings, mic, transcript, counts}' "$B/session.json"
+jq '{version, url, title, durationMs, firstSnapshotT, pageReadyT, tabs, settings, mic, transcript, counts}' "$B/session.json"
 ```
 
 `counts.errors` includes Chrome's `[network] Failed to load resource` lines, so it is usually higher than the number of `error` entries in the timeline.
@@ -22,6 +22,8 @@ jq -r '.[] | select(.type == "error" or .type == "request-failed") | "\(.t)\t\(.
 # What the user did: clicks, inputs, navigations, tab opens
 jq -r '.[] | select(.type | IN("click", "input", "navigation", "tab-open")) | "\(.t)\t\(.type)\t\(.summary)"' "$B/timeline.json"
 ```
+
+`input` entries are user input only: programmatic value and checked changes are dropped at export. Checkboxes and radios carry `checked` (true or false), text fields `value`.
 
 ### Window around a moment
 
@@ -40,7 +42,7 @@ Each timeline entry's `ref` names the full record: `{file: "network.json", reque
 
 ## Transcript
 
-Check `.status` first: `ok`, `partial` and `pending` (still transcribing) have segments; `none`, `skipped` and `failed` say why in `.note`.
+Check `.status` first: `ok`, `partial` and `pending` (still transcribing) have segments; `none`, `skipped` and `failed` say why in `.note`. Without a transcript, work from clicks, repeated clicks and navigations, and say in the report that the narration is missing (the audio is in `audio/`).
 
 ```bash
 jq '{status, note, model, segmentCount, errors}' "$B/transcript.json"
@@ -136,8 +138,8 @@ jq -r --arg q "$Q" '.[] as $s | $s.frames[] | select(.payload // "" | test($q)) 
 jq -r '.[] | select(.level == "error" and (.text | startswith("[network]") | not))
   | "\(.t)\t#\(.index) \(.source)\t\(.text[0:200])\t\(.url // "" | .[0:80]):\(.line // "")"' "$B/console.json"
 
-# Errors and warnings
-jq -r '.[] | select(.level | IN("error", "warn")) | "\(.t)\t#\(.index) \(.level)\t\(.text[0:200])"' "$B/console.json"
+# Errors and warnings, without lines from browser extensions (Blook's own recorder logs a Canvas2D getImageData warning when canvas recording is on)
+jq -r '.[] | select(.level | IN("error", "warn")) | select(.url // "" | startswith("chrome-extension://") | not) | "\(.t)\t#\(.index) \(.level)\t\(.text[0:200])"' "$B/console.json"
 
 # Everything within ±W ms of T
 T=9661 W=2000

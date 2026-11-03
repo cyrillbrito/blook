@@ -1,7 +1,7 @@
 // Recording session lifecycle, run in the background service worker:
 // debugger attach and detach, recorder injection, mic, batching and status broadcasts.
 import { browser } from 'wxt/browser';
-import { getBySession, openOverseerDB, putSession } from '../db';
+import { getBySession, openBlookDB, putSession } from '../db';
 import type { OffscreenReply, PanelMessage, RecordingStatus } from '../messages';
 import { settingsItem } from '../settings';
 import type { MicInfo, RrwebEventRow, SessionMeta } from '../types';
@@ -14,11 +14,11 @@ import type { eventWithTime } from '@rrweb/types';
 /** Isolated-world bridge (extension messaging) and MAIN-world rrweb recorder. */
 const RECORDER_JS = '/content-scripts/recorder.js';
 const RECORDER_MAIN_JS = '/content-scripts/recorder-main.js';
-const RECORDER_MAIN_ID = 'overseer-recorder-main';
-const RECORDER_ID = 'overseer-recorder';
+const RECORDER_MAIN_ID = 'blook-recorder-main';
+const RECORDER_ID = 'blook-recorder';
 const CHUNK_MS = 30_000;
 /** Saved in storage.session so a restarted service worker can resume the session. */
-const ACTIVE_KEY = 'overseer-active';
+const ACTIVE_KEY = 'blook-active';
 
 interface Active {
   meta: SessionMeta;
@@ -29,6 +29,10 @@ interface Active {
   keepalive: ReturnType<typeof setInterval>;
   micRunning: boolean;
   permissionTabId?: number;
+  /** The Record reload of the first tab started loading (so its `complete` is the new page). */
+  reloadSeen?: boolean;
+  /** Fallback that ends the loading-page phase if the load event never comes. */
+  readyTimer?: ReturnType<typeof setTimeout>;
 }
 
 let status: RecordingStatus = { state: 'idle' };
@@ -119,7 +123,7 @@ export async function startSession(tabId: number): Promise<RecordingStatus> {
   if (status.state !== 'idle') return status;
   const tab = await browser.tabs.get(tabId).catch(() => undefined);
   if (!tab?.url || !/^(https?|file):/.test(tab.url)) {
-    setStatus({ state: 'idle', error: 'Overseer can only record http(s) and file pages.' });
+    setStatus({ state: 'idle', error: 'Blook can only record http(s) and file pages.' });
     return status;
   }
   const settings = await settingsItem.getValue();
@@ -158,7 +162,10 @@ export async function startSession(tabId: number): Promise<RecordingStatus> {
   persist();
   setStatus({ state: 'recording', phase: 'loading-page', session: meta });
   // Reload so the rrweb snapshot is fresh and every request and socket is seen from the start.
-  await browser.tabs.reload(tabId, { bypassCache: true }).catch(() => {});
+  // No bypassCache: re-downloading a big SPA (10 MB of Grafana JS) left the page blank for
+  // seconds. Cached responses still show up in CDP (fromDiskCache) with their bodies.
+  await browser.tabs.reload(tabId).catch(() => {});
+  active.readyTimer = setTimeout(() => markPageReady('timeout'), PAGE_READY_TIMEOUT_MS);
   if (settings.mic) void startMic();
   return status;
 }
@@ -209,7 +216,7 @@ function setMic(mic: MicInfo) {
 
 export async function onMicError(error: string, needsPermission?: boolean) {
   if (!active) return;
-  console.warn('[overseer] mic', error);
+  console.warn('[blook] mic', error);
   active.micRunning = false;
   setMic({ state: needsPermission ? 'needs-permission' : 'failed', error });
   if (needsPermission) {
@@ -248,7 +255,8 @@ export function addRrwebEvents(tabId: number | undefined, frameId: number | unde
       active.meta.firstSnapshotT = snap.timestamp - startedAt;
       void putSession(active.meta);
       persist();
-      setStatus({ ...status, phase: 'live', session: active.meta });
+      // Live once the page also fired load (the snapshot alone can be an empty shell).
+      if (active.meta.pageReadyT !== undefined) setStatus({ ...status, phase: 'live', session: active.meta });
     }
   }
   const rows: RrwebEventRow[] = events.map((event) => ({
@@ -260,6 +268,25 @@ export function addRrwebEvents(tabId: number | undefined, frameId: number | unde
   }));
   active.writer.addRrweb(rows);
   return true;
+}
+
+const PAGE_READY_TIMEOUT_MS = 30_000;
+
+/**
+ * The recorded page finished loading (load event of the Record reload, or the fallback timer).
+ * Saves pageReadyT and ends the "Loading page…" phase once a snapshot exists too.
+ */
+function markPageReady(why: 'load' | 'timeout') {
+  const a = active;
+  if (!a || a.meta.pageReadyT !== undefined) return;
+  clearTimeout(a.readyTimer);
+  a.meta.pageReadyT = Date.now() - a.meta.startedAt;
+  if (why === 'timeout') console.warn('[blook] page load not seen; marking ready');
+  void putSession(a.meta);
+  persist();
+  if (status.state === 'recording') {
+    setStatus({ ...status, phase: a.meta.firstSnapshotT !== undefined ? 'live' : 'loading-page', session: a.meta });
+  }
 }
 
 export async function stopSession(error?: string): Promise<RecordingStatus> {
@@ -313,7 +340,7 @@ async function doStop(error?: string): Promise<RecordingStatus> {
   const micError = a.meta.mic?.state === 'failed' ? `Microphone: ${a.meta.mic.error}` : undefined;
   setStatus({ state: 'idle', session: a.meta, error: error ?? micError });
   // Transcribe now if a key is set, so Export is quick. Export retries if this fails.
-  void ensureTranscript(a.meta.id).catch((err) => console.warn('[overseer] transcription', err));
+  void ensureTranscript(a.meta.id).catch((err) => console.warn('[blook] transcription', err));
   return status;
 }
 
@@ -324,6 +351,7 @@ async function teardown() {
   persist();
   if (a) {
     clearInterval(a.keepalive);
+    clearTimeout(a.readyTimer);
     a.writer.stop();
     if (a.permissionTabId !== undefined) browser.tabs.remove(a.permissionTabId).catch(() => {});
   }
@@ -363,7 +391,7 @@ export function registerListeners() {
     try {
       await attach(tab.id);
     } catch (err) {
-      console.warn('[overseer] could not follow tab', tab.id, err);
+      console.warn('[blook] could not follow tab', tab.id, err);
       return;
     }
     const url = tab.pendingUrl || tab.url || '';
@@ -384,6 +412,10 @@ export function registerListeners() {
         void putSession(active.meta);
         persist();
       }
+    }
+    if (tabId === active.meta.tabs[0]!.tabId && active.meta.pageReadyT === undefined) {
+      if (info.status === 'loading') active.reloadSeen = true;
+      else if (info.status === 'complete' && active.reloadSeen) markPageReady('load');
     }
     if (info.status === 'complete') inject(tabId);
   });
@@ -416,12 +448,13 @@ export async function restoreSession() {
     return;
   }
   await registerRecorder().catch(() => {});
+  if (active.meta.pageReadyT === undefined) active.readyTimer = setTimeout(() => markPageReady('timeout'), 5000);
   persist();
   setStatus({
     state: 'recording',
-    phase: active.meta.firstSnapshotT === undefined ? 'loading-page' : 'live',
+    phase: active.meta.firstSnapshotT === undefined || active.meta.pageReadyT === undefined ? 'loading-page' : 'live',
     session: active.meta,
   });
   // Make sure the db is open early.
-  await openOverseerDB();
+  await openBlookDB();
 }

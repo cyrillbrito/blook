@@ -1,6 +1,6 @@
 # References and inspiration
 
-Tools that do part of what Overseer does: what each one is, how it works, and what to borrow. Source code for the open-source ones is cloned (shallow) in `references/`, which git ignores. To refresh a clone, run `git -C references/<name> pull`.
+Tools that do part of what Blook does: what each one is, how it works, and what to borrow. Source code for the open-source ones is cloned (shallow) in `references/`, which git ignores. To refresh a clone, run `git -C references/<name> pull`.
 
 The full earlier research, with pricing and a safety review of Proofline, is in [research.md](research.md).
 
@@ -24,7 +24,7 @@ The full earlier research, with pricing and a safety review of Proofline, is in 
 - **How:** `rrweb-snapshot` serializes the DOM and gives each node an id. A `MutationObserver` records changes, and listeners record mouse, scroll, input, viewport and media events. Each event has an absolute ms `timestamp`. The replayer rebuilds the DOM in an iframe (or with `rrdom` without a browser) and applies events up to any time.
 - **Packages to know:** `@rrweb/record`, `@rrweb/replay`, `rrweb-player` (UI player), `rrdom` / `rrdom-nodejs` (virtual DOM for headless replay), `@rrweb/packer` (compression), `rrvideo` (renders a replay to video).
 - **Plugins:** `rrweb-plugin-console-record`, `rrweb-plugin-network-record` (patches fetch/XHR, merged June 2026), `rrweb-plugin-canvas-webrtc-record`.
-- **Borrow:** `packages/web-extension` is rrweb's own browser extension. It records any site and has a replay page. It's the closest thing to Overseer's rrweb half, so read it first for how it injects the recorder and stores events. `rrvideo` shows how to drive a replay headlessly, which is the base for the replay tool's `screenshot <t>`.
+- **Borrow:** `packages/web-extension` is rrweb's own browser extension. It records any site and has a replay page. It's the closest thing to Blook's rrweb half, so read it first for how it injects the recorder and stores events. `rrvideo` shows how to drive a replay headlessly, which is the base for the replay tool's `screenshot <t>`.
 
 ## Proofline Session Recorder
 
@@ -100,7 +100,7 @@ The full earlier research, with pricing and a safety review of Proofline, is in 
 
 These let an agent read or drive a live browser. None records a narrated session over time.
 
-- **Chrome DevTools MCP** ([repo](https://github.com/ChromeDevTools/chrome-devtools-mcp), Apache-2.0): CDP from an MCP server: console, network, screenshots, performance. It doesn't capture WebSocket frames ([issue #1172](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1172)). A good model for the shape of Overseer's replay-tool MCP.
+- **Chrome DevTools MCP** ([repo](https://github.com/ChromeDevTools/chrome-devtools-mcp), Apache-2.0): CDP from an MCP server: console, network, screenshots, performance. It doesn't capture WebSocket frames ([issue #1172](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1172)). A good model for the shape of Blook's replay-tool MCP.
 - **Playwright trace viewer** ([docs](https://playwright.dev/docs/trace-viewer), Apache-2.0): per-action DOM snapshots, network and console in one trace ZIP. The closest existing "bundle an agent can read" format. Its time-travel snapshot UI is worth studying.
 - **Orca Design Mode** (MIT), **Stagewise** (AGPL-3.0), **React Grab** (MIT), **T3 Code** (MIT): element pickers that give an agent the HTML, computed styles, a selector and the React component or source file. Use them for ideas if `pointer <t>` should return richer element context.
 - **Claude in Chrome**, **Cursor browser** (closed): an agent drives the browser and reads console, network and DOM.

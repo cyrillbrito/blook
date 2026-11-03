@@ -11,7 +11,7 @@ export default defineConfig({
     server: { watch: { ignored: ['**/references/**'] } },
   }),
   manifest: {
-    name: 'Overseer',
+    name: 'Blook',
     description: 'Record a narrated browser session into a local bundle for coding agents',
     permissions: [
       'sidePanel',
@@ -24,6 +24,6 @@ export default defineConfig({
       'downloads',
     ],
     host_permissions: ['<all_urls>'],
-    action: { default_title: 'Overseer' },
+    action: { default_title: 'Blook' },
   },
 });

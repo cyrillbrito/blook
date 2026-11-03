@@ -1,4 +1,4 @@
-// Load an Overseer bundle (folder or .zip) and answer pure-data questions
+// Load a Blook bundle (folder or .zip) and answer pure-data questions
 // about its rrweb events: viewport, URL and mouse position at time t.
 // Only session.json and rrweb/<tab>.json are read; other files may change shape.
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
@@ -83,7 +83,7 @@ function readZip(file: string): Files {
   const raw = unzipSync(readFileSync(file), {
     filter: (f) => /(^|\/)session\.json$|(^|\/)rrweb\/[^/]+\.json$/.test(f.name),
   });
-  // Entries may sit under a top folder ("overseer-<id>/..."); strip it.
+  // Entries may sit under a top folder ("blook-<id>/..."); strip it.
   const names = Object.keys(raw);
   const prefix = names.find((n) => n.endsWith('session.json'))?.slice(0, -'session.json'.length)
     ?? names[0]?.replace(/rrweb\/[^/]+$/, '') ?? '';

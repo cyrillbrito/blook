@@ -3,7 +3,8 @@
 // Each chunk is transcribed as soon as it's saved (background), the rest after Stop,
 // and Export only fills in what's missing. Results live per chunk in the transcripts store.
 import { browser } from 'wxt/browser';
-import { getBySession, openOverseerDB } from '../db';
+import { alignWords } from './vad';
+import { getBySession, openBlookDB } from '../db';
 import type { PanelMessage } from '../messages';
 import { settingsItem } from '../settings';
 import type {
@@ -15,10 +16,14 @@ import type {
   TranscriptSegment,
   TranscriptWord,
 } from '../types';
+import { DEFAULT_SETTINGS } from '../types';
+
+/** The STT model, fixed in code (supports verbose_json with word timestamps). The old `transcriptionModel` setting is ignored. */
+const transcriptionModel = DEFAULT_SETTINGS.transcriptionModel;
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/audio/transcriptions';
 /** Dev/test only: a fake endpoint URL in storage.local under this key replaces OpenRouter. */
-const ENDPOINT_OVERRIDE_KEY = 'overseer-stt-endpoint';
+const ENDPOINT_OVERRIDE_KEY = 'blook-stt-endpoint';
 async function endpoint(): Promise<string> {
   const v = (await browser.storage.local.get(ENDPOINT_OVERRIDE_KEY))[ENDPOINT_OVERRIDE_KEY];
   return typeof v === 'string' && v ? v : ENDPOINT;
@@ -44,10 +49,14 @@ async function transcribeChunk(chunk: AudioChunkRow, apiKey: string, model: stri
 
   const json = await postWithRetry(form, apiKey);
 
-  // Word and segment times are seconds from the chunk start.
-  const at = (s: number) => Math.round(chunk.t + s * 1000);
-  const words: TranscriptWord[] = (json.words ?? []).map((w) => ({ word: w.word.trim(), start: at(w.start), end: at(w.end) }));
-  let segments: TranscriptSegment[] = (json.segments ?? []).map((s) => ({ text: s.text.trim(), start: at(s.start), end: at(s.end) }));
+  // Word and segment times are seconds from the chunk start. Pull them out of silence with
+  // the chunk's voiced ranges (lib/transcribe/vad.ts), then shift to session time.
+  const voiced = chunk.voiced ?? [];
+  const rel = <T extends { start: number; end: number }>(list: T[]) =>
+    alignWords(list.map((x) => ({ ...x, start: x.start * 1000, end: x.end * 1000 })), voiced);
+  const toSession = (ms: number) => Math.round(chunk.t + ms);
+  const words: TranscriptWord[] = rel(json.words ?? []).map((w) => ({ word: w.word.trim(), start: toSession(w.start), end: toSession(w.end) }));
+  let segments: TranscriptSegment[] = rel(json.segments ?? []).map((s) => ({ text: s.text.trim(), start: toSession(s.start), end: toSession(s.end) }));
   if (!segments.length && json.text?.trim()) {
     segments = [{ text: json.text.trim(), start: chunk.t, end: chunk.t + (chunk.durationMs ?? 0) }];
   }
@@ -63,7 +72,7 @@ async function postWithRetry(form: FormData, apiKey: string): Promise<VerboseRes
     try {
       res = await fetch(await endpoint(), {
         method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'X-Title': 'Overseer' },
+        headers: { Authorization: `Bearer ${apiKey}`, 'X-Title': 'Blook' },
         body: form,
         signal: AbortSignal.timeout(120_000),
       });
@@ -107,7 +116,7 @@ function legacyComplete(row: TranscriptRow | undefined, model: string) {
 /** Stores one chunk result and re-merges segments, words and errors. */
 function saveResult(sessionId: SessionId, model: string, result: TranscriptChunkResult): Promise<void> {
   const run = async () => {
-    const db = await openOverseerDB();
+    const db = await openBlookDB();
     const row: TranscriptRow = (await db.get('transcripts', sessionId)) ?? { sessionId, model, segments: [], words: [] };
     const chunks = (row.chunks ?? []).filter((c) => c.index !== result.index);
     chunks.push(result);
@@ -160,9 +169,9 @@ function runChunk(chunk: AudioChunkRow, apiKey: string, model: string): Promise<
  * Without an API key it does nothing (Export or a later key picks it up).
  */
 export async function transcribeChunkSoon(sessionId: SessionId, index: number): Promise<void> {
-  const { openRouterApiKey, transcriptionModel } = await settingsItem.getValue();
+  const { openRouterApiKey } = await settingsItem.getValue();
   if (!openRouterApiKey) return notify(sessionId);
-  const db = await openOverseerDB();
+  const db = await openBlookDB();
   const chunk = await db.get('audioChunks', [sessionId, index]);
   if (!chunk) return;
   await runChunk(chunk, openRouterApiKey, transcriptionModel);
@@ -174,8 +183,8 @@ export async function transcribeChunkSoon(sessionId: SessionId, index: number): 
  * Throws only when no chunk could be transcribed at all.
  */
 export async function ensureTranscript(sessionId: SessionId): Promise<TranscriptRow | undefined> {
-  const db = await openOverseerDB();
-  const { openRouterApiKey, transcriptionModel } = await settingsItem.getValue();
+  const db = await openBlookDB();
+  const { openRouterApiKey } = await settingsItem.getValue();
   const stored = await db.get('transcripts', sessionId);
   if (!openRouterApiKey) return stored;
   if (legacyComplete(stored, transcriptionModel)) return stored;
@@ -207,7 +216,7 @@ export async function storedTranscriptOptions(sessionId: SessionId): Promise<{
   transcriptStatus: 'ok' | 'partial' | 'pending' | 'none' | 'skipped' | 'failed';
   transcriptNote?: string;
 }> {
-  const db = await openOverseerDB();
+  const db = await openBlookDB();
   const transcript = await db.get('transcripts', sessionId);
   const s = await transcriptionStatus(sessionId);
   const progress = `${s.done} of ${s.total} audio chunks transcribed`;
@@ -232,13 +241,13 @@ export async function storedTranscriptOptions(sessionId: SessionId): Promise<{
 
 /** Progress for the side panel's session row. */
 export async function transcriptionStatus(sessionId: SessionId): Promise<TranscriptionStatus> {
-  const db = await openOverseerDB();
+  const db = await openBlookDB();
   const [total, row, settings] = await Promise.all([
     db.countFromIndex('audioChunks', 'bySession', sessionId),
     db.get('transcripts', sessionId),
     settingsItem.getValue(),
   ]);
-  const model = settings.transcriptionModel;
+  const model = transcriptionModel;
   if (total === 0) return { state: 'none', done: 0, total };
   const done = legacyComplete(row, model) ? total : (row?.chunks?.filter((c) => isDone(c, model)).length ?? 0);
   const running = [...inflight.keys()].some((k) => k.startsWith(`${sessionId}:`));

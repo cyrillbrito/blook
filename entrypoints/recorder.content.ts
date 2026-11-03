@@ -9,7 +9,7 @@ import { sendToBackground, type ContentMessage } from '@/lib/messages';
 declare global {
   interface Window {
     /** Set once per document; a second injection only retries the hello. */
-    __overseerBridge?: { hello: () => Promise<void> };
+    __blookBridge?: { hello: () => Promise<void> };
   }
 }
 
@@ -19,7 +19,7 @@ export default defineContentScript({
   allFrames: true,
   runAt: 'document_start',
   main() {
-    if (window.__overseerBridge) return void window.__overseerBridge.hello();
+    if (window.__blookBridge) return void window.__blookBridge.hello();
     start();
   },
 });
@@ -38,7 +38,7 @@ function on(type: string, fn: (data: any) => void) {
 function start() {
   // Listen first: the MAIN script may run before or after this one.
   let options: { mask: boolean; canvas: boolean } | undefined;
-  on('overseer:ready', () => options && emit('overseer:start', options));
+  on('blook:ready', () => options && emit('blook:start', options));
 
   let buffer: eventWithTime[] = [];
   let sending: Promise<unknown> = Promise.resolve();
@@ -53,16 +53,16 @@ function start() {
     );
     return sending;
   };
-  on('overseer:events', ({ events }) => {
+  on('blook:events', ({ events }) => {
     for (const e of events) buffer.push(e);
     void send();
   });
 
   const waiting = new Map<number, () => void>();
-  on('overseer:flushed', ({ id }) => waiting.get(id)?.());
+  on('blook:flushed', ({ id }) => waiting.get(id)?.());
   let nextId = 1;
   /** Asks the MAIN recorder to hand over its buffer, then waits until it reached the background. */
-  const drain = (type: 'overseer:flush' | 'overseer:stop') =>
+  const drain = (type: 'blook:flush' | 'blook:stop') =>
     new Promise<void>((resolve) => {
       const id = nextId++;
       const timer = setTimeout(done, 1000); // recorder never started in this frame
@@ -77,7 +77,7 @@ function start() {
 
   browser.runtime.onMessage.addListener((msg: ContentMessage, _sender, sendResponse) => {
     if (msg.type === 'rrweb/flush' || msg.type === 'rrweb/stop') {
-      drain(msg.type === 'rrweb/stop' ? 'overseer:stop' : 'overseer:flush').then(() => sendResponse({ ok: true }));
+      drain(msg.type === 'rrweb/stop' ? 'blook:stop' : 'blook:flush').then(() => sendResponse({ ok: true }));
       return true;
     }
     return undefined;
@@ -88,8 +88,8 @@ function start() {
     const res = await sendToBackground({ type: 'rrweb/hello' }).catch(() => undefined);
     if (!res?.record || options) return;
     options = { mask: res.mask, canvas: !!res.canvas };
-    emit('overseer:start', options);
+    emit('blook:start', options);
   };
-  window.__overseerBridge = { hello };
+  window.__blookBridge = { hello };
   void hello();
 }

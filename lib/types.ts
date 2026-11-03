@@ -33,6 +33,8 @@ export interface SessionMeta {
   transcription?: TranscriptionStatus;
   /** Session time of the first rrweb full snapshot of the first tab (DOM available from here). */
   firstSnapshotT?: SessionTime;
+  /** Session time the Record reload of the first tab finished loading (its load event). */
+  pageReadyT?: SessionTime;
 }
 
 export interface TranscriptionStatus {
@@ -175,6 +177,11 @@ export interface AudioChunkRow {
   durationMs?: number;
   mimeType: string;
   blob: Blob;
+  /**
+   * Voiced ranges [start, end] in ms from the chunk start, from an energy VAD in the offscreen
+   * document. Used to pull Whisper word times out of silence. Missing in older chunks.
+   */
+  voiced?: [number, number][];
 }
 
 export interface TranscriptWord {
@@ -210,7 +217,10 @@ export interface Settings {
   /** rrweb canvas recording (2 fps WebP snapshots). Off by default: it grows the bundle fast. */
   canvas?: boolean;
   openRouterApiKey: string;
-  /** OpenRouter STT model; must support verbose_json with word timestamps. */
+  /**
+   * OpenRouter STT model. Kept for compatibility only: not shown in the panel, and lib/transcribe
+   * always uses the default below (supports verbose_json with word timestamps).
+   */
   transcriptionModel: string;
 }
 

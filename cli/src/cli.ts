@@ -1,12 +1,14 @@
 #!/usr/bin/env node
-// overseer-replay: look at an Overseer bundle at time t.
+// blook: look at a Blook bundle at time t.
 import { parseArgs } from 'node:util';
 import { resolve } from 'node:path';
 import { loadBundle, parseTime, formatTime, pageStateAt, interactionsBetween } from './bundle.ts';
 import { ReplayEngine } from './replay.ts';
 import { installBrowser } from './browser.ts';
+import { skillCommand } from './skill.ts';
+import pkg from '../package.json' with { type: 'json' };
 
-const USAGE = `Usage: overseer-replay <command> <bundle> [t] [options]
+const USAGE = `Usage: blook <command> <bundle> [t] [options]
 
 Commands:
   info       <bundle>              tabs, duration, snapshot range and clicks (no browser)
@@ -15,6 +17,11 @@ Commands:
   pointer    <bundle> <t>          mouse position at t and the element under it
   install-browser [--force]        download Playwright's Chrome headless shell (~100 MB)
                                    (only needed without Google Chrome installed)
+  skill install [--copy] [flags]   install the agent skill with \`npx skills add\` (flags go to it,
+                                   e.g. -a claude-code -y); --copy, or no npx: write it to
+                                   ~/.agents/skills/blook/
+  skill path | print               where --copy installs it | print SKILL.md
+  --version
 
 <bundle> is an exported folder or .zip. <t> is ms since session start (12345),
 seconds (12.3s) or mm:ss[.mmm] (00:18.5).
@@ -36,6 +43,12 @@ process.stdout.on('error', (e: NodeJS.ErrnoException) => {
 });
 
 async function main() {
+  const argv = process.argv.slice(2);
+  if (argv[0] === '--version' || argv[0] === '-v') return void process.stdout.write(pkg.version + '\n');
+  if (argv[0] === 'skill') {
+    const rest = argv.slice(2);
+    return skillCommand(argv[1], rest.filter((a) => a !== '--copy'), rest.includes('--copy'));
+  }
   const { values, positionals } = parseArgs({
     allowPositionals: true,
     options: {

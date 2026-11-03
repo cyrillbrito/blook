@@ -19,7 +19,7 @@ export async function ensureOffscreen(): Promise<void> {
     .createDocument({
       url: URL_PATH,
       reasons: ['USER_MEDIA' as never],
-      justification: 'Record microphone narration during an Overseer session',
+      justification: 'Record microphone narration during a Blook session',
     })
     .finally(() => (creating = undefined));
   await creating;

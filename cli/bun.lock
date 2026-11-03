@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "overseer-replay",
+      "name": "blook",
       "dependencies": {
         "@rrweb/replay": "^2.2.0",
         "fflate": "^0.8.3",

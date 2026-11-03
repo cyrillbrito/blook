@@ -1,14 +1,14 @@
 {
-  "name": "overseer-replay",
+  "name": "blook",
   "private": true,
   "version": "0.0.1",
-  "description": "Replay an Overseer bundle at time T: screenshot, DOM, pointer",
+  "description": "Replay a Blook bundle at time T: screenshot, DOM, pointer",
   "type": "module",
-  "bin": { "overseer-replay": "./src/cli.ts" },
+  "bin": { "blook": "./src/cli.ts" },
   "scripts": {
     "replay": "node src/cli.ts",
     "replay:bun": "bun src/cli.ts",
-    "build:bin": "bun build --compile --minify src/cli.ts --external chromium-bidi --external 'chromium-bidi/*' --outfile dist/overseer-replay",
+    "build:bin": "bun build --compile --minify src/cli.ts --external chromium-bidi --external 'chromium-bidi/*' --outfile dist/blook",
     "compile": "tsc --noEmit"
   },
   "dependencies": {

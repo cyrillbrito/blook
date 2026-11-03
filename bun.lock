@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "overseer",
+      "name": "blook",
       "dependencies": {
         "@rrweb/record": "^2.2.0",
         "@rrweb/replay": "^2.2.0",

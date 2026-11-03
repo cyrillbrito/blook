@@ -1,6 +1,6 @@
-# overseer-replay
+# blook
 
-Look at an exported Overseer bundle at any time `t`: a screenshot, the DOM, or what the mouse was over. It replays `rrweb/<tab>.json` with `@rrweb/replay` in headless Chromium (Playwright). It reads only `session.json` and `rrweb/<tab>.json`.
+Look at an exported Blook bundle at any time `t`: a screenshot, the DOM, or what the mouse was over. It replays `rrweb/<tab>.json` with `@rrweb/replay` in headless Chromium (Playwright). It reads only `session.json` and `rrweb/<tab>.json`.
 
 ## Setup
 
@@ -15,11 +15,11 @@ Node 23.6+ runs the TypeScript directly (`node src/cli.ts`); no build step. Bun 
 ### Single binary (Bun)
 
 ```sh
-bun run build:bin                                   # dist/overseer-replay, ~75 MB (~32 MB gzipped), Bun runtime included
-bun run build:bin --target=bun-linux-x64 --outfile dist/overseer-replay-linux-x64   # cross-compile
+bun run build:bin                                   # dist/blook, ~75 MB (~32 MB gzipped), Bun runtime included
+bun run build:bin --target=bun-linux-x64 --outfile dist/blook-linux-x64   # cross-compile
 ```
 
-The binary embeds Playwright and the rrweb replay assets, but not a browser. It uses Playwright's cached `chromium-headless-shell` if its revision matches the bundled Playwright, else the installed Google Chrome. Without Chrome, `overseer-replay install-browser` downloads the matching headless shell (~100 MB) into Playwright's cache (`PLAYWRIGHT_BROWSERS_PATH` is honoured). `chromium-bidi` is left out (only Firefox/BiDi needs it).
+The binary embeds Playwright and the rrweb replay assets, but not a browser. It uses Playwright's cached `chromium-headless-shell` if its revision matches the bundled Playwright, else the installed Google Chrome. Without Chrome, `blook install-browser` downloads the matching headless shell (~100 MB) into Playwright's cache (`PLAYWRIGHT_BROWSERS_PATH` is honoured). `chromium-bidi` is left out (only Firefox/BiDi needs it).
 
 ## Commands
 
@@ -30,7 +30,11 @@ node src/cli.ts info       <bundle>                 # tabs, snapshot range, view
 node src/cli.ts screenshot <bundle> <t> [--out f.png] [--no-cursor]   # prints the PNG path
 node src/cli.ts dom        <bundle> <t> [--selector css] [--raw]
 node src/cli.ts pointer    <bundle> <t>
+node src/cli.ts skill install [--copy] [flags]   # the agent skill, via `npx skills add cyrillbrito/blook`
+node src/cli.ts skill path | print               # --copy target (~/.agents/skills/blook) | SKILL.md
 ```
+
+`skill install` runs `npx skills add cyrillbrito/blook --skill blook -g` ([Vercel's skills CLI](https://github.com/vercel-labs/skills)), which asks which agents to link it into; extra flags go to it, e.g. `-a claude-code -y`. With `--copy`, or without npx, it writes the skill files embedded in the binary to `~/.agents/skills/blook/`.
 
 Common options: `--tab <id>` (default: first tab in `session.json`), `--offline` (block all http(s) requests, for a dead asset server), `--wait <ms>` (max wait for images and fonts after seeking, default 3000).
 
@@ -43,9 +47,9 @@ Output is JSON on stdout (pipe to `jq`), except `screenshot` (the file path) and
 Examples:
 
 ```sh
-B=~/Downloads/overseer-2026-11-03_18-55-47.zip
+B=~/Downloads/blook-2026-11-03_18-55-47.zip
 node src/cli.ts info $B | jq '.tabs[0].clicks'
-# A small format-2 sample (CSS-in-JS, adopted stylesheet, canvas): /tmp/overseer-samples/overseer-2026-11-03_19-16-02.zip
+# A small format-2 sample (CSS-in-JS, adopted stylesheet, canvas): /tmp/blook-samples/blook-2026-11-03_19-16-02.zip
 node src/cli.ts pointer $B 00:18.036 | jq '{mouse, el: .element.path, text: .element.text}'
 node src/cli.ts dom $B 19000 --selector 'button[class*=LegendLabel]' | jq '.html | length'
 open "$(node src/cli.ts screenshot $B 00:18.8)"

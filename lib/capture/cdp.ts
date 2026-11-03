@@ -276,6 +276,8 @@ export class CdpCapture {
   private consoleRow(tabId: number, row: Omit<ConsoleRow, 'sessionId' | 'tabId'>) {
     // Log.enable and Runtime.enable replay entries from before attach: skip those.
     if (row.t < 0) return;
+    // Blook's own scripts (rrweb in the page's world) are not the app's console.
+    if (row.url?.startsWith('chrome-extension://') || /\(chrome-extension:\/\//.test(row.stack?.split('\n')[0] ?? '')) return;
     const clean = Object.fromEntries(Object.entries(row).filter(([, v]) => v !== undefined)) as typeof row;
     this.writer.addConsole({ sessionId: this.sessionId, tabId, ...clean });
   }

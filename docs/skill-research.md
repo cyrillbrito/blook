@@ -1,12 +1,12 @@
 # Skill research: guiding agents through recorded sessions
 
-Research for the `skills/overseer-bundle` skill. How other tools hand a recording or trace to a coding agent, and what to borrow.
+Research for the `skills/blook` skill. How other tools hand a recording or trace to a coding agent, and what to borrow.
 
 ## Jam (MCP server, CLI and skills)
 
 Sources: [Jam MCP](https://jam.dev/docs/jam-mcp), [Hand a Jam to your agent](https://jam.dev/docs/hand-a-jam-to-your-agent), [jamdotdev/skills](https://github.com/jamdotdev/skills) (`jam`, `jam-fix`, `jam-to-e2e`, `jam-to-tasks`).
 
-The closest product to Overseer, and the best agent guidance found.
+The closest product to Blook, and the best agent guidance found.
 
 - **Tools:** `getDetails` (summary plus an "Investigation Guide" of suggested next calls, built from the Jam's own signals: error counts, failing hosts, mic on), `getVideoTranscript` (WebVTT), `getUserEvents` (clicks, inputs, navigation in plain language), `getConsoleLogs` (`logLevel`, `limit`, cursor), `getNetworkRequests` (`statusCode: ["4xx","5xx"]`, `host`, `method`, `contentType`, `bodies: errors|all`, default bodies only for errors), `getFrames` (`overview` grid, `at` ms, or `window` with `count`, plus a `size` to save context).
 - **Skill structure:** one router skill (`jam`) that picks a task skill by intent: fix (diagnose only unless asked), e2e test, task list from a walkthrough. Each task skill is a numbered procedure with a fixed output template.
@@ -45,7 +45,7 @@ Sources: [Sentry replay details](https://docs.sentry.io/product/session-replay/r
 
 - Sentry's AI summary splits a replay into **chapters**: each groups related breadcrumbs, network and console by time range, with red chapters for errors.
 - PostHog's summarizer compresses events into a table before the LLM sees them: it drops low-context events, and maps repeated URLs and window ids to short keys. Every observation cites the moment in the recording.
-- Their MCPs mostly search and list recordings across many users. Overseer has one local session, so this part doesn't apply.
+- Their MCPs mostly search and list recordings across many users. Blook has one local session, so this part doesn't apply.
 - **Borrow:** compress before reading (our `timeline.json`), group by moments, and cite times.
 
 ## Anthropic skill authoring
@@ -55,7 +55,7 @@ Source: [Skill authoring best practices](https://platform.claude.com/docs/en/age
 - Only the `name` and `description` load up front, so the description must say what it is and when to use it.
 - Keep `SKILL.md` under 500 lines as a table of contents. Put details in reference files one level deep, loaded only when needed.
 
-## What the Overseer skill takes from this
+## What the Blook skill takes from this
 
 1. **Read order:** `session.json`, then `timeline.json`, then the transcript, and only then targeted queries. Never open the big files whole.
 2. **Transcript first.** The narration is the spec, and deictic words ("this", "here", "broken") are anchors for `pointer <t>`.

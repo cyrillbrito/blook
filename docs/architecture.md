@@ -1,6 +1,6 @@
 # Architecture
 
-Overseer has a recording side (the extension) and a reviewing side (the viewer for people, the skill and replay CLI for agents). The bundle ZIP sits between them. Its fields are in [bundle-format.md](bundle-format.md).
+Blook has a recording side (the extension) and a reviewing side (the viewer for people, the skill and replay CLI for agents). The bundle ZIP sits between them. Its fields are in [bundle-format.md](bundle-format.md).
 
 ```mermaid
 flowchart TD
@@ -35,7 +35,7 @@ flowchart TD
 
 **Viewer** (`components/viewer/`). A React app that plays the rrweb replay with the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. Two hosts use it: the extension's Replay page (`entrypoints/replay/`, which reads a session straight from IndexedDB), and the standalone `dist/viewer.html` (`bun run build:viewer`), one file that opens from disk and takes a dropped ZIP or folder.
 
-**Agent skill** (`skills/overseer-bundle/`). Tells an agent how to read a bundle: read order, jq recipes, and workflows for bug triage, task lists and E2E tests.
+**Agent skill** (`skills/blook/`). Tells an agent how to read a bundle: read order, jq recipes, and workflows for bug triage, task lists and E2E tests.
 
 **Replay CLI** (`cli/`). Replays the rrweb file in headless Chromium (Playwright) and answers `screenshot`, `dom` and `pointer` at time T. See [cli/README.md](../cli/README.md).
 
@@ -43,10 +43,10 @@ flowchart TD
 
 - **CDP over patching.** `chrome.debugger` sees every request, including ones made before page scripts run, gets full bodies and WebSocket frames, and needs no code in the page. The cost is Chrome's "debugging this browser" banner, and recording fails if DevTools is already attached to the tab.
 - **rrweb in the MAIN world.** rrweb patches `insertRule`, adopted stylesheets and canvas. Those patches only see the page's calls in the page's own world. Run isolated, CSS-in-JS styles were missing from the replay.
-- **Reload on Record.** After attaching the debugger, the tab reloads. The first snapshot is fresh, and every request and socket is seen from the start (CDP doesn't report sockets that were already open). The recorder snapshots as soon as `<body>` exists instead of waiting for `load`.
+- **Reload on Record.** After attaching the debugger, the tab reloads. The first snapshot is fresh, and every request and socket is seen from the start (CDP doesn't report sockets that were already open). The recorder snapshots as soon as `<body>` exists instead of waiting for `load`. The reload uses the HTTP cache, so big app bundles don't re-download, and the side panel shows "Loading page…" until the load event (`pageReadyT`).
 - **One clock.** Every `t` is ms since Record, from one `Date.now()` epoch. rrweb timestamps are shifted to the same clock at export.
 - **One MediaRecorder per chunk.** Each ~30 s chunk is its own recorder run, so every file is a standalone WebM. Timeslice chunks aren't: only the first has the header.
-- **Transcription.** Whisper on OpenRouter with `verbose_json` and word timestamps (`gpt-4o-transcribe` rejects that format). Chunks are transcribed as they are saved, and Export fills in any gaps. Word time = chunk start + seconds × 1000.
+- **Transcription.** Whisper on OpenRouter with `verbose_json` and word timestamps (`gpt-4o-transcribe` rejects that format). Chunks are transcribed as they are saved, and Export fills in any gaps. Word time = chunk start + seconds × 1000, after an energy VAD (`lib/transcribe/vad.ts`, run in the offscreen document per chunk) moves word edges out of silence.
 - **No screenshots or video.** The replay can rebuild any moment, so the bundle stays small and the agent asks for visuals only when it needs them.
 
 ## Known limits

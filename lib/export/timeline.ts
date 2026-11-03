@@ -12,8 +12,14 @@ const SOURCE_MUTATION = 0;
 const SOURCE_MOUSE_INTERACTION = 2;
 const SOURCE_SCROLL = 3;
 const SOURCE_INPUT = 5;
+const MOUSE_DOWN = 1;
 const MOUSE_CLICK = 2;
 const MOUSE_DBLCLICK = 4;
+const MOUSE_FOCUS = 5;
+const MOUSE_BLUR = 6;
+const TOUCH_START = 7;
+/** Without rrweb's userTriggered flag, a checkbox change counts only this soon after a related click. */
+const USER_ACTION_MS = 1000;
 const NODE_ELEMENT = 2;
 const NODE_TEXT = 3;
 
@@ -27,6 +33,7 @@ const PREVIEW = 120;
 
 export type TimelineType =
   | 'navigation'
+  | 'page-ready'
   | 'tab-open'
   | 'snapshot'
   | 'click'
@@ -44,6 +51,7 @@ export type TimelineType =
 export type TimelineRef =
   | { file: 'session.json'; navigation: number }
   | { file: 'session.json'; tab: number }
+  | { file: 'session.json'; field: 'pageReadyT' }
   | { file: string; event: number } // rrweb/<tabId>.json, index into the array
   | { file: 'network.json'; requestId: string }
   | { file: 'websockets.json'; socketId: string; frame?: number; frameEnd?: number }
@@ -107,6 +115,21 @@ class NodeMap {
     return cut(out, max);
   }
 
+  /** True when a is b, or one contains the other (within a few levels), or a label points at b. */
+  related(a: number, b: number): boolean {
+    const up = (from: number, to: number) => {
+      for (let cur: number | undefined = from, d = 0; cur !== undefined && d < 8; d++) {
+        if (cur === to) return true;
+        cur = this.parent.get(cur);
+      }
+      return false;
+    };
+    if (up(a, b) || up(b, a)) return true;
+    const label = this.nodes.get(a)?.attributes;
+    const target = this.nodes.get(b)?.attributes;
+    return !!label?.for && label.for === target?.id;
+  }
+
   describe(id: number): string {
     let n = this.nodes.get(id);
     let nid = id;
@@ -149,6 +172,8 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
   let href: string | undefined;
   const lastInput = new Map<number, TimelineEntry>();
   const lastScroll = new Map<number, TimelineEntry>();
+  let lastAction: { t: number; id: number } | undefined;
+  let focused: number | undefined;
 
   events.forEach((e, i) => {
     const t: number = e.timestamp;
@@ -172,7 +197,12 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
           const n = map.nodes.get(attr.id);
           if (n?.attributes) Object.assign(n.attributes, attr.attributes);
         }
+      } else if (d.source === SOURCE_MOUSE_INTERACTION && (d.type === MOUSE_FOCUS || d.type === MOUSE_BLUR)) {
+        focused = d.type === MOUSE_FOCUS ? d.id : focused === d.id ? undefined : focused;
+      } else if (d.source === SOURCE_MOUSE_INTERACTION && (d.type === MOUSE_DOWN || d.type === TOUCH_START)) {
+        lastAction = { t, id: d.id };
       } else if (d.source === SOURCE_MOUSE_INTERACTION && (d.type === MOUSE_CLICK || d.type === MOUSE_DBLCLICK)) {
+        lastAction = { t, id: d.id };
         const target = map.describe(d.id);
         const dbl = d.type === MOUSE_DBLCLICK;
         out.push({
@@ -188,13 +218,24 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
           ref: { file, event: i },
         });
       } else if (d.source === SOURCE_INPUT) {
+        // Drop inputs nobody typed: nodes rrweb never serialized (id -1), programmatic value
+        // and checked changes (React renders, deselected radio siblings), and, for recordings
+        // without rrweb's userTriggered flag, changes with no related click or focus first.
+        const node = map.nodes.get(d.id);
+        if (d.id < 0 || !node) return;
+        const kind = String(node.attributes?.type ?? '').toLowerCase();
+        const toggle = node.tagName === 'input' && (kind === 'checkbox' || kind === 'radio');
+        if (d.userTriggered === false) return;
+        if (d.userTriggered === undefined) {
+          const clicked = lastAction && t - lastAction.t < USER_ACTION_MS && map.related(lastAction.id, d.id);
+          if (toggle ? !clicked : !(clicked || focused === d.id)) return;
+        }
+        if (toggle && kind === 'radio' && d.isChecked === false) return;
         const text: string = d.text ?? '';
-        const value = d.isChecked !== undefined && !text ? { checked: d.isChecked } : { value: text.slice(0, 200) };
-        const shown = 'checked' in value ? `checked=${value.checked}` : `"${cut(text, 40)}"`;
+        const value = toggle ? { checked: !!d.isChecked } : { value: text.slice(0, 200) };
+        const shown = toggle ? (d.isChecked ? 'checked' : 'unchecked') : `"${cut(text, 40)}"`;
         const prev = lastInput.get(d.id);
         if (prev && t - (prev.endT as number) < INPUT_MERGE_MS) {
-          delete prev.value;
-          delete prev.checked;
           Object.assign(prev, value, { endT: t, summary: `Input ${prev.target} = ${shown}`, ref: { file, event: i } });
         } else {
           const target = map.describe(d.id);
@@ -241,6 +282,10 @@ export function buildTimeline(input: {
   (meta.navigations ?? []).forEach((nav, i) =>
     out.push({ t: nav.t, type: 'navigation', tabId: nav.tabId, summary: `Navigate to ${nav.url}`, url: nav.url, ref: { file: 'session.json', navigation: i } }),
   );
+  if (meta.pageReadyT !== undefined) {
+    const tab = meta.tabs[0]!;
+    out.push({ t: meta.pageReadyT, type: 'page-ready', tabId: tab.tabId, summary: 'Page finished loading (load event)', ref: { file: 'session.json', field: 'pageReadyT' } });
+  }
   meta.tabs.forEach((tab, i) => {
     if (i === 0) return;
     out.push({ t: tab.t, type: 'tab-open', tabId: tab.tabId, summary: `New tab opened from tab ${tab.openerTabId}: ${tab.url}`, url: tab.url, openerTabId: tab.openerTabId, ref: { file: 'session.json', tab: i } });

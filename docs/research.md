@@ -4,7 +4,7 @@
 **Scope:** Free or open-source tools that record a browser session (narration, network, WebSocket messages, console, screenshots, element pointing) into a local bundle an AI agent can turn into tests
 **Investigated by:** pi (agent session)
 
-Background only. This was written before Overseer existed, to pick between using Proofline and building our own. What was built is in [architecture.md](architecture.md).
+Background only. This was written before Blook (first called Overseer) existed, to pick between using Proofline and building our own. What was built is in [architecture.md](architecture.md).
 
 ---
 
@@ -165,7 +165,7 @@ Recommendations:
 1. Use a separate Chrome profile for testing.
 1. Record dev or test environments only, not production with customer data.
 1. Check exports for tokens before sharing. Redaction covers common credentials only.
-1. Check whether Altium has a policy on browser extensions with `debugger` access.
+1. Check whether your employer has a policy on browser extensions with `debugger` access.
 
 ---
 

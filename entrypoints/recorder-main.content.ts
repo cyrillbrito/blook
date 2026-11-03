@@ -5,15 +5,15 @@
 //
 // No extension APIs here. It talks to the isolated bridge (recorder.content.ts) with
 // CustomEvents on `document` whose detail is a JSON string (strings cross worlds safely):
-//   main → bridge: overseer:ready, overseer:events {events}, overseer:flushed {id}
-//   bridge → main: overseer:start {mask, canvas}, overseer:flush {id}, overseer:stop {id}
+//   main → bridge: blook:ready, blook:events {events}, blook:flushed {id}
+//   bridge → main: blook:start {mask, canvas}, blook:flush {id}, blook:stop {id}
 import { record } from '@rrweb/record';
 import type { eventWithTime } from '@rrweb/types';
 
 const FLUSH_MS = 500;
 /** Elements with this class are left out of the recording when masking is on. */
-const BLOCK_CLASS = 'overseer-block';
-const MASK_TEXT_SELECTOR = '[data-overseer-mask], .overseer-mask';
+const BLOCK_CLASS = 'blook-block';
+const MASK_TEXT_SELECTOR = '[data-blook-mask], .blook-mask';
 
 interface StartOptions {
   mask: boolean;
@@ -22,7 +22,7 @@ interface StartOptions {
 
 declare global {
   interface Window {
-    __overseerMain?: boolean;
+    __blookMain?: boolean;
   }
 }
 
@@ -33,15 +33,15 @@ export default defineContentScript({
   runAt: 'document_start',
   world: 'MAIN',
   main() {
-    if (window.__overseerMain) return;
-    window.__overseerMain = true;
+    if (window.__blookMain) return;
+    window.__blookMain = true;
     let started = false;
-    on('overseer:start', (opts: StartOptions) => {
+    on('blook:start', (opts: StartOptions) => {
       if (started) return;
       started = true;
       void start(opts);
     });
-    emit('overseer:ready', {});
+    emit('blook:ready', {});
   },
 });
 
@@ -64,7 +64,7 @@ async function start(opts: StartOptions) {
     if (!buffer.length) return;
     const events = buffer;
     buffer = [];
-    emit('overseer:events', { events });
+    emit('blook:events', { events });
   };
 
   await bodyReady();
@@ -79,6 +79,8 @@ async function start(opts: StartOptions) {
       recordCrossOriginIframes: true,
       inlineStylesheet: true,
       collectFonts: true,
+      // Marks each input event as user-made or programmatic, so the timeline can drop the latter.
+      userTriggeredOnInput: true,
       ...(opts.canvas
         ? { recordCanvas: true, sampling: { canvas: 2 }, dataURLOptions: { type: 'image/webp', quality: 0.5 } }
         : {}),
@@ -92,15 +94,15 @@ async function start(opts: StartOptions) {
   addEventListener('pagehide', flush);
   addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
 
-  on('overseer:flush', ({ id }) => {
+  on('blook:flush', ({ id }) => {
     flush();
-    emit('overseer:flushed', { id });
+    emit('blook:flushed', { id });
   });
-  const offStop = on('overseer:stop', ({ id }) => {
+  const offStop = on('blook:stop', ({ id }) => {
     stopRecord?.();
     clearInterval(timer);
     flush();
-    emit('overseer:flushed', { id });
+    emit('blook:flushed', { id });
     offStop();
   });
 }

@@ -1,4 +1,4 @@
-// Headless replay of an Overseer bundle: Playwright Chromium + @rrweb/replay.
+// Headless replay of a Blook bundle: Playwright Chromium + @rrweb/replay.
 // One ReplayEngine owns the browser; open() gives a TabReplay that can seek to
 // any t repeatedly (an MCP server can keep it alive between calls).
 import { readFileSync } from 'node:fs';
@@ -63,7 +63,7 @@ export class ReplayEngine {
       try {
         browser = await chromium.launch({ headless: true, channel: 'chrome' });
       } catch {
-        throw new Error('No browser found: install Google Chrome, or run `overseer-replay install-browser`');
+        throw new Error('No browser found: install Google Chrome, or run `blook install-browser`');
       }
     }
     return new ReplayEngine(browser, opts);
@@ -205,7 +205,7 @@ export class TabReplay {
       c.style.transform = `translate(${m.x}px, ${m.y}px)`;
     }, draw ? { x: mouse.x, y: mouse.y } : null);
     const id = this.bundle.session.id ?? 'session';
-    const path = opts.out ?? join(tmpdir(), `overseer-${id}-${this.tab}-${res.replayedT}.png`);
+    const path = opts.out ?? join(tmpdir(), `blook-${id}-${this.tab}-${res.replayedT}.png`);
     await this.page.screenshot({ path, clip: { x: 0, y: 0, ...res.viewport }, timeout: 15000, animations: 'disabled' });
     return { ...res, path, mouse };
   }
@@ -292,14 +292,16 @@ function canvasFramesAt(events: RrwebEvent[], t: number): CanvasFrame[] {
   });
 }
 
-// Runs in the browser. Returns how many frames failed.
+// Runs in the browser. Returns how many frames failed to draw. Frames of canvases that are
+// no longer in the replayed DOM at t (removed panels, old pages) are skipped, not failures.
 async function drawCanvasFrames(frames: CanvasFrame[]) {
   const mirror = (window as any).__replayer.getMirror();
   let failed = 0;
   for (const f of frames) {
     try {
       const canvas = mirror.getNode(f.id) as HTMLCanvasElement | null;
-      const ctx = canvas?.getContext?.('2d');
+      if (!canvas?.isConnected) continue;
+      const ctx = canvas.getContext?.('2d');
       if (!ctx) { failed++; continue; }
       const parts = f.blob.base64.map((b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0)));
       const bmp = await createImageBitmap(new Blob(parts, { type: f.blob.type }));

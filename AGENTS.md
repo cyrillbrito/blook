@@ -1,6 +1,6 @@
-# Overseer
+# Blook
 
-Overseer is a Chrome extension for personal use. I press Record in my web app and talk while I use it: walk a flow, point with the mouse, describe bugs. On Stop it exports one local bundle (a ZIP) with everything that happened in the browser.
+Blook is a Chrome extension for personal use. I press Record in my web app and talk while I use it: walk a flow, point with the mouse, describe bugs. On Stop it exports one local bundle (a ZIP) with everything that happened in the browser.
 
 ## Two sides
 
@@ -14,7 +14,7 @@ Overseer is a Chrome extension for personal use. I press Record in my web app an
 **Reviewing.** Two kinds of readers open the bundle:
 
 - A person, for example a developer opening a Jira ticket with the ZIP attached. They load it in the viewer (the extension's Replay page or the standalone `viewer.html`) and see the replay, timeline, transcript, network, WebSockets and console in sync.
-- A coding agent. It uses the `overseer-bundle` skill: jq over the JSON files, and the replay CLI for a screenshot, the DOM or the element under the mouse at any time T.
+- A coding agent. It uses the `blook` skill: jq over the JSON files, and the replay CLI for a screenshot, the DOM or the element under the mouse at any time T.
 
 The bundle has no screenshots or video. The replay rebuilds the page at any time, so it is the source of truth.
 
@@ -49,7 +49,7 @@ The replay CLI lives in `cli/`, with its own `bun install`:
 ```sh
 cd cli
 bun src/cli.ts pointer <bundle.zip> 00:18.5   # also: info, screenshot, dom, install-browser
-bun run build:bin                             # single binary: dist/overseer-replay
+bun run build:bin                             # single binary: dist/blook
 ```
 
 Details in [cli/README.md](cli/README.md).
@@ -60,7 +60,7 @@ Details in [cli/README.md](cli/README.md).
 - `lib/`: capture, export, transcription, and the shared types and messages
 - `components/viewer/`: the viewer, shared by the Replay page and `viewer.html`
 - `cli/`: the replay CLI
-- `skills/overseer-bundle/`: the agent skill
+- `skills/blook/`: the agent skill
 
 ## Docs
 

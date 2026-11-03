@@ -1,5 +1,5 @@
 {
-  "name": "overseer",
+  "name": "blook",
   "description": "Record a narrated browser session into a local bundle for coding agents",
   "private": true,
   "version": "0.0.1",

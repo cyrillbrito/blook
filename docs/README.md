@@ -5,7 +5,7 @@ Short, high-level guidance. Technical detail lives next to the code.
 - [architecture.md](architecture.md): how recording, the bundle, the viewer and the agent side fit together, and the key decisions
 - [bundle-format.md](bundle-format.md): the exact bundle layout and fields. The agent skill is written from it, so keep it in sync with `lib/export/`.
 - [../cli/README.md](../cli/README.md): the replay CLI
-- [../skills/overseer-bundle/SKILL.md](../skills/overseer-bundle/SKILL.md): the agent skill
+- [../skills/blook/SKILL.md](../skills/blook/SKILL.md): the agent skill
 
 Background:
 

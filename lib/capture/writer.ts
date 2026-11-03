@@ -64,7 +64,7 @@ export class BatchWriter {
       if (requests.length) writes.push(putMany('networkRequests', requests));
       if (sockets.length) writes.push(putMany('wsSockets', sockets));
       const results = await Promise.allSettled(writes);
-      for (const r of results) if (r.status === 'rejected') console.error('[overseer] flush', r.reason);
+      for (const r of results) if (r.status === 'rejected') console.error('[blook] flush', r.reason);
     };
     this.chain = this.chain.then(run, run);
     return this.chain;

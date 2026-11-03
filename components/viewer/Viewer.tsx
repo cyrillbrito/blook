@@ -3,10 +3,14 @@ import type { Bundle } from './bundle';
 import { AudioSync, Clock, TabReplay, lastAtOrBefore } from './playback';
 import { ConsolePanel, NetworkPanel, TimelinePanel, TranscriptPanel, WebSocketsPanel, type Focus, type PanelId } from './panels';
 import { cx, formatDuration, formatTime, shortUrl, useNow, usePlaying } from './util';
+import { Badge, Button, Switch } from '@/components/ui';
+import { DownloadIcon, PauseIcon, PlayIcon, SpinnerIcon, VolumeIcon } from '@/components/ui/icons';
 
 const SPEEDS = [0.5, 1, 2, 4, 8];
 
-export function Viewer({ bundle, onOpen }: { bundle: Bundle; onOpen?: () => void }) {
+type Download = () => Promise<void>;
+
+export function Viewer({ bundle, onDownload }: { bundle: Bundle; onDownload?: Download }) {
   // Created in an effect, so StrictMode's mount-unmount-mount gets a fresh pair.
   const [pb, setPb] = useState<{ clock: Clock; audio: AudioSync; bundle: Bundle }>();
   useEffect(() => {
@@ -19,10 +23,10 @@ export function Viewer({ bundle, onOpen }: { bundle: Bundle; onOpen?: () => void
     };
   }, [bundle]);
   if (pb?.bundle !== bundle) return null;
-  return <ViewerBody bundle={bundle} onOpen={onOpen} clock={pb.clock} audio={pb.audio} />;
+  return <ViewerBody bundle={bundle} onDownload={onDownload} clock={pb.clock} audio={pb.audio} />;
 }
 
-function ViewerBody({ bundle, onOpen, clock, audio }: { bundle: Bundle; onOpen?: () => void; clock: Clock; audio: AudioSync }) {
+function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDownload?: Download; clock: Clock; audio: AudioSync }) {
 
   const tabs = useMemo(() => [...bundle.rrweb.keys()], [bundle]);
   const allTabs = useMemo(() => {
@@ -78,27 +82,29 @@ function ViewerBody({ bundle, onOpen, clock, audio }: { bundle: Bundle; onOpen?:
   const panelProps = { bundle, tabs: allTabs, clock, follow, seek, open, focus };
 
   return (
-    <div className="flex h-screen flex-col bg-white text-xs text-gray-900">
-      <header className="flex shrink-0 items-center gap-3 border-b border-gray-200 bg-gray-50 px-3 py-1.5">
-        <span className="font-semibold">Overseer</span>
-        <span className="min-w-0 truncate font-medium" title={s.url}>
+    <div className="flex h-screen flex-col bg-surface text-xs text-fg">
+      <header className="flex h-10 shrink-0 items-center gap-3 border-b border-line bg-surface-muted px-3">
+        <span className="flex shrink-0 items-center gap-1.5 font-semibold">
+          <span className="h-2 w-2 rounded-full bg-recording" />
+          Blook
+        </span>
+        <span className="h-4 w-px shrink-0 bg-line" />
+        <span className="min-w-0 truncate text-sm font-medium" title={s.url}>
           {s.title || shortUrl(s.url)}
         </span>
-        <span className="shrink-0 text-gray-500">
+        <span className="shrink-0 text-muted">
           {new Date(s.startedAt).toLocaleString()} · {formatDuration(bundle.endT)}
-          {s.status === 'recording' && ' · ended without Stop'}
-          {s.settings?.mask && ' · masked'}
-          {s.settings?.canvas && ' · canvas'}
-          {s.version == null && ' · old bundle format'}
         </span>
-        <span className="ml-auto flex shrink-0 gap-2">
-          {errors > 0 && <span className="text-red-700">{errors} errors</span>}
-          {failed > 0 && <span className="text-red-700">{failed} failed requests</span>}
-          {onOpen && (
-            <button onClick={onOpen} className="rounded border border-gray-300 bg-white px-2 py-0.5 hover:bg-gray-100">
-              Open bundle…
-            </button>
-          )}
+        <span className="flex shrink-0 gap-1">
+          {s.status === 'recording' && <Badge tone="warn">ended without Stop</Badge>}
+          {s.settings?.mask && <Badge>masked</Badge>}
+          {s.settings?.canvas && <Badge>canvas</Badge>}
+          {s.version == null && <Badge tone="warn">old bundle format</Badge>}
+        </span>
+        <span className="ml-auto flex shrink-0 items-center gap-2">
+          {errors > 0 && <Badge tone="danger">{errors} errors</Badge>}
+          {failed > 0 && <Badge tone="danger">{failed} failed requests</Badge>}
+          {onDownload && <DownloadButton onDownload={onDownload} />}
         </span>
       </header>
 
@@ -113,7 +119,7 @@ function ViewerBody({ bundle, onOpen, clock, audio }: { bundle: Bundle; onOpen?:
                     key={id}
                     title={url}
                     onClick={() => setTabId(id)}
-                    className={cx('max-w-56 shrink-0 truncate rounded px-2 py-0.5', id === tabId ? 'bg-gray-800 text-white' : 'border border-gray-300 hover:bg-gray-100')}
+                    className={cx('max-w-56 shrink-0 truncate rounded-control px-2 py-0.5', id === tabId ? 'bg-fg text-white' : 'border border-line-strong hover:bg-surface-sunken')}
                   >
                     Tab {i + 1}
                     {url && `: ${shortUrl(url)}`}
@@ -155,10 +161,9 @@ function ViewerBody({ bundle, onOpen, clock, audio }: { bundle: Bundle; onOpen?:
                 {label} <span className={cx('text-gray-400', id === 'console' && errors > 0 && 'text-red-600')}>{c[id]}</span>
               </button>
             ))}
-            <label className="mb-1 ml-auto flex items-center gap-1 px-2 text-gray-600" title="Scroll lists to the playhead while playing">
-              <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
-              Follow
-            </label>
+            <span className="mb-1.5 ml-auto px-2 text-gray-600">
+              <Switch label="Follow" checked={follow} onChange={setFollow} title="Scroll lists to the playhead while playing" />
+            </span>
           </div>
           <div className="flex min-h-0 flex-1 flex-col">
             {panel === 'timeline' && <TimelinePanel {...panelProps} />}
@@ -387,20 +392,17 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
         )}
       </div>
       <div className="mt-1 flex items-center gap-2">
-        <button
-          onClick={() => clock.toggle()}
-          className="w-16 rounded bg-gray-800 px-2 py-0.5 text-white hover:bg-gray-700"
-          title="Play/pause (Space)"
-        >
-          {playing ? '❚❚ Pause' : '▶ Play'}
-        </button>
+        <Button variant="primary" size="sm" className="w-18" onClick={() => clock.toggle()} title="Play/pause (Space)">
+          {playing ? <PauseIcon className="h-3.5 w-3.5" /> : <PlayIcon className="h-3.5 w-3.5" />}
+          {playing ? 'Pause' : 'Play'}
+        </Button>
         <span className="font-mono tabular-nums">
           <span ref={timeRef} /> <span className="text-gray-400">/ {formatTime(bundle.endT)}</span>
         </span>
         <select
           value={speed}
           onChange={(e) => clock.setSpeed(Number(e.target.value))}
-          className="rounded border border-gray-300 bg-white px-1 py-0.5"
+          className="h-6 rounded-control border border-line-strong bg-surface px-1"
           title="Speed"
         >
           {SPEEDS.map((v) => (
@@ -410,16 +412,17 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
           ))}
         </select>
         {audio.available && (
-          <button
+          <Button
+            size="sm"
             onClick={() => {
               audio.setMuted(!muted);
               setMuted(!muted);
             }}
-            className="rounded border border-gray-300 bg-white px-2 py-0.5 hover:bg-gray-100"
             title={speed > 4 ? 'Audio is off above 4×' : 'Mic audio'}
           >
-            {muted ? '🔇 Muted' : '🔊 Audio'}
-          </button>
+            <VolumeIcon muted={muted} className="h-3.5 w-3.5" />
+            {muted ? 'Muted' : 'Audio'}
+          </Button>
         )}
         <span className="ml-auto flex gap-2 text-[11px] text-gray-500">
           <Legend cls={MARKER_STYLE.error} label="error" />
@@ -430,6 +433,30 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
         </span>
       </div>
     </div>
+  );
+}
+
+function DownloadButton({ onDownload }: { onDownload: Download }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  return (
+    <>
+      {error && <span className="max-w-64 truncate text-red-700" title={error}>{error}</span>}
+      <Button
+        size="sm"
+        disabled={busy}
+        title="Download this session as a bundle .zip"
+        onClick={async () => {
+          setBusy(true);
+          setError(undefined);
+          await onDownload().catch((e) => setError(String((e as Error)?.message ?? e)));
+          setBusy(false);
+        }}
+      >
+        {busy ? <SpinnerIcon className="h-3.5 w-3.5" /> : <DownloadIcon className="h-3.5 w-3.5" />}
+        {busy ? 'Preparing…' : 'Download bundle'}
+      </Button>
+    </>
   );
 }
 

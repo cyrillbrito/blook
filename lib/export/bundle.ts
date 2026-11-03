@@ -1,13 +1,27 @@
 // Builds the session bundle ZIP with fflate. The layout and every field are documented in
 // docs/bundle-format.md: keep both in sync, an agent skill is written from that doc.
 import { strToU8, zipSync, type Zippable } from 'fflate';
-import { getBySession, openOverseerDB } from '../db';
+import { getBySession, openBlookDB } from '../db';
 import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, SessionMeta, TranscriptRow } from '../types';
 import { buildTimeline, isNetworkFailureLog } from './timeline';
 
 export const BUNDLE_FORMAT_VERSION = 2;
 /** Text bodies and frame payloads up to this many UTF-8 bytes stay inline in the JSON. */
 const INLINE_MAX = 2048;
+/** Resource types whose response bodies are replaced by a sha256 (see docs/bundle-format.md). */
+const STATIC_TYPES = new Set(['Script', 'Stylesheet', 'Font', 'Image', 'Media']);
+
+async function sha256(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Console entries from Blook's own scripts (rrweb's canvas readback warning, …). */
+export function isExtensionConsole(c: { url?: string; stack?: string }): boolean {
+  if (c.url?.startsWith('chrome-extension://')) return true;
+  const top = c.stack?.match(/\((\S+?):\d+:\d+\)/)?.[1];
+  return !!top?.startsWith('chrome-extension://');
+}
 
 export type TranscriptStatus = 'ok' | 'partial' | 'pending' | 'none' | 'skipped' | 'failed';
 
@@ -37,6 +51,7 @@ export interface RequestOut {
   responseBodyBinary?: boolean;
   responseBodyTruncated?: boolean;
   responseBodyOmitted?: string;
+  responseBodySha256?: string;
 }
 
 export interface FrameOut {
@@ -144,7 +159,7 @@ export async function buildBundle(
   sessionId: SessionId,
   opts: { transcript?: TranscriptRow; transcriptStatus?: TranscriptStatus; transcriptNote?: string } = {},
 ): Promise<{ folder: string; zip: Uint8Array }> {
-  const db = await openOverseerDB();
+  const db = await openBlookDB();
   const meta = await db.get('sessions', sessionId);
   if (!meta) throw new Error(`session ${sessionId} not found`);
 
@@ -162,7 +177,7 @@ export async function buildBundle(
   consoleRows.sort((a, b) => a.t - b.t || (a.id ?? 0) - (b.id ?? 0));
   audio.sort((a, b) => a.index - b.index);
 
-  const folder = `overseer-${meta.id}`;
+  const folder = `blook-${meta.id}`;
   const files: Zippable = {};
   const put = (path: string, data: Uint8Array, level: 0 | 6 = 6) => {
     files[`${folder}/${path}`] = [data, { level }];
@@ -218,7 +233,8 @@ export async function buildBundle(
   });
 
   // network.json, with bodies over INLINE_MAX in network/bodies/.
-  const requests: RequestOut[] = requestRows.map((r: NetworkRequestRow) => {
+  const requests: RequestOut[] = [];
+  for (const r of requestRows as NetworkRequestRow[]) {
     const fid = fileId(r.requestId);
     const out: RequestOut = clean({
       id: r.requestId,
@@ -252,7 +268,12 @@ export async function buildBundle(
       const bytes = binary ? base64ToBytes(r.responseBody) : strToU8(r.responseBody);
       out.responseBodySize = bytes.length;
       if (binary) out.responseBodyBinary = true;
-      if (!binary && bytes.length <= INLINE_MAX) out.responseBody = r.responseBody;
+      if (STATIC_TYPES.has(r.resourceType ?? '')) {
+        // App bundles, CSS, fonts and images are most of the bytes and rarely the bug:
+        // keep size, type and a hash to tell versions apart, not the body.
+        out.responseBodySha256 = await sha256(bytes);
+        out.responseBodyOmitted = `static resource (${r.resourceType}): sha256 only`;
+      } else if (!binary && bytes.length <= INLINE_MAX) out.responseBody = r.responseBody;
       else {
         out.responseBodyFile = `network/bodies/${fid}.${extFor(r.mimeType, binary, r.url)}`;
         // Already-compressed formats gain nothing from deflate.
@@ -263,10 +284,12 @@ export async function buildBundle(
       out.responseBodyBinary = true;
       out.responseBodyOmitted = 'binary body over the 300 KB capture cap';
     }
-    return out;
-  });
+    requests.push(out);
+  }
 
-  const consoleOut: ConsoleOut[] = consoleRows.map(({ sessionId: _s, id: _i, ...rest }, index) => ({ index, ...rest }));
+  const consoleOut: ConsoleOut[] = consoleRows
+    .filter((c) => !isExtensionConsole(c))
+    .map(({ sessionId: _s, id: _i, ...rest }, index) => ({ index, ...rest }));
 
   // transcript.json: segments with their words, all in session ms.
   const transcript = opts.transcript;
@@ -310,6 +333,7 @@ export async function buildBundle(
     t: c.t,
     endT: c.durationMs !== undefined ? c.t + c.durationMs : undefined,
     durationMs: c.durationMs,
+    voiced: c.voiced?.map(([a, b]) => [Math.round(c.t + a), Math.round(c.t + b)]),
     mimeType: c.mimeType,
     size: c.blob.size,
     file: `audio/${String(c.index).padStart(3, '0')}.webm`,
@@ -377,7 +401,7 @@ function sessionJson(
 ) {
   const durationMs = meta.durationMs ?? (meta.endedAt ? meta.endedAt - meta.startedAt : undefined);
   return clean({
-    format: 'overseer-bundle',
+    format: 'blook-bundle',
     version: BUNDLE_FORMAT_VERSION,
     id: meta.id,
     url: meta.url,
@@ -393,6 +417,7 @@ function sessionJson(
     clock:
       'Every t, endT and rrweb timestamp in this bundle is integer ms since startedAt (Unix ms). Absolute time = startedAt + t.',
     firstSnapshotT: meta.firstSnapshotT,
+    pageReadyT: meta.pageReadyT,
     tabs: meta.tabs,
     navigations: meta.navigations ?? [],
     settings: meta.settings,

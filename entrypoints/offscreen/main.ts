@@ -1,6 +1,7 @@
 // Mic recorder. Each ~30 s chunk is its own MediaRecorder run (stop, then start a new one),
 // because timeslice chunks are not standalone WebM files: only the first has the header.
-import { openOverseerDB } from '@/lib/db';
+import { openBlookDB } from '@/lib/db';
+import { voicedRanges, type Range } from '@/lib/transcribe/vad';
 import { sendToBackground, type OffscreenMessage, type OffscreenReply } from '@/lib/messages';
 
 const MIME = 'audio/webm;codecs=opus';
@@ -62,7 +63,7 @@ async function stopMic(): Promise<OffscreenReply> {
 
 /** Continues numbering if the mic restarts within a session (e.g. after permission was granted). */
 async function firstFreeIndex(id: string): Promise<number> {
-  const db = await openOverseerDB();
+  const db = await openBlookDB();
   const keys = await db.getAllKeysFromIndex('audioChunks', 'bySession', id);
   return keys.length ? Math.max(...keys.map((k) => k[1])) + 1 : 0;
 }
@@ -86,7 +87,7 @@ function startChunk() {
     saves.add(save);
     save
       .catch((err) => {
-        console.error('[overseer] save audio chunk', err);
+        console.error('[blook] save audio chunk', err);
         void sendToBackground({ type: 'mic/error', error: `saving audio chunk ${index} failed: ${err}` }).catch(() => {});
       })
       .finally(() => {
@@ -123,7 +124,8 @@ async function saveChunk(
 ) {
   if (!blob.size) return;
   const t = startedAt - epoch;
-  const db = await openOverseerDB();
+  const voiced = await detectVoiced(blob);
+  const db = await openBlookDB();
   await db.put('audioChunks', {
     sessionId,
     index,
@@ -131,6 +133,19 @@ async function saveChunk(
     durationMs: endedAt - startedAt,
     mimeType: blob.type,
     blob,
+    ...(voiced ? { voiced } : {}),
   });
   await sendToBackground({ type: 'audio/chunk-saved', sessionId, index, t }).catch(() => {});
+}
+
+/** Decodes the chunk at 16 kHz mono and finds voiced ranges. Undefined if decoding fails. */
+async function detectVoiced(blob: Blob): Promise<Range[] | undefined> {
+  try {
+    const ctx = new OfflineAudioContext(1, 16_000, 16_000);
+    const audio = await ctx.decodeAudioData(await blob.arrayBuffer());
+    return voicedRanges(audio.getChannelData(0), audio.sampleRate);
+  } catch (err) {
+    console.warn('[blook] VAD', err);
+    return undefined;
+  }
 }

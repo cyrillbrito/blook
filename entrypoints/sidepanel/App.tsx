@@ -1,9 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteSession, listSessions } from '@/lib/db';
 import type { PanelMessage, RecordingStatus } from '@/lib/messages';
 import { settingsItem } from '@/lib/settings';
-import { DEFAULT_SETTINGS, type SessionMeta, type Settings } from '@/lib/types';
+import { DEFAULT_SETTINGS, type MicState, type SessionMeta, type Settings } from '@/lib/types';
 import { formatDate, formatDuration, shortUrl, tryBackground } from '@/components/util';
+import { offerFile } from '@/components/handoff';
+import { Alert, Badge, Button, Card, Field, IconButton, Input, LiveDot, SectionTitle, Switch, cx } from '@/components/ui';
+import {
+  DownloadIcon,
+  FolderOpenIcon,
+  GearIcon,
+  MicIcon,
+  MicOffIcon,
+  RecordIcon,
+  SpinnerIcon,
+  StopIcon,
+  TrashIcon,
+} from '@/components/ui/icons';
 
 const NO_ANSWER = 'The background worker did not answer.';
 
@@ -54,68 +67,156 @@ export default function App() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col gap-4 bg-white p-3 text-sm text-gray-900">
-      <RecordControls status={status} onRecord={record} onStop={stop} />
-      {(error || status.error) && (
-        <p className="rounded border border-red-200 bg-red-50 px-2 py-1 text-red-700">{error ?? status.error}</p>
-      )}
-      <SettingsPanel locked={status.state !== 'idle'} />
-      <SessionList sessions={sessions} onChanged={refreshSessions} />
+    <main className="flex min-h-screen flex-col gap-3 bg-surface-muted p-3 text-sm text-fg">
+      <Header />
+      {status.state === 'idle' ? <IdleCard onRecord={record} /> : <LiveCard status={status} onStop={stop} />}
+      {(error || status.error) && <Alert>{error ?? status.error}</Alert>}
+      <SettingsCard locked={status.state !== 'idle'} />
+      <SessionList sessions={sessions} activeId={status.state !== 'idle' ? status.session?.id : undefined} onChanged={refreshSessions} />
     </main>
   );
 }
 
-function RecordControls(props: { status: RecordingStatus; onRecord: () => void; onStop: () => void }) {
-  const { state, session } = props.status;
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    if (state !== 'recording') return;
-    const id = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(id);
-  }, [state]);
-
-  const elapsed = session && state === 'recording' ? now - session.startedAt : 0;
-  const busy = state === 'starting' || state === 'stopping';
-  const recording = state === 'recording';
-
+/** Brand plus "Open bundle…": pick a .zip here, the Replay page opens with it. */
+function Header() {
+  const input = useRef<HTMLInputElement>(null);
+  const open = (file?: File) => {
+    if (!file) return;
+    const id = offerFile(file);
+    browser.tabs.create({ url: browser.runtime.getURL(`/replay.html?open=${id}`) });
+  };
   return (
-    <section className="flex items-center gap-3">
-      <button
-        className={`w-24 rounded px-3 py-2 font-medium text-white disabled:opacity-60 ${
-          recording ? 'bg-gray-800 hover:bg-gray-900' : 'bg-red-600 hover:bg-red-700'
-        }`}
-        disabled={busy}
-        onClick={recording ? props.onStop : props.onRecord}
-      >
-        {recording ? 'Stop' : busy ? '…' : 'Record'}
-      </button>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          {recording && <span className="h-2 w-2 animate-pulse rounded-full bg-red-600" />}
-          <span className="font-medium">
-            {recording && props.status.phase === 'loading-page' ? 'Loading page…' : STATE_LABEL[state]}
-          </span>
-          {recording && <span className="font-mono tabular-nums text-gray-600">{formatDuration(elapsed)}</span>}
-        </div>
-        {session && state !== 'idle' && (
-          <div className="truncate text-xs text-gray-500" title={session.url}>
-            {shortUrl(session.url)}
-          </div>
-        )}
-      </div>
-    </section>
+    <header className="flex items-center gap-2">
+      <span className="flex items-center gap-1.5 font-semibold">
+        <span className="h-2 w-2 rounded-full bg-recording" />
+        Blook
+      </span>
+      <input
+        ref={input}
+        type="file"
+        accept=".zip,application/zip"
+        hidden
+        onChange={(e) => {
+          open(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
+      <Button variant="ghost" size="sm" className="ml-auto" onClick={() => input.current?.click()} title="Open a bundle .zip in the viewer">
+        <FolderOpenIcon className="h-3.5 w-3.5" />
+        Open bundle…
+      </Button>
+    </header>
   );
 }
 
-const STATE_LABEL: Record<RecordingStatus['state'], string> = {
-  idle: 'Ready',
-  starting: 'Starting…',
-  recording: 'Recording',
-  stopping: 'Stopping…',
+/** The tab Record would capture: the active tab of this window. */
+function useActiveTab() {
+  const [tab, setTab] = useState<{ url?: string; title?: string }>();
+  useEffect(() => {
+    const read = () =>
+      browser.tabs.query({ active: true, currentWindow: true }).then(([t]) => setTab(t ? { url: t.url, title: t.title } : undefined));
+    read();
+    const onUpdated = (_id: number, info: { url?: string; title?: string; status?: string }) => {
+      if (info.url || info.title || info.status) read();
+    };
+    browser.tabs.onActivated.addListener(read);
+    browser.tabs.onUpdated.addListener(onUpdated);
+    return () => {
+      browser.tabs.onActivated.removeListener(read);
+      browser.tabs.onUpdated.removeListener(onUpdated);
+    };
+  }, []);
+  return tab;
+}
+
+function IdleCard({ onRecord }: { onRecord: () => void }) {
+  const tab = useActiveTab();
+  return (
+    <Card className="space-y-2 p-3">
+      <Button variant="record" size="lg" className="w-full" onClick={onRecord}>
+        <RecordIcon className="h-4 w-4" />
+        Start recording
+      </Button>
+      <p className="truncate text-center text-xs text-muted" title={tab?.url}>
+        {tab?.url ? (
+          <>
+            Records this tab: <span className="text-fg">{tab.title || shortUrl(tab.url)}</span>
+          </>
+        ) : (
+          'Records the active tab.'
+        )}
+      </p>
+    </Card>
+  );
+}
+
+const MIC: Record<MicState, { label: string; tone: 'neutral' | 'ok' | 'warn' | 'danger'; on: boolean }> = {
+  off: { label: 'Mic off', tone: 'neutral', on: false },
+  starting: { label: 'Mic starting…', tone: 'neutral', on: true },
+  recording: { label: 'Mic on', tone: 'ok', on: true },
+  'needs-permission': { label: 'Mic needs permission', tone: 'warn', on: false },
+  failed: { label: 'Mic failed', tone: 'danger', on: false },
+  stopped: { label: 'Mic stopped', tone: 'neutral', on: false },
 };
 
-function SettingsPanel({ locked }: { locked: boolean }) {
+/** While starting, recording or stopping: the live state and Stop. */
+function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: () => void }) {
+  const { state, session, phase } = status;
+  const recording = state === 'recording';
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!recording) return;
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [recording]);
+
+  const elapsed = session ? Math.max(0, now - session.startedAt) : 0;
+  const loading = recording && phase === 'loading-page';
+  const mic = MIC[status.mic ?? session?.mic?.state ?? 'off'];
+  const label = state === 'starting' ? 'Starting…' : state === 'stopping' ? 'Saving…' : loading ? 'Loading page…' : 'Recording';
+
+  return (
+    <Card className="space-y-3 border-red-200 p-3 shadow-sm ring-1 ring-red-100">
+      <div className="flex items-center gap-2">
+        {recording ? <LiveDot /> : <SpinnerIcon className="h-3.5 w-3.5 text-muted" />}
+        <span className={cx('text-xs font-semibold tracking-wide uppercase', recording ? 'text-recording' : 'text-muted')}>{label}</span>
+        {status.mic || session?.mic ? (
+          <span className="ml-auto">
+            <Badge tone={mic.tone} title={session?.mic?.error}>
+              {mic.on ? <MicIcon className="h-3 w-3" /> : <MicOffIcon className="h-3 w-3" />}
+              {mic.label}
+            </Badge>
+          </span>
+        ) : null}
+      </div>
+
+      <div className="font-mono text-4xl leading-none font-semibold tabular-nums">{formatDuration(recording ? elapsed : (session?.durationMs ?? elapsed))}</div>
+
+      {session && (
+        <div className="min-w-0 space-y-0.5">
+          <div className="truncate font-medium" title={session.title}>
+            {session.title || shortUrl(session.url)}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted">
+            <span className="min-w-0 truncate" title={session.url}>
+              {shortUrl(session.url)}
+            </span>
+            {session.tabs.length > 1 && <Badge>{session.tabs.length} tabs</Badge>}
+          </div>
+          {loading && <p className="pt-1 text-xs text-warn">Waiting for the page: no DOM captured yet.</p>}
+        </div>
+      )}
+
+      <Button variant="primary" size="lg" className="w-full" disabled={!recording} onClick={onStop}>
+        {recording ? <StopIcon className="h-4 w-4" /> : <SpinnerIcon className="h-4 w-4" />}
+        {recording ? 'Stop recording' : state === 'starting' ? 'Starting…' : 'Stopping…'}
+      </Button>
+    </Card>
+  );
+}
+
+function SettingsCard({ locked }: { locked: boolean }) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [open, setOpen] = useState(false);
 
@@ -131,148 +232,169 @@ function SettingsPanel({ locked }: { locked: boolean }) {
   };
 
   return (
-    <section className="space-y-2 rounded border border-gray-200 p-2">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <Toggle label="Mask inputs and text" checked={settings.mask} disabled={locked} onChange={(mask) => update({ mask })} />
-        <Toggle label="Microphone" checked={settings.mic} disabled={locked} onChange={(mic) => update({ mic })} />
-        <Toggle label="Canvas (2 fps)" checked={!!settings.canvas} disabled={locked} onChange={(canvas) => update({ canvas })} />
-        <button className="ml-auto text-xs text-gray-500 hover:text-gray-900" onClick={() => setOpen(!open)}>
-          {open ? 'Hide settings' : 'Settings'}
-          {!open && !settings.openRouterApiKey && <span className="ml-1 text-amber-600">(no API key)</span>}
-        </button>
+    <Card className="p-3">
+      <div className="flex items-start gap-2">
+        <div className="flex flex-1 flex-wrap gap-x-4 gap-y-2 text-xs">
+          <Switch label="Microphone" checked={settings.mic} disabled={locked} onChange={(mic) => update({ mic })} />
+          <Switch label="Mask inputs and text" checked={settings.mask} disabled={locked} onChange={(mask) => update({ mask })} />
+          <Switch label="Canvas (2 fps)" checked={!!settings.canvas} disabled={locked} onChange={(canvas) => update({ canvas })} />
+        </div>
+        <IconButton label={open ? 'Hide settings' : 'Settings'} onClick={() => setOpen(!open)} className={cx(open && 'bg-surface-sunken text-fg')}>
+          <GearIcon className="h-3.5 w-3.5" />
+        </IconButton>
       </div>
+      {!open && !settings.openRouterApiKey && (
+        <button className="mt-2 cursor-pointer text-xs text-warn hover:underline" onClick={() => setOpen(true)}>
+          No OpenRouter API key: narration won't be transcribed.
+        </button>
+      )}
       {open && (
-        <div className="space-y-2 border-t border-gray-100 pt-2">
-          <label className="block">
-            <span className="text-xs text-gray-600">OpenRouter API key</span>
-            <input
+        <div className="mt-3 space-y-2 border-t border-line pt-3">
+          <Field label="OpenRouter API key">
+            <Input
               type="password"
-              className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 font-mono text-xs"
+              className="font-mono"
               placeholder="sk-or-…"
               value={settings.openRouterApiKey}
               onChange={(e) => update({ openRouterApiKey: e.target.value.trim() })}
             />
-          </label>
-          <label className="block">
-            <span className="text-xs text-gray-600">Transcription model (needs word timestamps)</span>
-            <input
-              className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 font-mono text-xs"
-              placeholder={DEFAULT_SETTINGS.transcriptionModel}
-              value={settings.transcriptionModel}
-              onChange={(e) => update({ transcriptionModel: e.target.value.trim() })}
-            />
-          </label>
+          </Field>
+          <p className="text-xs text-muted">Narration is transcribed with {DEFAULT_SETTINGS.transcriptionModel} on OpenRouter.</p>
         </div>
       )}
-    </section>
+    </Card>
   );
 }
 
-function Toggle(props: { label: string; checked: boolean; disabled?: boolean; onChange: (v: boolean) => void }) {
+function SessionList({ sessions, activeId, onChanged }: { sessions: SessionMeta[]; activeId?: string; onChanged: () => void }) {
   return (
-    <label className={`flex items-center gap-1.5 ${props.disabled ? 'opacity-50' : 'cursor-pointer'}`}>
-      <input
-        type="checkbox"
-        className="accent-red-600"
-        checked={props.checked}
-        disabled={props.disabled}
-        onChange={(e) => props.onChange(e.target.checked)}
-      />
-      {props.label}
-    </label>
-  );
-}
-
-function SessionList({ sessions, onChanged }: { sessions: SessionMeta[]; onChanged: () => void }) {
-  return (
-    <section className="space-y-1">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Sessions</h2>
-        <button className="text-xs text-gray-500 hover:text-gray-900" onClick={onChanged}>
-          Refresh
-        </button>
-      </div>
+    <section className="space-y-1.5">
+      <SectionTitle
+        actions={
+          <Button variant="ghost" size="sm" onClick={onChanged}>
+            Refresh
+          </Button>
+        }
+      >
+        Recordings {sessions.length > 0 && <span className="font-normal">({sessions.length})</span>}
+      </SectionTitle>
       {sessions.length === 0 ? (
-        <p className="py-4 text-center text-xs text-gray-400">No recordings yet.</p>
+        <Card className="px-3 py-6 text-center text-xs text-muted">No recordings yet. Press Start recording and talk while you use the page.</Card>
       ) : (
-        <ul className="divide-y divide-gray-100 rounded border border-gray-200">
+        <Card className="divide-y divide-line overflow-hidden">
           {sessions.map((s) => (
-            <SessionRow key={s.id} session={s} onChanged={onChanged} />
+            <SessionRow key={s.id} session={s} active={s.id === activeId} onChanged={onChanged} />
           ))}
-        </ul>
+        </Card>
       )}
     </section>
   );
 }
 
-function SessionRow({ session, onChanged }: { session: SessionMeta; onChanged: () => void }) {
+function SessionRow({ session, active, onChanged }: { session: SessionMeta; active: boolean; onChanged: () => void }) {
   const [busy, setBusy] = useState<'export' | 'delete'>();
-  const [error, setError] = useState<string>();
-  const recording = session.status === 'recording';
+  const [confirming, setConfirming] = useState(false);
+  const [note, setNote] = useState<{ text: string; tone: 'danger' | 'warn' }>();
+  // status 'recording' without being the live session means it ended without Stop (browser closed or crashed).
+  const live = active;
   const duration = session.durationMs ?? (session.endedAt ? session.endedAt - session.startedAt : undefined);
 
+  // Drop a pending confirm after a few seconds.
+  useEffect(() => {
+    if (!confirming) return;
+    const id = setTimeout(() => setConfirming(false), 4000);
+    return () => clearTimeout(id);
+  }, [confirming]);
+
   const openReplay = () =>
-    browser.tabs.create({ url: browser.runtime.getURL(`/replay.html?session=${encodeURIComponent(session.id)}` ) });
+    browser.tabs.create({ url: browser.runtime.getURL(`/replay.html?session=${encodeURIComponent(session.id)}`) });
 
   const exportZip = async () => {
     setBusy('export');
-    setError(undefined);
+    setNote(undefined);
     // Export can include transcription, so allow it a long time.
     const res = await tryBackground({ type: 'session/export', sessionId: session.id }, 10 * 60_000);
     setBusy(undefined);
-    if (!res) setError(NO_ANSWER);
-    else if (!res.ok) setError(res.error ?? 'Export failed.');
+    if (!res) setNote({ text: NO_ANSWER, tone: 'danger' });
+    else if (!res.ok) setNote({ text: res.error ?? 'Download failed.', tone: 'danger' });
+    else if (res.error) setNote({ text: res.error, tone: 'warn' });
   };
 
   const remove = async () => {
-    if (!confirm(`Delete the recording of ${shortUrl(session.url)}?`)) return;
+    setConfirming(false);
     setBusy('delete');
     const res = await tryBackground({ type: 'session/delete', sessionId: session.id });
-    if (!res) await deleteSession(session.id).catch((e) => setError(String(e)));
+    if (!res) await deleteSession(session.id).catch((e) => setNote({ text: String(e), tone: 'danger' }));
     setBusy(undefined);
     onChanged();
   };
 
+  const t = session.transcription;
   return (
-    <li className="space-y-1 px-2 py-1.5">
-      <div className="truncate font-medium" title={session.url}>
-        {session.title || shortUrl(session.url)}
+    <div className={cx('px-3 py-2', live && 'bg-recording-soft/60')}>
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-medium" title={session.url}>
+            {session.title || shortUrl(session.url)}
+          </div>
+          {session.title && (
+            <div className="truncate text-xs text-muted" title={session.url}>
+              {shortUrl(session.url)}
+            </div>
+          )}
+        </div>
+        {confirming ? (
+          <div className="flex shrink-0 items-center gap-1">
+            <Button variant="danger" size="sm" onClick={remove}>
+              Delete
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirming(false)}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="flex shrink-0 items-center gap-0.5">
+            <Button size="sm" onClick={openReplay} disabled={live} title="Open in the viewer">
+              Open
+            </Button>
+            <IconButton label="Download bundle .zip" onClick={exportZip} disabled={!!busy || live}>
+              {busy === 'export' ? <SpinnerIcon className="h-3.5 w-3.5" /> : <DownloadIcon className="h-3.5 w-3.5" />}
+            </IconButton>
+            <IconButton label="Delete" onClick={() => setConfirming(true)} disabled={!!busy || live} className="hover:text-danger">
+              <TrashIcon className="h-3.5 w-3.5" />
+            </IconButton>
+          </div>
+        )}
       </div>
-      <div className="flex items-center gap-2 text-xs text-gray-500">
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
         <span>{formatDate(session.startedAt)}</span>
         <span>·</span>
-        <span>{recording ? 'recording' : duration != null ? formatDuration(duration) : '—'}</span>
-        {session.transcription && session.transcription.state !== 'none' && (
-          <>
-            <span>·</span>
-            <span
-              className={session.transcription.state === 'failed' || session.transcription.state === 'partial' ? 'text-red-600' : undefined}
-              title={session.transcription.error}
-            >
-              {transcriptionLabel(session.transcription)}
-            </span>
-          </>
+        <span className="tabular-nums">{live ? 'recording' : duration != null ? formatDuration(duration) : '—'}</span>
+        {live && <Badge tone="recording">recording</Badge>}
+        {!live && session.status === 'recording' && <Badge tone="warn">ended without Stop</Badge>}
+        {t && t.state !== 'none' && (
+          <Badge tone={TRANSCRIPTION_TONE[t.state]} title={t.error}>
+            {transcriptionLabel(t)}
+          </Badge>
         )}
-        {session.tabs.length > 1 && (
-          <>
-            <span>·</span>
-            <span>{session.tabs.length} tabs</span>
-          </>
-        )}
-        <span className="ml-auto flex gap-2">
-          <RowAction onClick={openReplay}>Replay</RowAction>
-          <RowAction onClick={exportZip} disabled={!!busy || recording}>
-            {busy === 'export' ? 'Exporting…' : 'Export'}
-          </RowAction>
-          <RowAction onClick={remove} disabled={!!busy || recording} danger>
-            Delete
-          </RowAction>
-        </span>
+        {session.tabs.length > 1 && <Badge>{session.tabs.length} tabs</Badge>}
+        {busy === 'export' && <span>preparing download…</span>}
       </div>
-      {error && <div className="text-xs text-red-600">{error}</div>}
-    </li>
+      {confirming && <div className="mt-1 text-xs text-danger">Delete this recording? This can't be undone.</div>}
+      {note && <div className={cx('mt-1 text-xs', note.tone === 'danger' ? 'text-danger' : 'text-warn')}>{note.text}</div>}
+    </div>
   );
 }
+
+const TRANSCRIPTION_TONE: Record<NonNullable<SessionMeta['transcription']>['state'], 'neutral' | 'accent' | 'ok' | 'warn' | 'danger'> = {
+  none: 'neutral',
+  'no-key': 'warn',
+  pending: 'accent',
+  transcribing: 'accent',
+  done: 'ok',
+  partial: 'warn',
+  failed: 'danger',
+};
 
 function transcriptionLabel(t: NonNullable<SessionMeta['transcription']>): string {
   switch (t.state) {
@@ -282,24 +404,12 @@ function transcriptionLabel(t: NonNullable<SessionMeta['transcription']>): strin
     case 'done':
       return 'transcribed';
     case 'no-key':
-      return 'no API key';
+      return 'not transcribed: no API key';
     case 'partial':
       return `transcribed ${t.done}/${t.total}`;
     case 'failed':
-      return `failed: ${(t.error ?? 'transcription').slice(0, 40)}`;
+      return 'transcription failed';
     default:
       return '';
   }
-}
-
-function RowAction(props: { onClick: () => void; disabled?: boolean; danger?: boolean; children: React.ReactNode }) {
-  return (
-    <button
-      className={`hover:underline disabled:opacity-40 disabled:no-underline ${props.danger ? 'text-red-600' : 'text-blue-700'}`}
-      disabled={props.disabled}
-      onClick={props.onClick}
-    >
-      {props.children}
-    </button>
-  );
 }

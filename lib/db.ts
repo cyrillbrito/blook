@@ -12,7 +12,7 @@ import type {
   WebSocketRow,
 } from './types';
 
-export interface OverseerDB extends DBSchema {
+export interface BlookDB extends DBSchema {
   sessions: { key: SessionId; value: SessionMeta; indexes: { byStartedAt: number } };
   /** Auto-increment id keeps arrival order; bySessionTab gives rrweb/<tab>.json. */
   rrwebEvents: {
@@ -37,7 +37,7 @@ export interface OverseerDB extends DBSchema {
   transcripts: { key: SessionId; value: TranscriptRow };
 }
 
-export type OverseerDBHandle = IDBPDatabase<OverseerDB>;
+export type BlookDBHandle = IDBPDatabase<BlookDB>;
 
 /** Stores that hold per-session rows with a bySession index. */
 export const SESSION_STORES = [
@@ -49,10 +49,11 @@ export const SESSION_STORES = [
   'audioChunks',
 ] as const;
 
-let dbPromise: Promise<OverseerDBHandle> | undefined;
+let dbPromise: Promise<BlookDBHandle> | undefined;
 
-export function openOverseerDB(): Promise<OverseerDBHandle> {
-  dbPromise ??= openDB<OverseerDB>('overseer', 1, {
+export function openBlookDB(): Promise<BlookDBHandle> {
+  // 'overseer' is the name from before the rename to Blook, kept so existing local sessions survive.
+  dbPromise ??= openDB<BlookDB>('overseer', 1, {
     upgrade(db) {
       db.createObjectStore('sessions', { keyPath: 'id' }).createIndex('byStartedAt', 'startedAt');
 
@@ -90,9 +91,9 @@ export function openOverseerDB(): Promise<OverseerDBHandle> {
 /** Writes a batch of rows to one store in a single transaction. */
 export async function putMany<S extends (typeof SESSION_STORES)[number]>(
   store: S,
-  rows: OverseerDB[S]['value'][],
+  rows: BlookDB[S]['value'][],
 ): Promise<void> {
-  const db = await openOverseerDB();
+  const db = await openBlookDB();
   const tx = db.transaction(store, 'readwrite');
   await Promise.all([...rows.map((row) => tx.store.put(row as never)), tx.done]);
 }
@@ -101,24 +102,24 @@ export async function putMany<S extends (typeof SESSION_STORES)[number]>(
 export async function getBySession<S extends (typeof SESSION_STORES)[number]>(
   store: S,
   sessionId: SessionId,
-): Promise<OverseerDB[S]['value'][]> {
-  const db = await openOverseerDB();
+): Promise<BlookDB[S]['value'][]> {
+  const db = await openBlookDB();
   return db.getAllFromIndex(store, 'bySession' as never, sessionId as never) as never;
 }
 
 export async function listSessions(): Promise<SessionMeta[]> {
-  const db = await openOverseerDB();
+  const db = await openBlookDB();
   return (await db.getAllFromIndex('sessions', 'byStartedAt')).reverse();
 }
 
 export async function putSession(meta: SessionMeta): Promise<void> {
-  const db = await openOverseerDB();
+  const db = await openBlookDB();
   await db.put('sessions', meta);
 }
 
 /** Deletes a session and all its rows. */
 export async function deleteSession(sessionId: SessionId): Promise<void> {
-  const db = await openOverseerDB();
+  const db = await openBlookDB();
   const stores = ['sessions', 'transcripts', ...SESSION_STORES] as const;
   const tx = db.transaction(stores, 'readwrite');
   tx.objectStore('sessions').delete(sessionId);

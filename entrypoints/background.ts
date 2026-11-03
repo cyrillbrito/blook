@@ -21,10 +21,10 @@ export default defineBackground(() => {
   // Clicking the toolbar icon opens the side panel.
   browser.sidePanel
     .setPanelBehavior({ openPanelOnActionClick: true })
-    .catch((err) => console.error('[overseer] setPanelBehavior', err));
+    .catch((err) => console.error('[blook] setPanelBehavior', err));
 
   registerListeners();
-  const ready = restoreSession().catch((err) => console.error('[overseer] restore', err));
+  const ready = restoreSession().catch((err) => console.error('[blook] restore', err));
 
   const handlers: { [K in keyof BackgroundRequests]: Handler } = {
     'session/start': (m) => startSession(m.tabId),
@@ -55,7 +55,7 @@ export default defineBackground(() => {
     'rrweb/events': (m, s) => ({ ok: addRrwebEvents(s.tab?.id, s.frameId, m.events) }),
     'audio/chunk-saved': (m) => {
       // Transcribe right away, in the background; the reply doesn't wait for it.
-      void transcribeChunkSoon(m.sessionId, m.index).catch((err) => console.warn('[overseer] transcription', err));
+      void transcribeChunkSoon(m.sessionId, m.index).catch((err) => console.warn('[blook] transcription', err));
       return { ok: true };
     },
     'mic/error': async (m) => {
@@ -75,7 +75,7 @@ export default defineBackground(() => {
     ready
       .then(() => handler(message, sender))
       .then(sendResponse, (err) => {
-        console.error('[overseer]', (message as BackgroundMessage).type, err);
+        console.error('[blook]', (message as BackgroundMessage).type, err);
         sendResponse({ ok: false, error: String(err?.message ?? err) });
       });
     return true;

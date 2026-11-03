@@ -45,7 +45,7 @@ export interface AudioChunk {
 }
 
 export interface Bundle {
-  /** Folder name, e.g. `overseer-2026-11-03_19-09-02`. */
+  /** Folder name, e.g. `blook-2026-11-03_19-09-02`. */
   name: string;
   session: SessionJson;
   timeline: TimelineEntry[];
@@ -62,13 +62,13 @@ export interface Bundle {
   file(path: string): Uint8Array | undefined;
 }
 
-/** Builds a bundle from paths (with or without the `overseer-<id>/` folder prefix) to bytes. */
+/** Builds a bundle from paths (with or without the `blook-<id>/` folder prefix) to bytes. */
 export function bundleFromFiles(input: Map<string, Uint8Array>, fallbackName = 'bundle'): Bundle {
   // Find session.json and treat its folder as the bundle root.
   const sessionPath = [...input.keys()]
     .filter((p) => p === 'session.json' || p.endsWith('/session.json'))
     .sort((a, b) => a.length - b.length)[0];
-  if (!sessionPath) throw new Error('No session.json found. Is this an Overseer bundle?');
+  if (!sessionPath) throw new Error('No session.json found. Is this a Blook bundle?');
   const prefix = sessionPath.slice(0, -'session.json'.length);
   const files = new Map<string, Uint8Array>();
   for (const [p, bytes] of input) if (p.startsWith(prefix)) files.set(p.slice(prefix.length), bytes);

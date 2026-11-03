@@ -48,9 +48,7 @@ export function urlName(url: string): string {
   }
 }
 
-export function cx(...parts: (string | false | undefined | null)[]): string {
-  return parts.filter(Boolean).join(' ');
-}
+export { cx } from '@/components/ui';
 
 /** The clock's time, re-rendering at most every `step` ms of session time. */
 export function useNow(clock: Clock, step = 100): number {
