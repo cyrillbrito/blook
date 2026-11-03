@@ -111,7 +111,7 @@ A `base64` body: `jq -r ... | .responseBody' | base64 -d > /tmp/body.bin`, and o
 
 ## WebSockets
 
-Payloads up to 2 KB are inline in `payload`; larger or binary ones are in the file named by `payloadFile`.
+Every payload is inline. `payloadEncoding` says what it is, as for HTTP bodies: `json` (parsed, jq walks into it), `text` or `base64` (binary). A cut payload has `truncated` (at 1 MB).
 
 ```bash
 # Sockets
@@ -120,11 +120,17 @@ jq -r '.[] | "\(.t)-\(.endT // "open")\t\(.frameCount) frames (\(.sentCount) sen
 # Frames within ±W ms of T
 T=1500 W=2000
 jq -r --argjson t $T --argjson w $W '.[] as $s | $s.frames[] | select(.t >= $t - $w and .t <= $t + $w)
-  | "\(.t)\t\($s.id)#\(.index)\t\(.direction)\t\(.size) B\t\(.payload // .payloadFile | .[0:200])"' "$B/websockets.json"
+  | "\(.t)\t\($s.id)#\(.index)\t\(.direction)\t\(.size) B\t\(if .payloadEncoding == "json" then .payload | tojson else .payload end | .[0:200])"' "$B/websockets.json"
 
-# Frames whose payload matches (inline payloads; for files, rg in websockets/frames/)
+# Frames whose payload matches (text and JSON payloads)
 Q='subscribe'
-jq -r --arg q "$Q" '.[] as $s | $s.frames[] | select(.payload // "" | test($q)) | "\(.t)\t\($s.id)#\(.index)\t\(.direction)\t\(.payload[0:200])"' "$B/websockets.json"
+jq -r --arg q "$Q" '.[] as $s | $s.frames[] | select(.payloadEncoding != "base64")
+  | (if .payloadEncoding == "json" then .payload | tojson else .payload end) as $p | select($p | test($q))
+  | "\(.t)\t\($s.id)#\(.index)\t\(.direction)\t\($p[0:200])"' "$B/websockets.json"
+
+# One frame's JSON payload, by socket id and frame index (from a timeline ref)
+ID=1.2 I=0
+jq --arg id "$ID" --argjson i $I '.[] | select(.id == $id) | .frames[$i].payload' "$B/websockets.json"
 ```
 
 ## Console

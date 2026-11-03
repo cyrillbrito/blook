@@ -39,12 +39,12 @@ The CLI takes `<t>` as ms (`9648`), seconds (`9.6s`) or `[hh:]mm:ss[.mmm]` (`00:
 | `timeline.json` | Every event in one array sorted by `t`: `{ t, type, tabId, summary, ref, ... }`. Types: `navigation`, `page-ready`, `tab-open`, `snapshot`, `click`, `input`, `scroll`, `request`, `request-failed`, `ws-open`, `ws-close`, `ws-frame`, `console`, `error`, `speech`. `ref` points to the full record |
 | `transcript.json` | `status` (`ok`, `partial`, `pending` have text; `none`, `skipped`, `failed` explain in `note`); `segments[]`: `{ index, t, endT, text, words: [{ word, t, endT }] }` |
 | `network.json` | HTTP requests: `{ id, t, endT, method, url, resourceType, status, failed, errorText?, requestHeaders, requestBody?, responseBody?, ... }`. API calls keep their response body; static assets have `responseBodyNotKept` |
-| `websockets.json` | Sockets: `{ id, url, t, endT, frames: [{ index, t, direction, payload or payloadFile }] }` |
+| `websockets.json` | Sockets: `{ id, url, t, endT, frames: [{ index, t, direction, size, payload, payloadEncoding }] }`. Payloads are inline, encoded like bodies: `json` (parsed), `text` or `base64` |
 | `console.json` | `{ index, t, source (console, exception, log), level, text, url, line, stack? }` |
 | `rrweb.json` | The DOM recording, per tab. Use the CLI; event types in [rrweb.md](rrweb.md) |
 | `audio/` | Raw mic chunks, only with audio |
 
-All fields: [bundle-format.md](https://github.com/cyrillbrito/blook/blob/main/docs/bundle-format.md). Never `cat` `network.json` or `rrweb.json`: they're large. Query with jq and follow `*File` fields instead of building file names. With `settings.mask` on, typed text shows as `*`: expected, not a bug.
+All fields: [bundle-format.md](https://github.com/cyrillbrito/blook/blob/main/docs/bundle-format.md). Never `cat` `network.json`, `websockets.json` or `rrweb.json`: they can be large. Query them with jq. With `settings.mask` on, typed text shows as `*`: expected, not a bug.
 
 ## The CLI
 

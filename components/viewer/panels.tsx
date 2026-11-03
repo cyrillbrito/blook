@@ -348,7 +348,13 @@ export function NetworkPanel({ bundle, tabs, clock, follow, seek, focus }: Props
 
 // ---------------------------------------------------------------- WebSockets
 
-type FrameRow = FrameOut & { socket: SocketOut; key: string };
+type FrameRow = FrameOut & { socket: SocketOut; key: string; text?: string };
+
+/** A frame's payload as one line of text for the list and the filter; undefined for binary. */
+function frameText(f: FrameOut): string | undefined {
+  if (f.payloadEncoding === 'base64') return undefined;
+  return f.payloadEncoding === 'json' ? JSON.stringify(f.payload) : String(f.payload);
+}
 
 export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Props) {
   const sockets = bundle.websockets;
@@ -370,8 +376,8 @@ export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Pr
   const items = useMemo<FrameRow[]>(() => {
     const src = socket ? [socket] : sockets;
     return src
-      .flatMap((s) => s.frames.map((f) => ({ ...f, socket: s, key: `${s.id}:${f.index}` })))
-      .filter((f) => (dir === 'all' || f.direction === dir) && includes(f.payload ?? f.payloadFile, q))
+      .flatMap((s) => s.frames.map((f) => ({ ...f, socket: s, key: `${s.id}:${f.index}`, text: frameText(f) })))
+      .filter((f) => (dir === 'all' || f.direction === dir) && includes(f.text, q))
       .sort((a, b) => a.t - b.t);
   }, [socket, sockets, dir, q]);
 
@@ -384,7 +390,7 @@ export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Pr
         </span>
         {!socket && <span className="w-24 shrink-0 truncate text-gray-500">{urlName(f.socket.url)}</span>}
         <span className="min-w-0 flex-1 truncate">
-          {f.payload ?? <span className="text-gray-500">{f.opcode === 2 ? `<binary ${formatBytes(f.size)}>` : f.payloadFile}</span>}
+          {f.text ?? <span className="text-gray-500">{`<binary ${formatBytes(f.size)}>`}</span>}
         </span>
         <span className="w-14 shrink-0 text-right text-gray-500">{formatBytes(f.size)}</span>
       </div>
@@ -451,11 +457,8 @@ export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Pr
         >
           <Body
             key={sel}
-            text={frame.payload}
-            file={frame.payloadFile}
-            bytes={frame.payloadFile ? () => bundle.file(frame.payloadFile!) : undefined}
-            binary={frame.opcode === 2}
-            note={frame.truncated ? 'Cut at 256 KB during capture.' : undefined}
+            {...bodyProps(frame.payload, frame.payloadEncoding)}
+            note={frame.truncated ? `Cut at 1 MB during capture (was ${formatBytes(frame.size)}).` : undefined}
           />
         </Detail>
       )}

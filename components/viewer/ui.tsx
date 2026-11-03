@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Clock } from './playback';
 import { lastAtOrBefore } from './playback';
 import { cx, formatBytes, formatTime, prettyJson, useActiveRow, useNow } from './util';
-import { decodeText } from './bundle';
 
 export interface PanelProps {
   clock: Clock;
@@ -173,32 +172,23 @@ export function Section({ title, children }: { title: string; children: ReactNod
 
 const SHOW_MAX = 200_000;
 
-/** A body or payload: inline text or base64, or a bundle file decoded only when shown. Pretty-prints JSON. */
+/** A body or payload: inline text, or base64 for binary. Pretty-prints JSON. */
 export function Body({
   text,
   base64,
-  file,
-  bytes,
   mime,
-  binary: binaryFile,
   note,
 }: {
   text?: string;
   /** Inline binary body. */
   base64?: string;
-  file?: string;
-  bytes?: () => Uint8Array | undefined;
   mime?: string;
-  binary?: boolean;
   note?: ReactNode;
 }) {
   const [all, setAll] = useState(false);
   const [raw, setRaw] = useState(false);
-  const binary = binaryFile || base64 !== undefined;
-  const data = useMemo(
-    () => (base64 !== undefined ? Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)) : text === undefined && file ? bytes?.() : undefined),
-    [base64, text, file, bytes],
-  );
+  const binary = base64 !== undefined;
+  const data = useMemo(() => (base64 !== undefined ? Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)) : undefined), [base64]);
   const isImage = binary && /^image\//.test(mime ?? '');
   const imgUrl = useMemo(
     () => (isImage && data ? URL.createObjectURL(new Blob([data as BlobPart], { type: mime })) : undefined),
@@ -206,17 +196,15 @@ export function Body({
   );
   useEffect(() => () => void (imgUrl && URL.revokeObjectURL(imgUrl)), [imgUrl]);
 
-  const body = text ?? (data && !binary ? decodeText(data) : undefined);
+  const body = text;
   const pretty = useMemo(() => (body !== undefined && !raw ? prettyJson(body) : { text: body ?? '', json: false }), [body, raw]);
 
-  if (text === undefined && base64 === undefined && !file) return <div className="px-2 py-1 text-gray-400">{note ?? 'No body.'}</div>;
-  if (file && !data) return <div className="px-2 py-1 text-gray-400">Missing in bundle: {file}</div>;
+  if (text === undefined && base64 === undefined) return <div className="px-2 py-1 text-gray-400">{note ?? 'No body.'}</div>;
   if (binary) {
     return (
       <div className="space-y-2 p-2">
         <div className="text-gray-500">
           Binary, {formatBytes(data?.length)}
-          {file && <> · <span className="font-mono">{file}</span></>}
         </div>
         {imgUrl && <img src={imgUrl} className="max-h-80 max-w-full border border-gray-200" />}
         {note}
@@ -227,7 +215,6 @@ export function Body({
   return (
     <div>
       <div className="flex items-center gap-2 px-2 py-0.5 text-[11px] text-gray-500">
-        {file && <span className="font-mono">{file}</span>}
         <span>{formatBytes(new TextEncoder().encode(body ?? '').length)}</span>
         {(pretty.json || raw) && (
           <button className="hover:text-gray-900" onClick={() => setRaw(!raw)}>

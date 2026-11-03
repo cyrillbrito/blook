@@ -6,10 +6,8 @@ import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, SessionMeta, Tr
 import { buildTimeline, isNetworkFailureLog } from './timeline';
 
 export const BUNDLE_FORMAT_VERSION = 1;
-/** Frame payloads up to this many UTF-8 bytes stay inline in the JSON. */
-const INLINE_MAX = 2048;
 
-/** How a body is stored in network.json: parsed JSON, a text string, or base64 bytes. */
+/** How a body or frame payload is stored: parsed JSON, a text string, or base64 bytes. */
 export type BodyEncoding = 'json' | 'text' | 'base64';
 
 /** JSON bodies that parse (and weren't cut) become JSON values, so jq can walk into them. */
@@ -21,6 +19,11 @@ function encodeBody(body: string, base64: boolean, mime: string | undefined, tru
     } catch {}
   }
   return { body, encoding: 'text' as const };
+}
+
+/** Text frames have no MIME type: parse those that look like a JSON object or array. */
+function encodePayload(payload: string, binary: boolean, truncated: boolean) {
+  return encodeBody(payload, binary, !binary && /^\s*[[{]/.test(payload) ? 'json' : undefined, truncated);
 }
 
 /** Console entries from Blook's own scripts (rrweb's canvas readback warning, …). */
@@ -66,9 +69,11 @@ export interface FrameOut {
   t: number;
   direction: 'sent' | 'received';
   opcode: number;
+  /** Payload size in bytes (decoded for binary), before any cut. */
   size: number;
-  payload?: string;
-  payloadFile?: string;
+  /** Parsed JSON when payloadEncoding is `json`, else a string (base64 for binary). */
+  payload: unknown;
+  payloadEncoding: BodyEncoding;
   truncated?: boolean;
 }
 
@@ -136,16 +141,8 @@ function clean<T extends object>(o: T): T {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
 }
 
-/** CDP ids can hold `.` and `#`: keep file names to [A-Za-z0-9._-]. */
-function fileId(id: string): string {
-  return id.replace(/[^A-Za-z0-9_-]/g, '_');
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+function base64Size(b64: string): number {
+  return (b64.length / 4) * 3 - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
 }
 
 export function contentType(headers: Headers | undefined): string | undefined {
@@ -207,13 +204,9 @@ export async function buildBundle(
     const list = framesBySocket.get(f.socketId) ?? framesBySocket.set(f.socketId, []).get(f.socketId)!;
     const index = list.length;
     const binary = f.opcode === 2;
-    const bytes = binary ? base64ToBytes(f.payload) : strToU8(f.payload);
-    const out: FrameOut = { index, t: f.t, direction: f.direction, opcode: f.opcode, size: bytes.length };
-    if (!binary && bytes.length <= INLINE_MAX) out.payload = f.payload;
-    else {
-      out.payloadFile = `websockets/frames/${fileId(f.socketId)}-${index}.${binary ? 'bin' : 'txt'}`;
-      put(out.payloadFile, bytes);
-    }
+    const size = f.size ?? (binary ? base64Size(f.payload) : strToU8(f.payload).length);
+    const { body, encoding } = encodePayload(f.payload, binary, !!f.truncated);
+    const out: FrameOut = { index, t: f.t, direction: f.direction, opcode: f.opcode, size, payload: body, payloadEncoding: encoding };
     if (f.truncated) out.truncated = true;
     list.push(out);
   }
@@ -348,10 +341,8 @@ export async function buildBundle(
   }
   fileMap['network.json'] =
     'HTTP requests sorted by t, with headers and inline bodies (JSON bodies parsed). Can be large: query with jq, never read whole. Bodies of static files and page loads are not kept.';
-  fileMap['websockets.json'] = 'WebSocket connections sorted by t, each with all its frames (t, direction, payload).';
-  if (Object.keys(files).some((k) => k.includes('/websockets/frames/'))) {
-    fileMap['websockets/frames/'] = 'WebSocket frame payloads over 2 KB and all binary payloads, named <socketId>-<frameIndex>.<txt|bin>.';
-  }
+  fileMap['websockets.json'] =
+    'WebSocket connections sorted by t, each with all its frames (t, direction, payload inline, JSON payloads parsed). Can be large: query with jq.';
   fileMap['console.json'] = 'Console calls, uncaught exceptions and browser log entries sorted by t.';
   fileMap['transcript.json'] = `Narration: status "${transcriptStatus}", segments with words, all times in session ms.`;
   if (audio.length) {

@@ -1,11 +1,8 @@
 // Turns chrome.debugger (CDP) events into stored rows: HTTP requests with bodies,
 // WebSocket sockets and frames, console calls, exceptions and browser log entries.
 import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, WebSocketRow } from '../types';
-import { bodyPolicy, capBase64, capText } from './body-policy';
+import { BODY_MAX_BYTES, bodyPolicy, capBase64, capText } from './body-policy';
 import type { BatchWriter } from './writer';
-
-/** WebSocket payloads above this are cut. */
-const FRAME_CAP = 256_000;
 
 export type SendCommand = (tabId: number, method: string, params?: object) => Promise<any>;
 
@@ -235,15 +232,18 @@ export class CdpCapture {
 
   private onFrame(p: any, direction: 'sent' | 'received') {
     const payload: string = p.response?.payloadData ?? '';
-    const cut = payload.length > FRAME_CAP;
+    const opcode: number = p.response?.opcode ?? 1;
+    // Same cap as HTTP bodies. Binary payloads (opcode 2) arrive as base64.
+    const cut = opcode === 2 ? capBase64(payload, BODY_MAX_BYTES) : capText(payload, BODY_MAX_BYTES);
     this.writer.addFrame({
       sessionId: this.sessionId,
       socketId: p.requestId,
       t: this.mono(p.timestamp),
       direction,
-      opcode: p.response?.opcode ?? 1,
-      payload: cut ? payload.slice(0, FRAME_CAP) : payload,
-      ...(cut ? { truncated: true } : {}),
+      opcode,
+      payload: 'b64' in cut ? cut.b64 : cut.text,
+      size: cut.size,
+      ...(cut.truncated ? { truncated: true } : {}),
     });
   }
 

@@ -28,7 +28,6 @@ The export is a ZIP with one folder, `blook-<sessionId>/`. All paths below are r
 
 - A redirect reuses the CDP requestId. Each earlier hop gets its own record with id `<requestId>#redirect<N>`, where N = 1, 2, ….
 - `console.json[i].index == i` and `transcript.json.segments[i].index == i`, so `.[i]` and `select(.index == i)` give the same record.
-- File names built from ids replace every character outside `[A-Za-z0-9_-]` with `_`. For example, frame 3 of socket `64397.5` is `websockets/frames/64397_5-3.txt`. Always follow the `*File` path fields instead of building names yourself.
 
 ## Files
 
@@ -37,15 +36,14 @@ session.json                  entry point: meta, counts, mic outcome, files map
 timeline.json                 every event in one array sorted by t, with refs
 rrweb.json                    rrweb events per tab (DOM replay source of truth)
 network.json                  HTTP requests, with kept bodies inline
-websockets.json               WebSocket connections with their frames
-websockets/frames/            frame payloads over 2 KB and all binary payloads
+websockets.json               WebSocket connections with their frames, payloads inline
 console.json                  console calls, uncaught exceptions, browser log entries
 transcript.json               narration: segments with words
 audio/chunks.json             mic chunk index (only when there is audio)
 audio/NNN.webm                raw mic audio, WebM/Opus, ~30 s each
 ```
 
-Every file except `audio/chunks.json`, `websockets/frames/` and `audio/*.webm` is always present, even when empty (`[]`). `rrweb.json` is present when the page was recorded. `session.json` `.files` lists exactly the files and folders in this bundle.
+Every file except `audio/chunks.json` and `audio/*.webm` is always present, even when empty (`[]`). `rrweb.json` is present when the page was recorded. `session.json` `.files` lists exactly the files and folders in this bundle.
 
 JSON files are pretty-printed, except `rrweb.json`, which is one line.
 
@@ -142,7 +140,7 @@ Optional fields are left out when they don't apply. They are never `null`.
 | `request-failed` | as `request`, plus `errorText?` | Same. The request had a network error (not a cancel) or HTTP status ≥ 400. |
 | `ws-open` | `url`, `socketId`, `status?` | `{ file: "websockets.json", socketId }` |
 | `ws-close` | `url`, `socketId` | Same. `t` is when the socket closed. |
-| `ws-frame` | `socketId`, `direction` (`"sent"` \| `"received"`), `count`, `bytes`, `endT`, `preview` | `{ file: "websockets.json", socketId, frame, frameEnd }`. A group of `count` frames of one socket and one direction within 1 s of the group's first frame. `frame`..`frameEnd` (inclusive) are frame indexes. `preview` is the first frame's text cut to 120 chars, or `<binary N B>`. |
+| `ws-frame` | `socketId`, `direction` (`"sent"` \| `"received"`), `count`, `bytes`, `endT`, `preview` | `{ file: "websockets.json", socketId, frame, frameEnd }`. A group of `count` frames of one socket and one direction within 1 s of the group's first frame. `frame`..`frameEnd` (inclusive) are frame indexes. `preview` is the first frame's payload as text (JSON re-serialized) cut to 120 chars, or `<binary N B>`. |
 | `console` | `level`, `source` | `{ file: "console.json", index }`. Console entries with level `log`, `info`, `warn` or `debug`. |
 | `error` | `level`, `source` | Same. Level `error`: `console.error`, uncaught exceptions and browser errors. Chrome's `[network] Failed to load resource` lines are skipped, because the request already has a `request-failed` entry. |
 | `speech` | `text`, `endT` | `{ file: "transcript.json", segment: i }` |
@@ -243,7 +241,7 @@ Example:
 
 ## websockets.json
 
-Array of WebSocket connections sorted by `t`. Each has all its frames.
+Array of WebSocket connections sorted by `t`. Each has all its frames, with every payload inline, so the file can be large: query it with jq.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -267,10 +265,10 @@ Frame fields:
 | `t` | number | When it was sent or received. |
 | `direction` | `"sent"` \| `"received"` | `sent` = page to server. |
 | `opcode` | number | 1 text, 2 binary. |
-| `size` | number | Payload size in bytes (decoded for binary). |
-| `payload` | string? | Text payload, when it's at most 2048 UTF-8 bytes. |
-| `payloadFile` | string? | Path of the payload (`websockets/frames/<socketId>-<index>.txt` or `.bin`) when it's over 2048 bytes or binary. Binary is written as raw bytes. |
-| `truncated` | `true`? | The payload was cut at 256 KB during capture. |
+| `size` | number | Payload size in bytes (decoded for binary), before any cut. |
+| `payload` | any | The payload, always inline. Parsed JSON when `payloadEncoding` is `json`, else a string. |
+| `payloadEncoding` | `"json"` \| `"text"` \| `"base64"` | `json`: a text frame that starts with `{` or `[`, parsed, and wasn't cut. `text`: any other text frame. `base64`: a binary frame, as Chrome sent it. |
+| `truncated` | `true`? | The payload was cut at 1 MB (1,000,000 bytes) during capture, like HTTP bodies. It's then a `text` or `base64` prefix. |
 
 Example:
 
@@ -290,8 +288,9 @@ Example:
   "sentCount": 2,
   "receivedCount": 3,
   "frames": [
-    { "index": 0, "t": 4077, "direction": "sent", "opcode": 1, "size": 18, "payload": "{\"hello\":\"server\"}" },
-    { "index": 1, "t": 4078, "direction": "sent", "opcode": 1, "size": 5000, "payloadFile": "websockets/frames/64397_20-1.txt" }
+    { "index": 0, "t": 4077, "direction": "sent", "opcode": 1, "size": 18, "payload": { "hello": "server" }, "payloadEncoding": "json" },
+    { "index": 1, "t": 4078, "direction": "sent", "opcode": 1, "size": 5, "payload": "ping!", "payloadEncoding": "text" },
+    { "index": 2, "t": 4079, "direction": "received", "opcode": 2, "size": 4, "payload": "3q2+7w==", "payloadEncoding": "base64" }
   ]
 }
 ```

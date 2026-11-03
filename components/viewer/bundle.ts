@@ -117,8 +117,3 @@ export async function filesFromDrop(dt: DataTransfer): Promise<{ file: File; pat
 export function filesFromInput(list: FileList): { file: File; path: string }[] {
   return [...list].map((file) => ({ file, path: file.webkitRelativePath || file.name }));
 }
-
-const TEXT_DECODER = new TextDecoder();
-export function decodeText(bytes: Uint8Array): string {
-  return TEXT_DECODER.decode(bytes);
-}

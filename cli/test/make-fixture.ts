@@ -1,6 +1,6 @@
 // Writes test/fixtures/blook-fixture.zip: a tiny synthetic bundle (800×600 page, a typed input,
 // mouse moves, a click on #save at 2000 that shows "Saved" at 2100, "Fixture" selected at 3000,
-// one failed request, one console error).
+// one failed request, a WebSocket with a JSON, a text and a binary frame, one console error).
 // Run `bun test/make-fixture.ts` after changing it; the zip is committed.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { zipSync, strToU8 } from 'fflate';
@@ -75,19 +75,30 @@ const session = {
   settings: { mask: false, mic: false, canvas: false },
   mic: { state: 'off' },
   transcript: { status: 'none', note: 'mic was off' },
-  counts: { rrwebEvents: events.length, timeline: 5, requests: 1, failedRequests: 1, webSockets: 0, webSocketFrames: 0, console: 1, errors: 1, audioChunks: 0, transcriptSegments: 0 },
+  counts: { rrwebEvents: events.length, timeline: 8, requests: 1, failedRequests: 1, webSockets: 1, webSocketFrames: 3, console: 1, errors: 1, audioChunks: 0, transcriptSegments: 0 },
   files: {},
 };
 const tab = FIXTURE.tabId;
 const timeline = [
   { t: 0, type: 'navigation', tabId: tab, summary: 'Navigate to http://localhost:4791/', url: 'http://localhost:4791/', ref: { file: 'session.json', navigation: 0 } },
   { t: 20, type: 'snapshot', tabId: tab, summary: 'DOM snapshot: http://localhost:4791/', ref: { file: 'rrweb.json', tabId: tab, event: 1 } },
+  { t: 100, type: 'ws-open', tabId: tab, summary: 'WebSocket open ws://localhost:4791/ws', url: 'ws://localhost:4791/ws', socketId: '1.2', status: 101, ref: { file: 'websockets.json', socketId: '1.2' } },
+  { t: 600, type: 'ws-frame', tabId: tab, summary: 'WebSocket sent: {"subscribe":"orders"}', socketId: '1.2', direction: 'sent', count: 1, bytes: 25, endT: 600, preview: '{"subscribe":"orders"}', ref: { file: 'websockets.json', socketId: '1.2', frame: 0, frameEnd: 0 } },
   { t: 1500, type: 'input', tabId: tab, summary: 'Input input #name: "Ada"', target: 'input #name', nodeId: input.id, value: 'Ada', endT: 1500, ref: { file: 'rrweb.json', tabId: tab, event: 5 } },
   { t: 2000, type: 'click', tabId: tab, summary: 'Click button "Save" #save', target: 'button "Save" #save', nodeId: save.id, x: FIXTURE.click.x, y: FIXTURE.click.y, ref: { file: 'rrweb.json', tabId: tab, event: 8 } },
   { t: 2010, type: 'request-failed', tabId: tab, summary: 'POST /api/save 500', method: 'POST', url: 'http://localhost:4791/api/save', status: 500, ref: { file: 'network.json', requestId: '1.1' } },
   { t: 2050, type: 'error', tabId: tab, summary: 'console.error: save failed', level: 'error', source: 'console', ref: { file: 'console.json', index: 0 } },
 ];
 const network = [{ id: '1.1', tabId: tab, t: 2010, endT: 2040, durationMs: 30, method: 'POST', url: 'http://localhost:4791/api/save', resourceType: 'Fetch', status: 500, failed: true, requestHeaders: {}, requestBody: { name: 'Ada' }, requestBodyEncoding: 'json', responseBody: { error: 'boom' }, responseBodyEncoding: 'json' }];
+const socket = {
+  id: '1.2', requestId: '1.2', tabId: tab, url: 'ws://localhost:4791/ws', t: 100, endT: 4500, durationMs: 4400, status: 101,
+  frameCount: 3, sentCount: 1, receivedCount: 2,
+  frames: [
+    { index: 0, t: 600, direction: 'sent', opcode: 1, size: 25, payload: { subscribe: 'orders' }, payloadEncoding: 'json' },
+    { index: 1, t: 650, direction: 'received', opcode: 1, size: 2, payload: 'ok', payloadEncoding: 'text' },
+    { index: 2, t: 2020, direction: 'received', opcode: 2, size: 4, payload: '3q2+7w==', payloadEncoding: 'base64' },
+  ],
+};
 const consoleLog = [{ index: 0, tabId: tab, t: 2050, source: 'console', level: 'error', text: 'save failed' }];
 
 const dir = `blook-${FIXTURE.id}/`;
@@ -96,7 +107,7 @@ const files: Record<string, unknown> = {
   'timeline.json': timeline,
   'rrweb.json': { tabs: [{ tabId: tab, url: 'http://localhost:4791/', events }] },
   'network.json': network,
-  'websockets.json': [],
+  'websockets.json': [socket],
   'console.json': consoleLog,
   'transcript.json': { status: 'none', note: 'mic was off', segmentCount: 0, wordCount: 0, segments: [] },
 };

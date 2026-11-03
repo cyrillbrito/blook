@@ -154,6 +154,9 @@ export interface WebSocketFrameRow {
   /** CDP opcode: 1 text, 2 binary (payload is base64). */
   opcode: number;
   payload: string;
+  /** Payload size in bytes (decoded for binary), before any cut. */
+  size?: number;
+  /** The payload was cut at BODY_MAX_BYTES. */
   truncated?: boolean;
 }
 

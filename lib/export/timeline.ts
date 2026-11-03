@@ -292,7 +292,7 @@ export function buildTimeline(input: {
         group.summary = `WebSocket ${f.direction} ${group.count} frames (${group.bytes} B): ${group.preview}`;
         continue;
       }
-      const preview = f.opcode === 2 ? `<binary ${f.size} B>` : cut(f.payload ?? `<${f.size} B in ${f.payloadFile}>`);
+      const preview = f.payloadEncoding === 'base64' ? `<binary ${f.size} B>` : cut(f.payloadEncoding === 'json' ? JSON.stringify(f.payload) : String(f.payload));
       group = {
         t: f.t,
         type: 'ws-frame',
