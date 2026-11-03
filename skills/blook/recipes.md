@@ -38,7 +38,7 @@ jq -r --argjson t $T --argjson w $W '.[] | select(.t >= $t - $w and .t <= $t + $
 jq -r --argjson t $T '.[] | select(.t < $t and (.endT // 1e15) >= $t) | "\(.t)-\(.endT // "open")\t\(.method) \(.status // "-") \(.url[0:120])\tid=\(.id)"' "$B/network.json"
 ```
 
-Each timeline entry's `ref` names the full record: `{file: "network.json", requestId}`, `{file: "console.json", index}`, `{file: "websockets.json", socketId, frame, frameEnd}`, `{file: "transcript.json", segment}`, `{file: "rrweb/<tab>.json", event}`.
+Each timeline entry's `ref` names the full record: `{file: "network.json", requestId}`, `{file: "console.json", index}`, `{file: "websockets.json", socketId, frame, frameEnd}`, `{file: "transcript.json", segment}`, `{file: "rrweb.json", tabId, event}` (index into that tab's `events`).
 
 ## Transcript
 
@@ -155,12 +155,13 @@ I=4
 jq -r --argjson i $I '.[$i] | "\(.text)\n\(.stack // "(no stack)")"' "$B/console.json"
 ```
 
-## rrweb (`rrweb/<tabId>.json`)
+## rrweb (`rrweb.json`)
 
 Clicks and inputs are already in the timeline with a readable `target`, and the replay CLI answers "what was under the mouse". Use these only without the CLI. Event types are in [rrweb.md](rrweb.md).
 
 ```bash
-R=$(ls "$B"/rrweb/*.json | head -1)
+# Events of the first tab; pick another with select(.tabId == $tab)
+R=$(mktemp); jq -c '.tabs[0].events' "$B/rrweb.json" > "$R"
 
 # Mouse position at or just before T
 T=5000

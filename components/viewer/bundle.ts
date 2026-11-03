@@ -91,11 +91,15 @@ export function bundleFromFiles(input: Map<string, Uint8Array>, fallbackName = '
   const session = json<SessionJson>('session.json', undefined as never);
   session.tabs ??= [];
   const rrweb = new Map<number, eventWithTime[]>();
+  const add = (tabId: number, events: unknown) => {
+    if (Array.isArray(events) && events.length) rrweb.set(tabId, (events as eventWithTime[]).sort((a, b) => a.timestamp - b.timestamp));
+  };
+  const rrwebJson = json<{ tabs?: { tabId: number; events: eventWithTime[] }[] }>('rrweb.json', {});
+  for (const t of rrwebJson.tabs ?? []) add(t.tabId, t.events);
+  // Bundles before format 4: one rrweb/<tabId>.json per tab.
   for (const [p] of files) {
     const m = /^rrweb\/(\d+)\.json$/.exec(p);
-    if (!m) continue;
-    const events = arr<eventWithTime>(p).sort((a, b) => a.timestamp - b.timestamp);
-    if (events.length) rrweb.set(Number(m[1]), events);
+    if (m) add(Number(m[1]), arr<eventWithTime>(p));
   }
   // Tab order: as in session.tabs, then any other rrweb file.
   const order = session.tabs.map((t) => t.tabId);

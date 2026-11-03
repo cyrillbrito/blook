@@ -1,6 +1,6 @@
 # blook
 
-Look at an exported Blook bundle at any time `t`: a screenshot, the DOM, or what the mouse was over. It replays `rrweb/<tab>.json` with `@rrweb/replay` in headless Chromium (Playwright). It reads only `session.json` and `rrweb/<tab>.json`.
+Look at an exported Blook bundle at any time `t`: a screenshot, the DOM, or what the mouse was over. It replays `rrweb.json` with `@rrweb/replay` in headless Chromium (Playwright). It reads only `session.json` and `rrweb.json` (older bundles: `rrweb/<tab>.json`).
 
 ## Setup
 

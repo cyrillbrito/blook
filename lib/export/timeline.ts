@@ -52,7 +52,7 @@ export type TimelineRef =
   | { file: 'session.json'; navigation: number }
   | { file: 'session.json'; tab: number }
   | { file: 'session.json'; field: 'pageReadyT' }
-  | { file: string; event: number } // rrweb/<tabId>.json, index into the array
+  | { file: 'rrweb.json'; tabId: number; event: number } // index into that tab's events
   | { file: 'network.json'; requestId: string }
   | { file: 'websockets.json'; socketId: string; frame?: number; frameEnd?: number }
   | { file: 'console.json'; index: number }
@@ -166,7 +166,6 @@ class NodeMap {
 }
 
 function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
-  const file = `rrweb/${tabId}.json`;
   const out: TimelineEntry[] = [];
   const map = new NodeMap();
   let href: string | undefined;
@@ -184,7 +183,7 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
       map.add(e.data.node);
       lastInput.clear();
       lastScroll.clear();
-      out.push({ t, type: 'snapshot', tabId, summary: `DOM snapshot${href ? `: ${href}` : ''}`, url: href, ref: { file, event: i } });
+      out.push({ t, type: 'snapshot', tabId, summary: `DOM snapshot${href ? `: ${href}` : ''}`, url: href, ref: { file: 'rrweb.json', tabId, event: i } });
     } else if (e.type === INCREMENTAL) {
       const d = e.data;
       if (d.source === SOURCE_MUTATION) {
@@ -215,7 +214,7 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
           x: d.x,
           y: d.y,
           ...(dbl ? { double: true } : {}),
-          ref: { file, event: i },
+          ref: { file: 'rrweb.json', tabId, event: i },
         });
       } else if (d.source === SOURCE_INPUT) {
         // Drop inputs nobody typed: nodes rrweb never serialized (id -1), programmatic value
@@ -236,10 +235,10 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
         const shown = toggle ? (d.isChecked ? 'checked' : 'unchecked') : `"${cut(text, 40)}"`;
         const prev = lastInput.get(d.id);
         if (prev && t - (prev.endT as number) < INPUT_MERGE_MS) {
-          Object.assign(prev, value, { endT: t, summary: `Input ${prev.target} = ${shown}`, ref: { file, event: i } });
+          Object.assign(prev, value, { endT: t, summary: `Input ${prev.target} = ${shown}`, ref: { file: 'rrweb.json', tabId, event: i } });
         } else {
           const target = map.describe(d.id);
-          const entry: TimelineEntry = { t, type: 'input', tabId, summary: `Input ${target} = ${shown}`, target, nodeId: d.id, ...value, endT: t, ref: { file, event: i } };
+          const entry: TimelineEntry = { t, type: 'input', tabId, summary: `Input ${target} = ${shown}`, target, nodeId: d.id, ...value, endT: t, ref: { file: 'rrweb.json', tabId, event: i } };
           out.push(entry);
           lastInput.set(d.id, entry);
         }
@@ -249,7 +248,7 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
           Object.assign(prev, { endT: t, x: d.x, y: d.y, summary: `Scroll ${prev.target} to ${d.x},${d.y}` });
         } else {
           const target = map.describe(d.id);
-          const entry: TimelineEntry = { t, type: 'scroll', tabId, summary: `Scroll ${target} to ${d.x},${d.y}`, target, nodeId: d.id, x: d.x, y: d.y, endT: t, ref: { file, event: i } };
+          const entry: TimelineEntry = { t, type: 'scroll', tabId, summary: `Scroll ${target} to ${d.x},${d.y}`, target, nodeId: d.id, x: d.x, y: d.y, endT: t, ref: { file: 'rrweb.json', tabId, event: i } };
           out.push(entry);
           lastScroll.set(d.id, entry);
         }

@@ -1,6 +1,6 @@
-# rrweb events in `rrweb/<tabId>.json`
+# rrweb events in `rrweb.json`
 
-An array of rrweb events (`type`, `data`, `timestamp`) on one line, sorted by `timestamp`. That's the session clock: ms since start. Only top-frame events. A timeline `ref.event` is an index into this array. Prefer the replay CLI. Read these only for questions it can't answer.
+`{ tabs: [{ tabId, url, events }] }` on one line. Each `events` is an array of rrweb events (`type`, `data`, `timestamp`), sorted by `timestamp`. That's the session clock: ms since start. Only top-frame events. A timeline `ref.event` is an index into the `events` of tab `ref.tabId`. Prefer the replay CLI. Read these only for questions it can't answer.
 
 ## Event `type`
 

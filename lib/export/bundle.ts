@@ -6,7 +6,7 @@ import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, SessionMeta, Tr
 import { bodyPolicy } from '../capture/body-policy';
 import { buildTimeline, isNetworkFailureLog } from './timeline';
 
-export const BUNDLE_FORMAT_VERSION = 3;
+export const BUNDLE_FORMAT_VERSION = 4;
 /** Frame payloads up to this many UTF-8 bytes stay inline in the JSON. */
 const INLINE_MAX = 2048;
 
@@ -155,7 +155,7 @@ export async function buildBundle(
     files[`${folder}/${path}`] = [data, { level }];
   };
 
-  // rrweb/<tabId>.json: top-frame events (cross-origin iframes are folded in by rrweb),
+  // rrweb.json: per tab, top-frame events (cross-origin iframes are folded in by rrweb),
   // timestamps rewritten to ms since session start, in arrival order.
   const rrwebByTab = new Map<number, any[]>();
   for (const row of rrweb) {
@@ -165,7 +165,14 @@ export async function buildBundle(
   }
   // Stable sort by t, so ref.event indexes match tools that sort by timestamp.
   for (const events of rrwebByTab.values()) events.sort((a, b) => a.timestamp - b.timestamp);
-  for (const [tabId, events] of rrwebByTab) put(`rrweb/${tabId}.json`, strToU8(JSON.stringify(events)));
+  // Tabs in the order they were opened (session.tabs), then any other.
+  const tabOrder = meta.tabs.map((t) => t.tabId);
+  const rank = (id: number) => (tabOrder.indexOf(id) + 1 || Infinity);
+  const rrwebTabs = [...rrwebByTab.keys()].sort((a, b) => rank(a) - rank(b));
+  if (rrwebTabs.length) {
+    const tabs = rrwebTabs.map((tabId) => ({ tabId, url: meta.tabs.find((t) => t.tabId === tabId)?.url, events: rrwebByTab.get(tabId)! }));
+    put('rrweb.json', strToU8(JSON.stringify({ tabs })));
+  }
 
   // websockets.json
   const socketIds = new Set(socketRows.map((s) => s.socketId));
@@ -315,8 +322,8 @@ export async function buildBundle(
     'session.json': 'This file: session meta, counts, mic outcome and this map. Read it first.',
     'timeline.json': 'Every event in one array sorted by t (navigation, click, input, request, ws, console, speech…); ref points into the detail files.',
   };
-  for (const tabId of rrwebByTab.keys()) {
-    fileMap[`rrweb/${tabId}.json`] = `rrweb events of tab ${tabId} (timestamp = ms since start); feed to the replay tool for DOM, screenshots and pointer at any t.`;
+  if (rrwebTabs.length) {
+    fileMap['rrweb.json'] = `rrweb events per tab ({ tabs: [{ tabId, url, events }] }, timestamp = ms since start, one line); feed to the replay tool for DOM, screenshots and pointer at any t.`;
   }
   fileMap['network.json'] =
     'HTTP requests sorted by t, with headers and inline bodies (JSON bodies parsed). Can be large: query with jq, never read whole. Bodies of static files and page loads are not kept.';

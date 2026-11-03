@@ -1,6 +1,6 @@
 # Bundle format
 
-What Blook exports, file by file and field by field. Format version **3** (`session.json` `.version`). An agent skill is written from this doc, so it is kept exact. The code that writes it is `lib/export/bundle.ts` and `lib/export/timeline.ts`.
+What Blook exports, file by file and field by field. Format version **4** (`session.json` `.version`). An agent skill is written from this doc, so it is kept exact. The code that writes it is `lib/export/bundle.ts` and `lib/export/timeline.ts`.
 
 The export is a ZIP with one folder, `blook-<sessionId>/`. All paths below are relative to that folder.
 
@@ -23,7 +23,7 @@ The export is a ZIP with one folder, `blook-<sessionId>/`. All paths below are r
 | WebSocket frame | `index` (0-based, per socket, in `t` order) | its socket | `websockets.json` `.frames` |
 | Console entry | `index` (0-based position in the array) | the session | `console.json` |
 | Transcript segment | `index` (0-based position in the array) | the session | `transcript.json` `.segments` |
-| rrweb event | position in the array (0-based) | its tab file | `rrweb/<tabId>.json` |
+| rrweb event | position in its tab's `events` (0-based) | its tab | `rrweb.json` `.tabs[] | select(.tabId == T) | .events` |
 | Tab | `tabId` (Chrome tab id, number) | the session | `session.json` `.tabs` |
 
 - A redirect reuses the CDP requestId. Each earlier hop gets its own record with id `<requestId>#redirect<N>`, where N = 1, 2, ….
@@ -35,7 +35,7 @@ The export is a ZIP with one folder, `blook-<sessionId>/`. All paths below are r
 ```
 session.json                  entry point: meta, counts, mic outcome, files map
 timeline.json                 every event in one array sorted by t, with refs
-rrweb/<tabId>.json            rrweb events per tab (DOM replay source of truth)
+rrweb.json                    rrweb events per tab (DOM replay source of truth)
 network.json                  HTTP requests, with kept bodies inline
 websockets.json               WebSocket connections with their frames
 websockets/frames/            frame payloads over 2 KB and all binary payloads
@@ -45,9 +45,9 @@ audio/chunks.json             mic chunk index (only when there is audio)
 audio/NNN.webm                raw mic audio, WebM/Opus, ~30 s each
 ```
 
-Every file except `audio/chunks.json`, `websockets/frames/` and `audio/*.webm` is always present, even when empty (`[]`). The `rrweb/` files are present when the page was recorded. `session.json` `.files` lists exactly the files and folders in this bundle.
+Every file except `audio/chunks.json`, `websockets/frames/` and `audio/*.webm` is always present, even when empty (`[]`). `rrweb.json` is present when the page was recorded. `session.json` `.files` lists exactly the files and folders in this bundle.
 
-JSON files are pretty-printed, except `rrweb/<tabId>.json`, which is one line.
+JSON files are pretty-printed, except `rrweb.json`, which is one line.
 
 ## session.json
 
@@ -56,7 +56,7 @@ The entry point. Read it first.
 | Field | Type | Meaning |
 |---|---|---|
 | `format` | `"blook-bundle"` | Constant. |
-| `version` | number | Bundle format version. `3` for this doc. |
+| `version` | number | Bundle format version. `4` for this doc. |
 | `id` | string | Session id, `YYYY-MM-DD_HH-MM-SS` in local time at Record. |
 | `url` | string | URL of the recorded tab at Record. |
 | `title` | string? | Tab title at Record. |
@@ -84,7 +84,7 @@ Example (shortened):
 ```json
 {
   "format": "blook-bundle",
-  "version": 3,
+  "version": 4,
   "id": "2026-11-03_19-09-02",
   "url": "http://localhost:4791/",
   "title": "Blook test",
@@ -108,7 +108,7 @@ Example (shortened):
   "files": {
     "session.json": "This file: session meta, counts, mic outcome and this map. Read it first.",
     "timeline.json": "Every event in one array sorted by t (…); ref points into the detail files.",
-    "rrweb/1653097249.json": "rrweb events of tab 1653097249 (timestamp = ms since start); …"
+    "rrweb.json": "rrweb events per tab ({ tabs: [{ tabId, url, events }] }, timestamp = ms since start, one line); …"
   }
 }
 ```
@@ -134,8 +134,8 @@ Optional fields are left out when they don't apply. They are never `null`.
 | `navigation` | `url` | `{ file: "session.json", navigation: i }`: index into `.navigations` |
 | `page-ready` | none | `{ file: "session.json", field: "pageReadyT" }`. The recorded page finished its first load (see `pageReadyT`). |
 | `tab-open` | `url`, `openerTabId` | `{ file: "session.json", tab: i }`: index into `.tabs` |
-| `snapshot` | `url?` | `{ file: "rrweb/<tabId>.json", event: i }`. A full DOM snapshot (page load or rrweb re-snapshot). The DOM is replayable from here. |
-| `click` | `target`, `nodeId`, `x`, `y`, `double?` | `{ file: "rrweb/<tabId>.json", event: i }`. `x`/`y` are viewport CSS px. `nodeId` is the rrweb node id. `target` describes the element (tag, accessible name, `#id` or `.class`). |
+| `snapshot` | `url?` | `{ file: "rrweb.json", tabId, event: i }`. A full DOM snapshot (page load or rrweb re-snapshot). The DOM is replayable from here. |
+| `click` | `target`, `nodeId`, `x`, `y`, `double?` | `{ file: "rrweb.json", tabId, event: i }`. `x`/`y` are viewport CSS px. `nodeId` is the rrweb node id. `target` describes the element (tag, accessible name, `#id` or `.class`). |
 | `input` | `target`, `nodeId`, `value` or `checked`, `endT` | rrweb ref to the **last** input event of the burst. Typing into one field with gaps under 5 s is one entry. `value` is the final text (at most 200 chars; masked as `*` when `mask` was on). Checkboxes and radios have `checked` (boolean) instead of `value`, and the summary says `checked` or `unchecked`. Only user input is listed: programmatic value and checked changes (the app rendering form state, radios unchecked because a sibling was picked) and nodes rrweb never serialized (id -1) are dropped. Recordings from before rrweb's `userTriggered` flag fall back to requiring a click on, or focus in, the field first. The raw events, programmatic ones included, stay in the rrweb file. |
 | `scroll` | `target`, `nodeId`, `x`, `y`, `endT` | rrweb ref to the **first** scroll event. Scrolls of one element with gaps under 1 s are one entry; `x`/`y` are the final scroll offset. `target` is `document` for the page. |
 | `request` | `method`, `url`, `status?`, `resourceType?`, `endT?`, `durationMs?` | `{ file: "network.json", requestId }`. Every HTTP request that didn't fail. |
@@ -154,24 +154,27 @@ Example entries:
 ```json
 [
   { "t": 0, "type": "navigation", "tabId": 1653097249, "summary": "Navigate to http://localhost:4791/", "url": "http://localhost:4791/", "ref": { "file": "session.json", "navigation": 0 } },
-  { "t": 57, "type": "snapshot", "tabId": 1653097249, "summary": "DOM snapshot: http://localhost:4791/", "url": "http://localhost:4791/", "ref": { "file": "rrweb/1653097249.json", "event": 1 } },
-  { "t": 8056, "type": "click", "tabId": 1653097249, "summary": "Click button \"Load data\" #go", "target": "button \"Load data\" #go", "nodeId": 22, "x": 196, "y": 223, "ref": { "file": "rrweb/1653097249.json", "event": 30 } },
+  { "t": 57, "type": "snapshot", "tabId": 1653097249, "summary": "DOM snapshot: http://localhost:4791/", "url": "http://localhost:4791/", "ref": { "file": "rrweb.json", "tabId": 1653097249, "event": 1 } },
+  { "t": 8056, "type": "click", "tabId": 1653097249, "summary": "Click button \"Load data\" #go", "target": "button \"Load data\" #go", "nodeId": 22, "x": 196, "y": 223, "ref": { "file": "rrweb.json", "tabId": 1653097249, "event": 30 } },
   { "t": 8063, "type": "request-failed", "tabId": 1653097249, "summary": "GET /api/fail → 500 (1 ms)", "method": "GET", "url": "http://localhost:4791/api/fail", "status": 500, "resourceType": "Fetch", "endT": 8064, "durationMs": 1, "ref": { "file": "network.json", "requestId": "64397.24" } },
   { "t": 5079, "type": "ws-frame", "tabId": 1653097249, "summary": "WebSocket received: {\"tick\":0,\"at\":1793732947150}", "socketId": "64397.20", "direction": "received", "count": 1, "bytes": 30, "endT": 5079, "preview": "{\"tick\":0,\"at\":1793732947150}", "ref": { "file": "websockets.json", "socketId": "64397.20", "frame": 2, "frameEnd": 2 } },
   { "t": 12000, "type": "speech", "summary": "🗣 \"This button does nothing\"", "text": "This button does nothing", "endT": 13400, "ref": { "file": "transcript.json", "segment": 3 } }
 ]
 ```
 
-## rrweb/\<tabId\>.json
+## rrweb.json
 
-The rrweb event array of one tab, sorted by `timestamp`, in [rrweb's event format](https://github.com/rrweb-io/rrweb/blob/master/docs/recipes/index.md) (`@rrweb/types` `eventWithTime`), with one change: **`timestamp` is ms since session start**. The viewer and the replay CLI use it directly. Only top-frame events are kept; rrweb folds cross-origin iframes into them.
+`{ "tabs": [{ "tabId": number, "url": string?, "events": [...] }] }`, one entry per recorded tab in the order the tabs were opened (as in `session.json` `.tabs`); usually one. `url` is the tab's URL when it joined the session.
+
+
+Each `events` is the rrweb event array of one tab, sorted by `timestamp`, in [rrweb's event format](https://github.com/rrweb-io/rrweb/blob/master/docs/recipes/index.md) (`@rrweb/types` `eventWithTime`), with one change: **`timestamp` is ms since session start**. The viewer and the replay CLI use it directly. Only top-frame events are kept; rrweb folds cross-origin iframes into them.
 
 Event `type`: 0 DomContentLoaded, 1 Load, 2 FullSnapshot, 3 IncrementalSnapshot, 4 Meta (`data.href`, `data.width`, `data.height`), 5 Custom, 6 Plugin. Incremental `data.source`: 0 Mutation, 1 MouseMove, 2 MouseInteraction (`data.type` 2 = Click, 4 = DblClick), 3 Scroll, 4 ViewportResize, 5 Input, 8 StyleSheetRule (`insertRule`/`deleteRule`), 9 CanvasMutation (only when `settings.canvas`), 15 AdoptedStyleSheet. The recorder runs in the page's own JavaScript world, so CSS-in-JS rules and canvas calls are captured.
 
 Notes:
 - The first full snapshot can arrive while the page is still parsing (at `firstSnapshotT`). The rest of the page then comes in as mutations, so the replay at `t` shows what the user saw at `t`.
 - Canvas content (`settings.canvas`) is recorded as 2 fps WebP snapshots. To replay it, the replayer needs `UNSAFE_replayCanvas: true`.
-- `timeline.json` `ref.event` is an index into this array.
+- `timeline.json` `ref.event` is an index into the `events` of tab `ref.tabId`.
 
 ## network.json
 

@@ -1,11 +1,11 @@
 ---
 name: blook
-description: Reads Blook bundles, narrated browser session recordings from the Blook Chrome extension. Use when the user shares or mentions a blook-*.zip, a folder with session.json, timeline.json and rrweb/, or a browser or session recording or replay: a narrated bug report or QA walkthrough, an E2E test to write from a recorded flow, or what the page showed at some moment. Not for HAR files, Playwright traces or live browser automation.
+description: Reads Blook bundles, narrated browser session recordings from the Blook Chrome extension. Use when the user shares or mentions a blook-*.zip, a folder with session.json, timeline.json and rrweb.json, or a browser or session recording or replay: a narrated bug report or QA walkthrough, an E2E test to write from a recorded flow, or what the page showed at some moment. Not for HAR files, Playwright traces or live browser automation.
 ---
 
 # Blook bundle
 
-A Blook bundle is one recorded browser session: a `blook-<date>_<time>.zip`, or that folder unzipped, with `session.json`, `timeline.json`, `transcript.json`, `network.json`, `websockets.json`, `console.json` and `rrweb/`. Typical asks: find what the user said was broken and what the page, network, WebSockets and console did at that moment; turn a narrated walkthrough into a task list; write an E2E test from a narrated flow.
+A Blook bundle is one recorded browser session: a `blook-<date>_<time>.zip`, or that folder unzipped, with `session.json`, `timeline.json`, `transcript.json`, `network.json`, `websockets.json`, `console.json` and `rrweb.json`. Typical asks: find what the user said was broken and what the page, network, WebSockets and console did at that moment; turn a narrated walkthrough into a task list; write an E2E test from a narrated flow.
 
 Someone pressed Record in their web app and talked while they used it: walked a flow, pointed with the mouse, described bugs. The bundle has the narration with word times, a full rrweb DOM recording, every HTTP request and WebSocket frame, and the console. There are no screenshots or video: the replay CLI rebuilds the page at any time.
 
@@ -41,7 +41,7 @@ Stop once you have the answer.
 | `network.json` | HTTP requests | `id`, `t`, `endT`, `durationMs`, `method`, `url`, `resourceType`, `status`, `failed`, `errorText`, headers, inline bodies (JSON parsed; only API calls and failed page loads keep a response body, others have `responseBodyNotKept`) |
 | `websockets.json` | Sockets with all frames | `id`, `url`, `t`, `endT`, `status`, counts; `frames[]`: `index`, `t`, `direction`, `opcode`, `size`, `payload` or `payloadFile` |
 | `console.json` | Console calls, uncaught exceptions, browser log entries | `index`, `t`, `source` (`console`, `exception`, `log`), `level`, `text`, `url`, `line`, `stack` |
-| `rrweb/<tabId>.json` | rrweb events, one line of JSON | Use the CLI. Event types: [rrweb.md](rrweb.md) |
+| `rrweb.json` | rrweb events per tab: `{ tabs: [{ tabId, url, events }] }`, one line of JSON | Use the CLI. Event types: [rrweb.md](rrweb.md) |
 | `audio/` | Raw mic chunks (WebM) and `chunks.json` | Only present with audio. A `skipped` transcript means audio exists but wasn't transcribed |
 
 Large files: never `cat` or read `network.json` or rrweb files whole. List with jq, then fetch one record by id. Always follow the `*File` fields instead of building file names. A cut body has `responseBodyTruncated` / `requestBodyTruncated` (at 1 MB), a cut frame `truncated` (at 256 KB). With `settings.mask` on, inputs and some text show as `*`: that's expected, not a bug.
