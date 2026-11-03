@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // blook: look at a Blook bundle at time t.
 import { parseArgs } from 'node:util';
-import { resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { loadBundle, parseTime, formatTime, pageStateAt, interactionsBetween } from './bundle.ts';
 import { ReplayEngine } from './replay.ts';
 import { installBrowser } from './browser.ts';
 import { skillCommand } from './skill.ts';
 import pkg from '../package.json' with { type: 'json' };
+
+const INSTALL_URL = 'https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh';
 
 const USAGE = `Usage: blook <command> <bundle> [t] [options]
 
@@ -21,6 +24,7 @@ Commands:
                                    e.g. -a claude-code -y); --copy, or no npx: write it to
                                    ~/.agents/skills/blook/
   skill path | print               where --copy installs it | print SKILL.md
+  update                           re-run the install script: latest CLI, extension, skill
   --version
 
 <bundle> is an exported folder or .zip. <t> is ms since session start (12345),
@@ -48,6 +52,13 @@ async function main() {
   if (argv[0] === 'skill') {
     const rest = argv.slice(2);
     return skillCommand(argv[1], rest.filter((a) => a !== '--copy'), rest.includes('--copy'));
+  }
+  if (argv[0] === 'update') {
+    // The compiled binary updates itself where it lives; under Node/Bun the script's default applies.
+    const env = { ...process.env };
+    if (basename(process.execPath) === 'blook') env.BLOOK_INSTALL_DIR ??= dirname(process.execPath);
+    const res = spawnSync('sh', ['-c', `curl -fsSL ${INSTALL_URL} | sh`], { stdio: 'inherit', env });
+    process.exit(res.status ?? 1);
   }
   const { values, positionals } = parseArgs({
     allowPositionals: true,

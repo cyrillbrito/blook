@@ -1,6 +1,6 @@
 ---
 name: blook
-description: Reads Blook bundles, narrated browser session recordings from the Blook Chrome extension. Use when the user shares or mentions a blook-*.zip, a folder with session.json, timeline.json and rrweb.json, or a browser or session recording or replay: a narrated bug report or QA walkthrough, an E2E test to write from a recorded flow, or what the page showed at some moment. Not for HAR files, Playwright traces or live browser automation.
+description: "Reads Blook bundles, narrated browser session recordings from the Blook Chrome extension. Use when the user shares or mentions a blook-*.zip, a folder with session.json, timeline.json and rrweb.json, or a browser or session recording or replay: a narrated bug report or QA walkthrough, an E2E test to write from a recorded flow, or what the page showed at some moment. Not for HAR files, Playwright traces or live browser automation."
 ---
 
 # Blook bundle
@@ -49,6 +49,8 @@ Large files: never `cat` or read `network.json` or rrweb files whole. List with 
 ## Replay CLI
 
 `blook` is the replay CLI: a binary from the [GitHub releases](https://github.com/cyrillbrito/blook/releases), or `cli/` in the repo. Use `blook` if it is on PATH or `cli/dist/blook` exists; else run `node src/cli.ts` (Node 23.6+) or `bun src/cli.ts` from `cli/`. If neither Google Chrome nor Playwright's headless shell is installed, run `blook install-browser` once.
+
+If `blook` isn't installed, install it (macOS, Linux x64; puts it in `~/.local/bin`) with `curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | BLOOK_NO_EXTENSION=1 BLOOK_NO_SKILL=1 sh`.
 
 `<t>` is ms (`9648`), seconds (`9.6s`) or `mm:ss.mmm` (`00:09.648`). Output is JSON, except `screenshot`, which prints a PNG path.
 

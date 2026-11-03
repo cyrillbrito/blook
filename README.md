@@ -17,28 +17,32 @@ A recording is one local ZIP file. Nothing is uploaded, and there are no account
 
 ## Install
 
-Blook isn't on the Chrome Web Store, so you load it by hand.
+On macOS or Linux (x64), run:
 
-1. Download `blook-<version>-chrome.zip` from the [latest release](https://github.com/cyrillbrito/blook/releases/latest) and unzip it.
-2. Open `chrome://extensions`.
-3. Turn on **Developer mode** (top right).
-4. Click **Load unpacked** and pick the unzipped folder.
-5. Pin Blook from the puzzle icon in the toolbar.
+```sh
+curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh
+```
+
+It installs the `blook` command-line tool to `~/.local/bin`, unpacks the extension to `~/.blook/extension`, and adds the `blook` skill to your coding agents. Run it again, or `blook update`, to update.
+
+Blook isn't on the Chrome Web Store, so you load the extension by hand, once:
+
+1. Open `chrome://extensions`.
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked** and pick `~/.blook/extension` (on macOS, press Cmd+Shift+G in the picker and paste the path).
+4. Pin Blook from the puzzle icon in the toolbar.
+
+After an update, click the reload icon on Blook's card in `chrome://extensions`. Prefer manual downloads? Everything is on the [releases page](https://github.com/cyrillbrito/blook/releases/latest).
 
 ![Blook loaded on chrome://extensions with Developer mode on](docs/images/extensions-page.png)
 
-6. Click the Blook icon to open the side panel.
-7. Optional: to get your voice transcribed, click the gear icon and paste an [OpenRouter API key](https://openrouter.ai/keys). Without a key, Blook still records everything else.
+5. Click the Blook icon to open the side panel.
+6. Optional: to get your voice transcribed, click the gear icon and paste an [OpenRouter API key](https://openrouter.ai/keys). Without a key, Blook still records everything else.
 
 ![The settings in the side panel, with the OpenRouter API key field](docs/images/sidepanel-settings.png)
 
 ## For coding agents
 
-An agent reads a recording's ZIP with the `blook` command-line tool and the `blook` skill.
-
-1. Download the binary for your machine from the [latest release](https://github.com/cyrillbrito/blook/releases/latest): `blook-darwin-arm64`, `blook-darwin-x64` or `blook-linux-x64`.
-2. Rename it to `blook`, run `chmod +x blook`, and put it on your `PATH`. On macOS, also run `xattr -d com.apple.quarantine blook`.
-3. If Google Chrome isn't installed, run `blook install-browser`.
-4. Run `blook skill install` to add the skill to your agents.
+An agent reads a recording's ZIP with the `blook` command-line tool and the `blook` skill, which the install command above sets up. If Google Chrome isn't installed, run `blook install-browser` once.
 
 Then give your agent a recording's ZIP.

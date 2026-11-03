@@ -32,6 +32,7 @@ node src/cli.ts dom        <bundle> <t> [--selector css] [--raw]
 node src/cli.ts pointer    <bundle> <t>
 node src/cli.ts skill install [--copy] [flags]   # the agent skill, via `npx skills add cyrillbrito/blook`
 node src/cli.ts skill path | print               # --copy target (~/.agents/skills/blook) | SKILL.md
+blook update                                     # re-run install.sh: latest CLI, extension, skill
 ```
 
 `skill install` runs `npx skills add cyrillbrito/blook --skill blook -g` ([Vercel's skills CLI](https://github.com/vercel-labs/skills)), which asks which agents to link it into; extra flags go to it, e.g. `-a claude-code -y`. With `--copy`, or without npx, it writes the skill files embedded in the binary to `~/.agents/skills/blook/`.

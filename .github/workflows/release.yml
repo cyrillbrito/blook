@@ -34,6 +34,8 @@ jobs:
           bun install --frozen-lockfile
           bun run compile
           bun run zip
+          # Versionless name, so releases/latest/download/blook-chrome.zip always works (install.sh uses it).
+          cp .output/blook-$(jq -r .version package.json)-chrome.zip .output/blook-chrome.zip
 
       - name: Build CLI binaries
         working-directory: cli
@@ -60,12 +62,15 @@ jobs:
           cat > notes.md <<NOTES
           ## Install
 
-          1. Extension: download \`blook-$V-chrome.zip\`, unzip it, open \`chrome://extensions\`, turn on Developer mode, and click **Load unpacked** on the folder.
-          2. CLI: download \`blook-<os>-<arch>\`, then \`chmod +x\` it and put it on your PATH as \`blook\`. On macOS, run \`xattr -d com.apple.quarantine blook\` first.
-          3. Without Google Chrome installed: \`blook install-browser\`.
-          4. Agent skill: \`blook skill install\` (or \`blook skill install --copy\` without Node).
+          macOS (arm64, x64) and Linux (x64). Installs the CLI, the extension folder and the agent skill; re-run to update.
+
+          \`\`\`sh
+          curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh
+          \`\`\`
+
+          Then in Chrome: open \`chrome://extensions\`, turn on Developer mode, click **Load unpacked** and pick \`~/.blook/extension\`. After an update, click the extension's reload icon.
 
           NOTES
           gh release create "v$V" --title "v$V" --generate-notes --notes-file notes.md \
-            .output/blook-$V-chrome.zip \
+            .output/blook-chrome.zip \
             cli/dist/blook-darwin-arm64 cli/dist/blook-darwin-x64 cli/dist/blook-linux-x64
