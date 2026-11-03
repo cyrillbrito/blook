@@ -41,6 +41,7 @@ bun install
 bun run dev            # extension in dev mode, load .output/chrome-mv3-dev unpacked
 bun run build          # .output/chrome-mv3
 bun run compile        # type-check
+bun run test           # bun test ./test/: capture rules, bundle export and timeline, no browser
 ```
 
 The replay CLI lives in `cli/`, with its own `bun install`:
@@ -78,7 +79,7 @@ The extension, the bundle, the viewer, the CLI, the skill and the docs describe 
 - **Skill change**: run its commands and jq recipes against a real bundle.
 - **Any change**: update the docs it touches (README.md for users, AGENTS.md and docs/ for developers).
 
-Before calling it done, validate across parts: `bun run compile` and `bun run build` at the root; `bun run test` in `cli/`; record a short session with the built extension and check it in the Replay page, with `blook info`/`pointer`, and with the skill recipes that touch what changed.
+Before calling it done, validate across parts: `bun run compile`, `bun run test` and `bun run build` at the root; `bun run test` in `cli/`; record a short session with the built extension and check it in the Replay page, with `blook info`/`pointer`, and with the skill recipes that touch what changed.
 
 ## Prior art
 

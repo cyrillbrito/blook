@@ -33,6 +33,7 @@ jobs:
         run: |
           bun install --frozen-lockfile
           bun run compile
+          bun run test
           bun run zip
           # Versionless name, so releases/latest/download/blook-chrome.zip always works (install.sh uses it).
           cp .output/blook-$(jq -r .version package.json)-chrome.zip .output/blook-chrome.zip

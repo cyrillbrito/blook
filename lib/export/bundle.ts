@@ -2,7 +2,7 @@
 // docs/bundle-format.md: keep both in sync, an agent skill is written from that doc.
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { getBySession, openBlookDB } from '../db';
-import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, SessionMeta, TranscriptRow } from '../types';
+import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, SessionMeta, TranscriptRow, WebSocketFrameRow, WebSocketRow } from '../types';
 import { buildTimeline, isNetworkFailureLog } from './timeline';
 
 export const BUNDLE_FORMAT_VERSION = 1;
@@ -22,7 +22,7 @@ function encodeBody(body: string, base64: boolean, mime: string | undefined, tru
 }
 
 /** Text frames have no MIME type: parse those that look like a JSON object or array. */
-function encodePayload(payload: string, binary: boolean, truncated: boolean) {
+export function encodePayload(payload: string, binary: boolean, truncated: boolean) {
   return encodeBody(payload, binary, !binary && /^\s*[[{]/.test(payload) ? 'json' : undefined, truncated);
 }
 
@@ -150,6 +150,40 @@ export function contentType(headers: Headers | undefined): string | undefined {
   return undefined;
 }
 
+/** websockets.json: sockets in `t` order, each with its frames, every payload inline. Rows sorted by t. */
+export function socketsOut(socketRows: WebSocketRow[], frameRows: WebSocketFrameRow[]): SocketOut[] {
+  const framesBySocket = new Map<string, FrameOut[]>();
+  for (const f of frameRows) {
+    const list = framesBySocket.get(f.socketId) ?? framesBySocket.set(f.socketId, []).get(f.socketId)!;
+    const index = list.length;
+    const binary = f.opcode === 2;
+    const size = f.size ?? (binary ? base64Size(f.payload) : strToU8(f.payload).length);
+    const { body, encoding } = encodePayload(f.payload, binary, !!f.truncated);
+    const out: FrameOut = { index, t: f.t, direction: f.direction, opcode: f.opcode, size, payload: body, payloadEncoding: encoding };
+    if (f.truncated) out.truncated = true;
+    list.push(out);
+  }
+  return socketRows.map((s) => {
+    const frames = framesBySocket.get(s.socketId) ?? [];
+    return clean({
+      id: s.socketId,
+      requestId: s.socketId,
+      tabId: s.tabId,
+      url: s.url,
+      t: s.t,
+      endT: s.closedT,
+      durationMs: s.closedT !== undefined ? s.closedT - s.t : undefined,
+      status: s.status,
+      requestHeaders: s.requestHeaders,
+      responseHeaders: s.responseHeaders,
+      frameCount: frames.length,
+      sentCount: frames.filter((f) => f.direction === 'sent').length,
+      receivedCount: frames.filter((f) => f.direction === 'received').length,
+      frames,
+    });
+  });
+}
+
 export async function buildBundle(
   sessionId: SessionId,
   opts: { transcript?: TranscriptRow; transcriptStatus?: TranscriptStatus; transcriptNote?: string } = {},
@@ -198,37 +232,8 @@ export async function buildBundle(
   }
 
   // websockets.json
-  const socketIds = new Set(socketRows.map((s) => s.socketId));
-  const framesBySocket = new Map<string, FrameOut[]>();
-  for (const f of frameRows) {
-    const list = framesBySocket.get(f.socketId) ?? framesBySocket.set(f.socketId, []).get(f.socketId)!;
-    const index = list.length;
-    const binary = f.opcode === 2;
-    const size = f.size ?? (binary ? base64Size(f.payload) : strToU8(f.payload).length);
-    const { body, encoding } = encodePayload(f.payload, binary, !!f.truncated);
-    const out: FrameOut = { index, t: f.t, direction: f.direction, opcode: f.opcode, size, payload: body, payloadEncoding: encoding };
-    if (f.truncated) out.truncated = true;
-    list.push(out);
-  }
-  const sockets: SocketOut[] = socketRows.map((s) => {
-    const frames = framesBySocket.get(s.socketId) ?? [];
-    return clean({
-      id: s.socketId,
-      requestId: s.socketId,
-      tabId: s.tabId,
-      url: s.url,
-      t: s.t,
-      endT: s.closedT,
-      durationMs: s.closedT !== undefined ? s.closedT - s.t : undefined,
-      status: s.status,
-      requestHeaders: s.requestHeaders,
-      responseHeaders: s.responseHeaders,
-      frameCount: frames.length,
-      sentCount: frames.filter((f) => f.direction === 'sent').length,
-      receivedCount: frames.filter((f) => f.direction === 'received').length,
-      frames,
-    });
-  });
+  const sockets = socketsOut(socketRows, frameRows);
+  const socketIds = new Set(sockets.map((s) => s.id));
 
   // network.json, bodies inline.
   const requests: RequestOut[] = [];
