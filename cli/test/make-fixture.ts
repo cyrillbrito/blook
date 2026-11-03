@@ -1,5 +1,6 @@
 // Writes test/fixtures/blook-fixture.zip: a tiny synthetic bundle (800×600 page, a typed input,
-// mouse moves, a click on #save at 2000 that shows "Saved" at 2100, one request, one console error).
+// mouse moves, a click on #save at 2000 that shows "Saved" at 2100, "Fixture" selected at 3000,
+// one failed request, one console error).
 // Run `bun test/make-fixture.ts` after changing it; the zip is committed.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { zipSync, strToU8 } from 'fflate';
@@ -20,7 +21,8 @@ const doc = { type: 0, id: ++id, childNodes: [] as any[] };
 doc.childNodes.push({ type: 1, name: 'html', publicId: '', systemId: '', id: ++id });
 const head = el('head', {}, [el('title', {}, [text('Fixture app')])]);
 const body = el('body', { style: 'margin:0;font:16px sans-serif' });
-const h1 = el('h1', { style: 'margin:0;padding:20px' }, [text('Fixture app')]);
+const h1Text = text('Fixture app');
+const h1 = el('h1', { style: 'margin:0;padding:20px' }, [h1Text]);
 const save = el('button', { id: 'save', type: 'button', style: 'position:absolute;left:100px;top:100px;width:120px;height:40px' }, [text('Save')]);
 const input = el('input', { id: 'name', name: 'name', style: 'position:absolute;left:100px;top:200px;width:200px' });
 body.childNodes.push(h1, save, input);
@@ -46,6 +48,10 @@ const events = [
     // rrweb adds each node on its own, children after their parent.
     data: { source: 0, texts: [], attributes: [], removes: [], adds: [{ parentId: body.id, nextId: null, node: status }, { parentId: status.id, nextId: null, node: text('Saved') }] },
   },
+  // Drag-select "Fixture" in the heading.
+  { type: 3, timestamp: 2800, data: { source: 2, type: 1, id: h1.id, x: 22, y: 40 } }, // MouseDown
+  { type: 3, timestamp: 3000, data: { source: 14, ranges: [{ start: h1Text.id, startOffset: 0, end: h1Text.id, endOffset: 7 }] } },
+  { type: 3, timestamp: 3050, data: { source: 2, type: 0, id: h1.id, x: 90, y: 40 } }, // MouseUp
   move(4000, 600, 500, body.id),
 ];
 

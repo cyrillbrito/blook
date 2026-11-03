@@ -132,6 +132,8 @@ export interface PointerResult extends SeekResult {
   mouse: MouseAt | null;
   element: ElementInfo | null;
   ancestry: ElementInfo[];
+  /** Text selected (highlighted) in the page at t, and the element that contains it. */
+  selection: { text: string; element: ElementInfo } | null;
   /** Mouse interactions within ±1 s of t (clicks, focus, ...). */
   nearbyInteractions: ReturnType<typeof interactionsBetween>;
 }
@@ -264,11 +266,8 @@ export class TabReplay {
     const events = this.bundle.events(this.tab);
     const mouse = mouseAt(events, res.replayedT);
     const nearbyInteractions = interactionsBetween(events, res.replayedT - 1000, res.replayedT + 1000);
-    if (!mouse) {
-      res.warnings.push('no mouse position recorded at or before t');
-      return { ...res, mouse, element: null, ancestry: [], nearbyInteractions };
-    }
-    const hit = await this.page.evaluate(describeAt, { x: mouse.x, y: mouse.y });
+    if (!mouse) res.warnings.push('no mouse position recorded at or before t');
+    const hit = await this.page.evaluate(describeAt, mouse && { x: mouse.x, y: mouse.y });
     return { ...res, mouse, ...hit, nearbyInteractions };
   }
 }
@@ -329,12 +328,14 @@ async function drawCanvasFrames(frames: CanvasFrame[]) {
 }
 
 // Runs in the browser. Kept self-contained: Playwright serializes it.
-function describeAt({ x, y }: { x: number; y: number }) {
+function describeAt(point: { x: number; y: number } | null) {
+  const { x, y } = point ?? { x: 0, y: 0 };
   const r = (window as any).__replayer;
   const mirror = r.getMirror();
-  let doc: Document = (r.iframe as HTMLIFrameElement).contentDocument!;
+  const top: Document = (r.iframe as HTMLIFrameElement).contentDocument!;
+  let doc = top;
   let ox = 0, oy = 0;
-  let el: Element | null = doc.elementFromPoint(x, y);
+  let el: Element | null = point ? doc.elementFromPoint(x, y) : null;
   // Descend into open shadow roots and same-origin iframes.
   for (let i = 0; el && i < 20; i++) {
     const sr = (el as HTMLElement).shadowRoot;
@@ -396,8 +397,18 @@ function describeAt({ x, y }: { x: number; y: number }) {
       path: path(e),
     };
   };
-  if (!el) return { element: null, ancestry: [] };
+  const element = el ? info(el) : null;
   const ancestry = [];
-  for (let c = el.parentElement; c && c.tagName !== 'HTML'; c = c.parentElement) ancestry.push(info(c));
-  return { element: info(el), ancestry };
+  for (let c = el?.parentElement; c && c.tagName !== 'HTML'; c = c.parentElement) ancestry.push(info(c));
+  // The replayer re-applies recorded selections (rrweb selection events) to the top document.
+  ox = 0; oy = 0;
+  const sel = top.getSelection();
+  const selText = sel && sel.rangeCount ? sel.toString().trim() : '';
+  let selection = null;
+  if (sel && selText) {
+    const c = sel.getRangeAt(0).commonAncestorContainer;
+    const ce = c.nodeType === 1 ? (c as Element) : c.parentElement;
+    if (ce) selection = { text: selText.length > 2000 ? selText.slice(0, 2000) + '…' : selText, element: info(ce) };
+  }
+  return { element, ancestry, selection };
 }

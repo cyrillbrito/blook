@@ -160,7 +160,12 @@ describe('replay', () => {
     expect(p.mouse).toMatchObject({ x: 160, y: 120, at: 2000, source: 'click', nodeId: 10 });
     expect(p.element).toMatchObject({ tag: 'button', id: 'save', text: 'Save', path: 'button#save', rect: { x: 100, y: 100, width: 120, height: 40 } });
     expect(p.ancestry.map((a: any) => a.tag)).toEqual(['body']);
-    expect(p.nearbyInteractions.map((i: any) => i.type)).toEqual(['Focus', 'MouseDown', 'Click']);
+    expect(p.nearbyInteractions.map((i: any) => i.type)).toEqual(['Focus', 'MouseDown', 'Click', 'MouseDown']);
+    expect(p.selection).toBeNull();
+  });
+  withBrowser('pointer reports the selected text', () => {
+    const p = run('pointer', ZIP, '3.5s').json();
+    expect(p.selection).toMatchObject({ text: 'Fixture', element: { tag: 'h1', path: 'body > h1' } });
   });
   withBrowser('dom has the typed value and the mutation', () => {
     const r = run('dom', ZIP, '2.5s');

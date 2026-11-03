@@ -64,10 +64,10 @@ export function registerReplay(program: Command) {
   replayCommand(
     program,
     'pointer',
-    'where the mouse was at t, the element under it and its ancestors, and clicks within 1 s',
+    'where the mouse was at t, the element under it, selected text, and clicks within 1 s',
     `Output: { tab, t, replayedT, time, url, viewport, warnings, mouse: { x, y, at, ageMs, source, nodeId },
 element: { tag, rrwebId, id?, classes?, text?, attributes, rect, path }, ancestry: [element...],
-nearbyInteractions: [{ t, type, nodeId, x?, y? }] }
+selection: { text, element } | null, nearbyInteractions: [{ t, type, nodeId, x?, y? }] }
 
 Examples:
   blook pointer blook-2026-11-03_21-12-51.zip 00:06.2

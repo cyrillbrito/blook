@@ -1,76 +1,68 @@
-# jq recipes for a Blook bundle
+# jq recipes
 
-`B` is the unzipped bundle folder (see SKILL.md). Every time is ms since session start. Each block sets its own inputs (`T`, `W`, `ID`, `Q`) at the top: change them and run. Output is one line per item.
+`B` is the unzipped bundle folder (SKILL.md, First steps). Times are ms since the session start. Each block sets its inputs (`T`, `W`, `ID`, `Q`) at the top. Output is one line per item.
 
-## Session
-
-```bash
-jq '{version, url, title, durationMs, firstSnapshotT, pageReadyT, tabs, settings, mic, transcript, counts}' "$B/session.json"
-```
-
-`counts.errors` leaves out Chrome's `[network] Failed to load resource` lines (`counts.failedRequests` covers those), so it equals the number of `error` entries in the timeline.
-
-## Timeline
+## Read first
 
 ```bash
-# Everything except DOM snapshots
-jq -r '.[] | select(.type != "snapshot") | "\(.t)\t\(.type)\t\(.summary)"' "$B/timeline.json"
+# Narration (check the status first: no segments unless ok, partial or pending)
+jq -r '"status: \(.status) \(.note // "")", (.segments[] | "\(.t)-\(.endT)\t#\(.index)\t\(.text)")' "$B/transcript.json"
+
+# Timeline without DOM snapshots and static assets: speech, clicks, inputs, API calls, errors
+jq -r '.[] | select(.type != "snapshot")
+  | select(.type != "request" or (.resourceType // "" | IN("Script", "Stylesheet", "Image", "Font", "Media") | not))
+  | "\(.t)\t\(.type)\t\(.summary[0:140])"' "$B/timeline.json"
 
 # What went wrong
 jq -r '.[] | select(.type == "error" or .type == "request-failed") | "\(.t)\t\(.type)\t\(.summary)"' "$B/timeline.json"
 
-# What the user did: clicks, inputs, navigations, tab opens
-jq -r '.[] | select(.type | IN("click", "input", "navigation", "tab-open")) | "\(.t)\t\(.type)\t\(.summary)"' "$B/timeline.json"
+# What the user did
+jq -r '.[] | select(.type | IN("click", "input", "scroll", "navigation", "tab-open")) | "\(.t)\t\(.type)\t\(.summary)"' "$B/timeline.json"
 ```
 
-`input` entries are user input only: programmatic value and checked changes are dropped at export. Checkboxes and radios carry `checked` (true or false), text fields `value`.
+Long sessions: add `| head -200`, or filter by type or window.
 
-### Window around a moment
+## Window around a moment
 
-The core query: everything within ±W ms of T, speech included. Set T to a speech segment's `t` or a click's `t`.
+Everything within ±W ms of T, speech included, then requests that started earlier and were still open at T.
 
 ```bash
-T=9300 W=3000
+T=6193 W=3000
 jq -r --argjson t $T --argjson w $W '.[] | select(.t >= $t - $w and .t <= $t + $w and .type != "snapshot")
-  | "\(.t)\t\(.type)\t\(.summary)"' "$B/timeline.json"
-
-# Plus requests that started earlier and were still running at T
-jq -r --argjson t $T '.[] | select(.t < $t and (.endT // 1e15) >= $t) | "\(.t)-\(.endT // "open")\t\(.method) \(.status // "-") \(.url[0:120])\tid=\(.id)"' "$B/network.json"
+  | "\(.t)\t\(.type)\t\(.summary[0:140])"' "$B/timeline.json"
+jq -r --argjson t $T '.[] | select(.t < $t and (.endT // 1e15) >= $t)
+  | "\(.t)-\(.endT // "open")\t\(.method) \(.status // "-") \(.url[0:120])\tid=\(.id)"' "$B/network.json"
 ```
 
-Each timeline entry's `ref` names the full record: `{file: "network.json", requestId}`, `{file: "console.json", index}`, `{file: "websockets.json", socketId, frame, frameEnd}`, `{file: "transcript.json", segment}`, `{file: "rrweb.json", tabId, event}` (index into that tab's `events`).
+A timeline entry's `ref` names its full record: `{file: "network.json", requestId}`, `{file: "console.json", index}`, `{file: "websockets.json", socketId, frame, frameEnd}`, `{file: "transcript.json", segment}`, `{file: "rrweb.json", tabId, event}`.
 
 ## Transcript
 
-Check `.status` first: `ok`, `partial` and `pending` (still transcribing) have segments; `none`, `skipped` and `failed` say why in `.note`. Without a transcript, work from clicks, repeated clicks and navigations, and say in the report that the narration is missing (the audio is in `audio/`).
-
 ```bash
-jq '{status, note, model, segmentCount, errors}' "$B/transcript.json"
+# Pointing words: run `blook pointer` at each t
+jq -r '.segments[].words[] | select(.word | test("^(this|that|here|there|these|those)\\W*$"; "i")) | "\(.t)\t\(.word)"' "$B/transcript.json"
 
-# All segments
-jq -r '.segments[] | "\(.t)-\(.endT)\t#\(.index)\t\(.text)"' "$B/transcript.json"
-
-# Segments that match a regex, case-insensitive
+# Segments matching a regex
 Q='broken|wrong|error|doesn.t|should|nothing happens|slow'
 jq -r --arg q "$Q" '.segments[] | select(.text | test($q; "i")) | "\(.t)-\(.endT)\t#\(.index)\t\(.text)"' "$B/transcript.json"
 
-# Pointing words: run `pointer` at each t
-jq -r '.segments[].words[] | select(.word | test("^(this|that|here|there|these|those)\\W*$"; "i")) | "\(.t)\t\(.word)"' "$B/transcript.json"
+# When a word was said
+Q='save'
+jq -r --arg q "$Q" '.segments[].words[] | select(.word | test($q; "i")) | "\(.t)\t\(.word)"' "$B/transcript.json"
 
 # What was being said at T
 T=4500
 jq -r --argjson t $T '.segments[] | select(.t <= $t and .endT >= $t) | "\(.t)-\(.endT)\t\(.text)"' "$B/transcript.json"
 ```
 
-## HTTP requests (`network.json`)
+The first word of a segment often starts early, over the silence before it: use its `endT` or the next word.
 
-`network.json` holds every kept body inline, so it can be large. Never read it whole: always go through jq.
+## HTTP requests
+
+`network.json` holds the kept bodies inline, so it can be large. Always go through jq.
 
 ```bash
-# Every request without its bodies: a small index to start from
-jq -c '.[] | del(.requestBody, .responseBody)' "$B/network.json" | head -50
-
-# Summary without static assets
+# API calls and page loads, without static assets
 jq -r '.[] | select(.resourceType | IN("Image", "Stylesheet", "Font", "Script", "Media") | not)
   | "\(.t)\t\(.method) \(.status // "-") \(.durationMs // "-")ms\t\(.url[0:120])\tid=\(.id)"' "$B/network.json"
 
@@ -78,99 +70,88 @@ jq -r '.[] | select(.resourceType | IN("Image", "Stylesheet", "Font", "Script", 
 jq -r '.[] | select(.failed) | "\(.t)\t\(.method) \(.status // .errorText)\t\(.url[0:120])\tid=\(.id)"' "$B/network.json"
 
 # Started within ±W ms of T
-T=9648 W=2000
+T=6193 W=2000
 jq -r --argjson t $T --argjson w $W '.[] | select(.t >= $t - $w and .t <= $t + $w)
   | "\(.t)\t\(.method) \(.status // "-")\t\(.url[0:120])\tid=\(.id)"' "$B/network.json"
-
-# Slowest API calls
-jq -r '[.[] | select(.durationMs and (.resourceType | IN("XHR", "Fetch", "Document")))] | sort_by(-.durationMs) | .[0:10][]
-  | "\(.durationMs)ms\tt=\(.t)\t\(.method) \(.url[0:120])"' "$B/network.json"
 
 # Calls to one endpoint (regex on the URL)
 Q='/api/'
 jq -r --arg q "$Q" '.[] | select(.url | test($q)) | "\(.t)\t\(.method) \(.status // "-")\t\(.url[0:120])\tid=\(.id)"' "$B/network.json"
 
+# Slowest API calls
+jq -r '[.[] | select(.durationMs and (.resourceType | IN("XHR", "Fetch", "Document")))] | sort_by(-.durationMs) | .[0:10][]
+  | "\(.durationMs)ms\tt=\(.t)\t\(.method) \(.url[0:120])"' "$B/network.json"
+
 # One request, without its bodies
-ID=75559.10
+ID=1.1
 jq --arg id "$ID" '.[] | select(.id == $id) | del(.requestBody, .responseBody)' "$B/network.json"
 ```
 
 ### Bodies
 
-Bodies are inline. `requestBodyEncoding` / `responseBodyEncoding` say how: `json` is a parsed JSON value (jq walks into it), `text` a string (HTML, XML, a cut body), `base64` binary. Only API calls (XHR, Fetch, EventSource, …) and failed page loads keep a response body; scripts, CSS, images, fonts and normal page loads have `responseBodyNotKept` with the reason. A cut body has `*BodyTruncated` (at 1 MB) and the original `*BodySize`.
+`requestBodyEncoding` and `responseBodyEncoding` say what the body is: `json` (parsed, jq walks into it), `text` (HTML, XML, a cut body) or `base64` (binary). A cut body has `*BodyTruncated` (at 1 MB). No body and no `responseBodyNotKept`: the request failed, was still open at Stop, or had none.
 
 ```bash
-ID=75559.8
+ID=1.1
 # What's there
 jq -c --arg id "$ID" '.[] | select(.id == $id) | {responseBodyEncoding, responseBodySize, responseBodyTruncated, responseBodyNotKept}' "$B/network.json"
 
-# A JSON body: look at its shape, then pull one path
+# A JSON body: its paths, then one of them
 jq -r --arg id "$ID" '.[] | select(.id == $id) | .responseBody | [paths | map(if type == "number" then "[]" else . end) | join(".")] | unique[]' "$B/network.json" | head -40
-jq -c --arg id "$ID" '.[] | select(.id == $id) | .responseBody.items[0:2]' "$B/network.json"
+jq -c --arg id "$ID" '.[] | select(.id == $id) | .responseBody' "$B/network.json" | head -c 2000; echo
 
-# A text body (HTML error page, XML, …): the first 2000 characters
+# A text body: the first 2000 characters
 jq -r --arg id "$ID" '.[] | select(.id == $id) | .responseBody | strings | .[0:2000]' "$B/network.json"
 
-# Request body (POST/PUT payload)
-ID=75559.10
-jq -c --arg id "$ID" '.[] | select(.id == $id) | .requestBody' "$B/network.json" | head -c 500; echo
+# The request body (POST/PUT payload)
+jq -c --arg id "$ID" '.[] | select(.id == $id) | .requestBody' "$B/network.json" | head -c 2000; echo
 ```
 
-Binary bodies (`base64`): decode to a file, e.g. `jq -r ... | .responseBody' | base64 -d > /tmp/body.png`, then open images with the read tool.
+A `base64` body: `jq -r ... | .responseBody' | base64 -d > /tmp/body.bin`, and open images with the read tool.
 
-## WebSocket (`websockets.json`)
+## WebSockets
 
-Payloads up to 2 KB are inline in `payload`; larger or binary ones are in `payloadFile`.
+Payloads up to 2 KB are inline in `payload`; larger or binary ones are in the file named by `payloadFile`.
 
 ```bash
 # Sockets
-jq -r '.[] | "\(.t)-\(.endT // "open")\t\(.status // "-")\t\(.frameCount) frames (\(.sentCount) sent, \(.receivedCount) received)\t\(.url)\tid=\(.id)"' "$B/websockets.json"
+jq -r '.[] | "\(.t)-\(.endT // "open")\t\(.frameCount) frames (\(.sentCount) sent, \(.receivedCount) received)\t\(.url)\tid=\(.id)"' "$B/websockets.json"
 
-# Frames within ±W ms of T, all sockets
-T=3334 W=2000
+# Frames within ±W ms of T
+T=1500 W=2000
 jq -r --argjson t $T --argjson w $W '.[] as $s | $s.frames[] | select(.t >= $t - $w and .t <= $t + $w)
   | "\(.t)\t\($s.id)#\(.index)\t\(.direction)\t\(.size) B\t\(.payload // .payloadFile | .[0:200])"' "$B/websockets.json"
 
-# Frames whose payload matches a regex (inline payloads; for files use rg on websockets/frames/)
+# Frames whose payload matches (inline payloads; for files, rg in websockets/frames/)
 Q='subscribe'
 jq -r --arg q "$Q" '.[] as $s | $s.frames[] | select(.payload // "" | test($q)) | "\(.t)\t\($s.id)#\(.index)\t\(.direction)\t\(.payload[0:200])"' "$B/websockets.json"
 ```
 
-## Console (`console.json`)
+## Console
 
 ```bash
-# Errors and exceptions, without Chrome's "Failed to load resource" lines (the requests cover those)
+# Errors and exceptions, without Chrome's "[network] Failed to load resource" lines (the requests cover those)
 jq -r '.[] | select(.level == "error" and (.text | startswith("[network]") | not))
   | "\(.t)\t#\(.index) \(.source)\t\(.text[0:200])\t\(.url // "" | .[0:80]):\(.line // "")"' "$B/console.json"
 
-# Errors and warnings, without lines from browser extensions (Blook's own recorder logs a Canvas2D getImageData warning when canvas recording is on)
-jq -r '.[] | select(.level | IN("error", "warn")) | select(.url // "" | startswith("chrome-extension://") | not) | "\(.t)\t#\(.index) \(.level)\t\(.text[0:200])"' "$B/console.json"
-
 # Everything within ±W ms of T
-T=9661 W=2000
+T=2050 W=2000
 jq -r --argjson t $T --argjson w $W '.[] | select(.t >= $t - $w and .t <= $t + $w) | "\(.t)\t#\(.index) \(.level)\t\(.text[0:200])"' "$B/console.json"
 
-# Stack of one entry
-I=4
+# One entry with its stack
+I=0
 jq -r --argjson i $I '.[$i] | "\(.text)\n\(.stack // "(no stack)")"' "$B/console.json"
 ```
 
-## rrweb (`rrweb.json`)
+## rrweb
 
-Clicks and inputs are already in the timeline with a readable `target`, and the replay CLI answers "what was under the mouse". Use these only without the CLI. Event types are in [rrweb.md](rrweb.md).
+`blook pointer` answers most rrweb questions. These find times the timeline doesn't list. Event types: [rrweb.md](rrweb.md).
 
 ```bash
-# Events of the first tab; pick another with select(.tabId == $tab)
-R=$(mktemp); jq -c '.tabs[0].events' "$B/rrweb.json" > "$R"
+# Text selections (source 14): when, then `blook pointer` at that t for .selection.text
+jq -r '.tabs[] | .tabId as $tab | .events[] | select(.type == 3 and .data.source == 14) | "\(.timestamp)\ttab \($tab)\tselection"' "$B/rrweb.json"
 
-# Mouse position at or just before T
-T=5000
-jq -c --argjson t $T '[.[] | select(.type == 3 and .data.source == 1) | .timestamp as $ts
-  | .data.positions[] | {t: ($ts + .timeOffset), x, y, nodeId: .id}] | map(select(.t <= $t)) | last' "$R"
-
-# A node by rrweb id: tag and attributes, from the full snapshot or a later mutation
-ID=20
-jq -c --argjson id $ID '[(.[] | select(.type == 2) | .data.node | .. | objects | select(.id? == $id)),
-  (.[] | select(.type == 3 and .data.source == 0) | .data.adds[]? | .node | select(.id == $id))]
-  | last | {id, tagName, attributes}' "$R"
+# Mouse down and up: a drag (select text, move, resize) is a MouseDown and MouseUp at different x/y
+jq -r '.tabs[0].events[] | select(.type == 3 and .data.source == 2 and (.data.type == 0 or .data.type == 1))
+  | "\(.timestamp)\t\(if .data.type == 1 then "down" else "up" end)\t\(.data.x | floor),\(.data.y | floor)\tnode \(.data.id)"' "$B/rrweb.json"
 ```
