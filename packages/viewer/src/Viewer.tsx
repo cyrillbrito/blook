@@ -28,7 +28,6 @@ export function Viewer({ bundle, onDownload }: { bundle: Bundle; onDownload?: Do
 }
 
 function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDownload?: Download; clock: Clock; audio: AudioSync }) {
-
   const tabs = useMemo(() => [...bundle.rrweb.keys()], [bundle]);
   const allTabs = useMemo(() => {
     const ids = new Set([...bundle.session.tabs.map((t) => t.tabId), ...tabs]);
@@ -119,7 +118,10 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
                     key={id}
                     title={url}
                     onClick={() => setTabId(id)}
-                    className={cx('max-w-56 shrink-0 truncate rounded-control px-2 py-0.5', id === tabId ? 'bg-fg text-white' : 'border border-line-strong hover:bg-surface-sunken')}
+                    className={cx(
+                      'max-w-56 shrink-0 truncate rounded-control px-2 py-0.5',
+                      id === tabId ? 'bg-fg text-white' : 'border border-line-strong hover:bg-surface-sunken',
+                    )}
                   >
                     Tab {i + 1}
                     {url && `: ${shortUrl(url)}`}
@@ -132,7 +134,9 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
           {tabId != null ? (
             <Stage key={tabId} bundle={bundle} tabId={tabId} clock={clock} />
           ) : (
-            <div className="flex flex-1 items-center justify-center bg-gray-100 text-gray-500">This bundle has no DOM recording (rrweb).</div>
+            <div className="flex flex-1 items-center justify-center bg-gray-100 text-gray-500">
+              This bundle has no DOM recording (rrweb).
+            </div>
           )}
           <Controls bundle={bundle} clock={clock} audio={audio} />
         </div>
@@ -278,9 +282,7 @@ function Stage({ bundle, tabId, clock }: { bundle: Bundle; tabId: number; clock:
         ref={rootRef}
         className={cx('overflow-hidden bg-white shadow [&_iframe]:border-0 [&_iframe]:bg-white', overlay && 'opacity-40')}
       />
-      {overlay && (
-        <span className="absolute top-2 left-1/2 -translate-x-1/2 rounded bg-gray-800/85 px-3 py-1 text-white">{overlay}</span>
-      )}
+      {overlay && <span className="absolute top-2 left-1/2 -translate-x-1/2 rounded bg-gray-800/85 px-3 py-1 text-white">{overlay}</span>}
     </div>
   );
 }
@@ -446,7 +448,11 @@ function DownloadButton({ onDownload }: { onDownload: Download }) {
   const [error, setError] = useState<string>();
   return (
     <>
-      {error && <span className="max-w-64 truncate text-red-700" title={error}>{error}</span>}
+      {error && (
+        <span className="max-w-64 truncate text-red-700" title={error}>
+          {error}
+        </span>
+      )}
       <Button
         size="sm"
         disabled={busy}

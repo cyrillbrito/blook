@@ -46,9 +46,12 @@ export function registerExtension(program: Command) {
     .description('show how to load the Chrome extension from ~/Blook/extension')
     .option('--path', 'print only the extension folder')
     .option('--no-open', "don't open chrome://extensions (it opens only on macOS, at a terminal)")
-    .addHelpText('after', `
+    .addHelpText(
+      'after',
+      `
 Examples:
   blook extension          # the steps to load it in Chrome
-  blook extension --path   # ~/Blook/extension, expanded`)
+  blook extension --path   # ~/Blook/extension, expanded`,
+    )
     .action(extension);
 }

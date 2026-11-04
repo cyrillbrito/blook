@@ -46,13 +46,16 @@ export function registerInfo(program: Command) {
     .command('info')
     .description('tabs, duration, viewport, DOM snapshot range and clicks with their targets (fast, no browser)')
     .argument('<bundle>', 'a blook-*.zip or its unzipped folder')
-    .addHelpText('after', `
+    .addHelpText(
+      'after',
+      `
 Output: { id, durationMs, duration, url, tabs: [{ tab, events, firstEventAt, firstSnapshotAt,
 lastEventAt, url, viewport, clicks: [{ time, t, type, nodeId, x, y, target? }] }] }
 
 Examples:
   blook info blook-2026-11-03_21-12-51.zip
   blook info blook-2026-11-03_21-12-51.zip | jq '.tabs[0].clicks'
-Next: blook pointer <bundle> <t> at a click's t, or at a time from timeline.json.`)
+Next: blook pointer <bundle> <t> at a click's t, or at a time from timeline.json.`,
+    )
     .action(info);
 }

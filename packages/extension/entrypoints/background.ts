@@ -19,9 +19,7 @@ type Handler = (msg: any, sender: Browser.runtime.MessageSender) => unknown | Pr
 
 export default defineBackground(() => {
   // Clicking the toolbar icon opens the side panel.
-  browser.sidePanel
-    .setPanelBehavior({ openPanelOnActionClick: true })
-    .catch((err) => console.error('[blook] setPanelBehavior', err));
+  browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => console.error('[blook] setPanelBehavior', err));
 
   registerListeners();
   const ready = restoreSession().catch((err) => console.error('[blook] restore', err));

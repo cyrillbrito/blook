@@ -341,9 +341,7 @@ function formatRemote(o: any): string {
   if ('value' in o && o.type !== 'object') return String(o.value);
   if (o.value === null || o.subtype === 'null') return 'null';
   if (o.preview?.properties) {
-    const props = o.preview.properties.map((p: any) =>
-      o.preview.subtype === 'array' ? previewValue(p) : `${p.name}: ${previewValue(p)}`,
-    );
+    const props = o.preview.properties.map((p: any) => (o.preview.subtype === 'array' ? previewValue(p) : `${p.name}: ${previewValue(p)}`));
     const more = o.preview.overflow ? ', …' : '';
     return o.preview.subtype === 'array'
       ? `${o.description ?? 'Array'} [${props.join(', ')}${more}]`

@@ -41,7 +41,9 @@ registerExtension(program);
 registerSkill(program);
 registerSetup(program);
 
-program.addHelpText('after', `
+program.addHelpText(
+  'after',
+  `
 Times (<t>): ${TIME_FORMATS}.\nAll bundle files share this clock.
 Output: JSON on stdout (screenshot: JSON with the PNG path); progress, warnings and errors on stderr.
 
@@ -54,7 +56,8 @@ Examples:
   blook screenshot blook-2026-11-03_21-12-51.zip 6.7s   # look at it
   blook transcribe blook-2026-11-03_21-12-51.zip        # no transcript yet: make one from audio/
 Run \`blook <command> --help\` for its options and output. \`blook skill print\` has the full guide
-for reading a bundle (timeline.json, network, console, transcript).`);
+for reading a bundle (timeline.json, network, console, transcript).`,
+);
 
 try {
   await program.parseAsync();

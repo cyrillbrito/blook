@@ -1,13 +1,7 @@
 // Batches rows in memory and writes them to IndexedDB about once a second,
 // so a service worker restart loses at most one interval of events.
 import { putMany } from '../db';
-import type {
-  ConsoleRow,
-  NetworkRequestRow,
-  RrwebEventRow,
-  WebSocketFrameRow,
-  WebSocketRow,
-} from '@blook/core/types';
+import type { ConsoleRow, NetworkRequestRow, RrwebEventRow, WebSocketFrameRow, WebSocketRow } from '@blook/core/types';
 
 export class BatchWriter {
   private rrweb: RrwebEventRow[] = [];

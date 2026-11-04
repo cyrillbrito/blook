@@ -48,12 +48,15 @@ export async function exportSession(sessionId: SessionId): Promise<{ ok: boolean
       filename: `${folder}.zip`,
       conflictAction: 'uniquify',
     });
-    return { ok: true, error:
+    return {
+      ok: true,
+      error:
         transcriptStatus === 'failed'
           ? `Exported without transcript: ${transcriptNote}`
           : transcript?.errors?.length
             ? `Transcript is partial: ${transcript.errors[0]!.error}`
-            : undefined };
+            : undefined,
+    };
   } catch (err) {
     return { ok: false, error: String((err as Error)?.message ?? err) };
   }

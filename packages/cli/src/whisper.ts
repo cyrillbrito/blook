@@ -39,10 +39,17 @@ export function findWhisperCli(): string | undefined {
 /** A model name (`base.en`, `small`) or a path to a ggml .bin file. Downloads a named model on first use. */
 export async function ensureModel(model: string): Promise<{ path: string; name: string }> {
   if (model.includes('/') || model.endsWith('.bin')) {
-    if (!existsSync(model)) throw new CliError(`Whisper model not found: ${model}`, EXIT.notFound, 'Pass a ggml model file, or a model name such as base.en.');
-    return { path: model, name: basename(model).replace(/^ggml-/, '').replace(/\.bin$/, '') };
+    if (!existsSync(model))
+      throw new CliError(`Whisper model not found: ${model}`, EXIT.notFound, 'Pass a ggml model file, or a model name such as base.en.');
+    return {
+      path: model,
+      name: basename(model)
+        .replace(/^ggml-/, '')
+        .replace(/\.bin$/, ''),
+    };
   }
-  if (!/^[\w.-]+$/.test(model)) throw new CliError(`Bad model name "${model}".`, EXIT.usage, 'Use a whisper.cpp model name such as base.en, small.en or small.');
+  if (!/^[\w.-]+$/.test(model))
+    throw new CliError(`Bad model name "${model}".`, EXIT.usage, 'Use a whisper.cpp model name such as base.en, small.en or small.');
   const path = join(modelsDir(), `ggml-${model}.bin`);
   if (existsSync(path)) return { path, name: model };
 
@@ -52,7 +59,12 @@ export async function ensureModel(model: string): Promise<{ path: string; name: 
   const part = `${path}.part`;
   try {
     const res = await fetch(url);
-    if (res.status === 404) throw new CliError(`No whisper.cpp model named "${model}".`, EXIT.usage, 'Use a name from https://huggingface.co/ggerganov/whisper.cpp, e.g. base.en, small.en, small.');
+    if (res.status === 404)
+      throw new CliError(
+        `No whisper.cpp model named "${model}".`,
+        EXIT.usage,
+        'Use a name from https://huggingface.co/ggerganov/whisper.cpp, e.g. base.en, small.en, small.',
+      );
     if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
     const total = Number(res.headers.get('content-length')) || 0;
     const out = createWriteStream(part);
@@ -68,7 +80,11 @@ export async function ensureModel(model: string): Promise<{ path: string; name: 
   } catch (e) {
     rmSync(part, { force: true });
     if (e instanceof CliError) throw e;
-    throw new CliError(`Downloading ${url} failed: ${e instanceof Error ? e.message : e}`, EXIT.network, 'Check the network and run it again, or pass --model <path to a ggml .bin>.');
+    throw new CliError(
+      `Downloading ${url} failed: ${e instanceof Error ? e.message : e}`,
+      EXIT.network,
+      'Check the network and run it again, or pass --model <path to a ggml .bin>.',
+    );
   }
   return { path, name: model };
 }
@@ -122,8 +138,24 @@ export function wav(samples: Float32Array): Buffer {
 
 /** whisper.cpp's DTW preset for a model name (`base.en-q5_1` → `base.en`, `large-v3-turbo` → `large.v3.turbo`). */
 export function dtwPreset(name: string): string | undefined {
-  const base = name.replace(/-q\d.*$/, '').replace(/^large-/, 'large.').replace(/-turbo$/, '.turbo');
-  const presets = ['tiny', 'tiny.en', 'base', 'base.en', 'small', 'small.en', 'medium', 'medium.en', 'large.v1', 'large.v2', 'large.v3', 'large.v3.turbo'];
+  const base = name
+    .replace(/-q\d.*$/, '')
+    .replace(/^large-/, 'large.')
+    .replace(/-turbo$/, '.turbo');
+  const presets = [
+    'tiny',
+    'tiny.en',
+    'base',
+    'base.en',
+    'small',
+    'small.en',
+    'medium',
+    'medium.en',
+    'large.v1',
+    'large.v2',
+    'large.v3',
+    'large.v3.turbo',
+  ];
   return presets.includes(base) ? base : undefined;
 }
 
@@ -138,7 +170,8 @@ export function runWhisper(cli: string, model: { path: string; name: string }, w
   // Builds before 1.8 have no -nfa (flash attention was off anyway).
   if (res.status !== 0 && /-nfa/.test(res.stderr ?? '')) res = run(args.filter((x) => x !== '-nfa'));
   if (res.error) throw new CliError(`Can't run ${cli}: ${res.error.message}`, EXIT.transcriber, WHISPER_INSTALL_HINT);
-  if (res.status !== 0) throw new Error(`whisper-cli exited with ${res.status}: ${(res.stderr || '').trim().split('\n').slice(-3).join(' ')}`);
+  if (res.status !== 0)
+    throw new Error(`whisper-cli exited with ${res.status}: ${(res.stderr || '').trim().split('\n').slice(-3).join(' ')}`);
   return wavPaths.map((p) => JSON.parse(readFileSync(`${p}.json`, 'utf8')));
 }
 

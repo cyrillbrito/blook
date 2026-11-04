@@ -259,7 +259,11 @@ function SettingsCard({ locked }: { locked: boolean }) {
           <Switch label="Mask inputs and text" checked={settings.mask} disabled={locked} onChange={(mask) => update({ mask })} />
           <Switch label="Canvas (2 fps)" checked={settings.canvas} disabled={locked} onChange={(canvas) => update({ canvas })} />
         </div>
-        <IconButton label={open ? 'Hide settings' : 'Settings'} onClick={() => setOpen(!open)} className={cx(open && 'bg-surface-sunken text-fg')}>
+        <IconButton
+          label={open ? 'Hide settings' : 'Settings'}
+          onClick={() => setOpen(!open)}
+          className={cx(open && 'bg-surface-sunken text-fg')}
+        >
           <GearIcon className="h-3.5 w-3.5" />
         </IconButton>
       </div>
@@ -289,11 +293,11 @@ function SettingsCard({ locked }: { locked: boolean }) {
 function SessionList({ sessions, activeId, onChanged }: { sessions: SessionMeta[]; activeId?: string; onChanged: () => void }) {
   return (
     <section className="space-y-1.5">
-      <SectionTitle>
-        Recordings {sessions.length > 0 && <span className="font-normal">({sessions.length})</span>}
-      </SectionTitle>
+      <SectionTitle>Recordings {sessions.length > 0 && <span className="font-normal">({sessions.length})</span>}</SectionTitle>
       {sessions.length === 0 ? (
-        <Card className="px-3 py-6 text-center text-xs text-muted">No recordings yet. Press Start recording and talk while you use the page.</Card>
+        <Card className="px-3 py-6 text-center text-xs text-muted">
+          No recordings yet. Press Start recording and talk while you use the page.
+        </Card>
       ) : (
         <Card className="divide-y divide-line overflow-hidden">
           {sessions.map((s) => (
@@ -320,8 +324,7 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
     return () => clearTimeout(id);
   }, [confirming]);
 
-  const openReplay = () =>
-    browser.tabs.create({ url: browser.runtime.getURL(`/replay.html?session=${encodeURIComponent(session.id)}`) });
+  const openReplay = () => browser.tabs.create({ url: browser.runtime.getURL(`/replay.html?session=${encodeURIComponent(session.id)}`) });
 
   const exportZip = async () => {
     setBusy('export');
@@ -398,7 +401,10 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
         )}
         {session.tabs.length > 1 && <span>· {session.tabs.length} tabs</span>}
         {tLabel && (
-          <span title={t?.error} className={cx(tTone === 'danger' ? 'text-danger' : tTone === 'warn' ? 'text-warn' : tTone === 'accent' && 'text-accent')}>
+          <span
+            title={t?.error}
+            className={cx(tTone === 'danger' ? 'text-danger' : tTone === 'warn' ? 'text-warn' : tTone === 'accent' && 'text-accent')}
+          >
             · {tLabel}
           </span>
         )}

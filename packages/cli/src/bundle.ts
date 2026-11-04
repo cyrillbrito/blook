@@ -53,11 +53,17 @@ export function loadBundle(path: string): Bundle {
   const { tabs } = json('rrweb.json', files.rrweb) as { tabs: { tabId: number; events: RrwebEvent[] }[] };
   const byTab = new Map((tabs ?? []).filter((t) => t.events?.length).map((t) => [String(t.tabId), t.events]));
   const tabIds = [...byTab.keys()];
-  if (!tabIds.length) throw new CliError(`No page recording in ${path}: rrweb.json has no events.`, EXIT.notFound, 'The bundle has no DOM to replay; read timeline.json and the other files instead.');
+  if (!tabIds.length)
+    throw new CliError(
+      `No page recording in ${path}: rrweb.json has no events.`,
+      EXIT.notFound,
+      'The bundle has no DOM to replay; read timeline.json and the other files instead.',
+    );
 
   const resolveTab = (tabId?: string) => {
     if (tabId == null) return tabIds[0]!;
-    if (!tabIds.includes(tabId)) throw new CliError(`Unknown tab ${tabId}.`, EXIT.usage, `Use --tab with one of: ${tabIds.join(', ')} (\`blook info\` lists them).`);
+    if (!tabIds.includes(tabId))
+      throw new CliError(`Unknown tab ${tabId}.`, EXIT.usage, `Use --tab with one of: ${tabIds.join(', ')} (\`blook info\` lists them).`);
     return tabId;
   };
   const lastEvent = Math.max(...[...byTab.values()].map((ev) => ev[ev.length - 1]!.timestamp));
@@ -72,7 +78,11 @@ export function loadBundle(path: string): Bundle {
   };
 }
 
-interface BundleFiles { session: string; rrweb: string; timeline?: string }
+interface BundleFiles {
+  session: string;
+  rrweb: string;
+  timeline?: string;
+}
 
 function readFolder(dir: string): BundleFiles {
   const read = (name: string, required = true) => {
@@ -113,7 +123,11 @@ export function parseTime(s: string): number {
   if (/^\d+(ms)?$/.test(v)) return Number(v.replace(/ms$/, ''));
   if (/^\d+\.\d+$/.test(v)) {
     // Bundle times are whole ms, so "3.2" is almost always meant as seconds: ask rather than guess.
-    throw new CliError(`Ambiguous time "${s}".`, EXIT.usage, `A bare number is ms: use ${v}s for seconds, or ${Math.round(Number(v) * 1000)} for ms.`);
+    throw new CliError(
+      `Ambiguous time "${s}".`,
+      EXIT.usage,
+      `A bare number is ms: use ${v}s for seconds, or ${Math.round(Number(v) * 1000)} for ms.`,
+    );
   }
   if (/^\d+(\.\d+)?s$/.test(v)) return Math.round(Number(v.slice(0, -1)) * 1000);
   if (/^\d+(:\d{1,2}){1,2}(\.\d+)?$/.test(v)) {
@@ -144,7 +158,19 @@ export function formatTime(ms: number): string {
 // rrweb enums (from @rrweb/types), kept local so this file has no deps.
 const EventType = { FullSnapshot: 2, IncrementalSnapshot: 3, Meta: 4 } as const;
 const Source = { MouseMove: 1, MouseInteraction: 2, ViewportResize: 4, TouchMove: 6, Drag: 12 } as const;
-const Interaction = ['MouseUp', 'MouseDown', 'Click', 'ContextMenu', 'DblClick', 'Focus', 'Blur', 'TouchStart', 'TouchMove_Departed', 'TouchEnd', 'TouchCancel'];
+const Interaction = [
+  'MouseUp',
+  'MouseDown',
+  'Click',
+  'ContextMenu',
+  'DblClick',
+  'Focus',
+  'Blur',
+  'TouchStart',
+  'TouchMove_Departed',
+  'TouchEnd',
+  'TouchCancel',
+];
 
 export interface PageState {
   url: string | null;
@@ -218,7 +244,12 @@ export function interactionsBetween(events: RrwebEvent[], from: number, to: numb
     if (e.timestamp > to) break;
     if (e.type === EventType.IncrementalSnapshot && e.data.source === Source.MouseInteraction) {
       const d = e.data;
-      out.push({ t: e.timestamp, type: Interaction[d.type] ?? String(d.type), nodeId: d.id, ...(typeof d.x === 'number' ? { x: d.x, y: d.y } : {}) });
+      out.push({
+        t: e.timestamp,
+        type: Interaction[d.type] ?? String(d.type),
+        nodeId: d.id,
+        ...(typeof d.x === 'number' ? { x: d.x, y: d.y } : {}),
+      });
     }
   }
   return out;

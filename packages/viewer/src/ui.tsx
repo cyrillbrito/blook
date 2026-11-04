@@ -83,7 +83,15 @@ export function Toolbar({ children }: { children: ReactNode }) {
   return <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-gray-200 bg-white px-2 py-1">{children}</div>;
 }
 
-export function Search({ value, onChange, placeholder = 'Filter' }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+export function Search({
+  value,
+  onChange,
+  placeholder = 'Filter',
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
   return (
     <input
       type="search"
@@ -100,10 +108,7 @@ export function Chip({ active, onClick, children, title }: { active: boolean; on
     <button
       title={title}
       onClick={onClick}
-      className={cx(
-        'h-6 rounded px-1.5 text-xs',
-        active ? 'bg-gray-200 font-medium text-gray-900' : 'text-gray-500 hover:bg-gray-100',
-      )}
+      className={cx('h-6 rounded px-1.5 text-xs', active ? 'bg-gray-200 font-medium text-gray-900' : 'text-gray-500 hover:bg-gray-100')}
     >
       {children}
     </button>
@@ -136,7 +141,10 @@ export function SubTabs<K extends string>({ tabs, value, onChange }: { tabs: [K,
         <button
           key={k}
           onClick={() => onChange(k)}
-          className={cx('border-b-2 px-1.5 py-1 text-xs', k === value ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-600 hover:text-gray-900')}
+          className={cx(
+            'border-b-2 px-1.5 py-1 text-xs',
+            k === value ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-600 hover:text-gray-900',
+          )}
         >
           {label}
         </button>
@@ -204,9 +212,7 @@ export function Body({
   if (binary) {
     return (
       <div className="space-y-2 p-2">
-        <div className="text-gray-500">
-          Binary, {formatBytes(data?.length)}
-        </div>
+        <div className="text-gray-500">Binary, {formatBytes(data?.length)}</div>
         {imgUrl && <img src={imgUrl} className="max-h-80 max-w-full border border-gray-200" />}
         {note}
       </div>

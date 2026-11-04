@@ -13,15 +13,7 @@ export default defineConfig({
   manifest: {
     name: 'Blook',
     description: 'Record a narrated browser session into a local bundle for coding agents',
-    permissions: [
-      'sidePanel',
-      'debugger',
-      'storage',
-      'offscreen',
-      'scripting',
-      'unlimitedStorage',
-      'downloads',
-    ],
+    permissions: ['sidePanel', 'debugger', 'storage', 'offscreen', 'scripting', 'unlimitedStorage', 'downloads'],
     host_permissions: ['<all_urls>'],
     // sidePanel.setPanelBehavior needs Chrome 116.
     minimum_chrome_version: '116',

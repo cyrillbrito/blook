@@ -90,10 +90,7 @@ export function TimelinePanel({ bundle, tabs, clock, follow, seek, open, focus }
   const items = useMemo(
     () =>
       bundle.timeline.filter(
-        (e) =>
-          !hidden.has(e.type) &&
-          (!onlyProblems || e.type === 'error' || e.type === 'request-failed') &&
-          includes(e.summary, q),
+        (e) => !hidden.has(e.type) && (!onlyProblems || e.type === 'error' || e.type === 'request-failed') && includes(e.summary, q),
       ),
     [bundle, hidden, onlyProblems, q],
   );
@@ -157,7 +154,10 @@ export function TimelinePanel({ bundle, tabs, clock, follow, seek, open, focus }
         <Detail title={selected.summary} onClose={() => setSel(undefined)}>
           {target && (
             <div className="px-2 pt-2">
-              <button className="rounded border border-gray-300 px-2 py-0.5 hover:bg-gray-100" onClick={() => open(target.panel, target.key)}>
+              <button
+                className="rounded border border-gray-300 px-2 py-0.5 hover:bg-gray-100"
+                onClick={() => open(target.panel, target.key)}
+              >
                 Open in {target.label} →
               </button>
             </div>
@@ -280,7 +280,14 @@ export function NetworkPanel({ bundle, tabs, clock, follow, seek, focus }: Props
         empty="No requests match."
       />
       {r && (
-        <Detail title={<span className="font-mono">{r.method} {r.url}</span>} onClose={() => setSel(undefined)}>
+        <Detail
+          title={
+            <span className="font-mono">
+              {r.method} {r.url}
+            </span>
+          }
+          onClose={() => setSel(undefined)}
+        >
           <SubTabs
             tabs={[
               ['headers', 'Headers'],
@@ -298,7 +305,14 @@ export function NetworkPanel({ bundle, tabs, clock, follow, seek, focus }: Props
                     ['URL', r.url],
                     ['Method', r.method],
                     ['Status', r.status != null ? `${r.status} ${r.statusText ?? ''}` : undefined],
-                    ['Error', r.errorText && <span key="error" className="text-red-700">{r.errorText}</span>],
+                    [
+                      'Error',
+                      r.errorText && (
+                        <span key="error" className="text-red-700">
+                          {r.errorText}
+                        </span>
+                      ),
+                    ],
                     ['Type', r.resourceType],
                     ['MIME', r.mimeType],
                     ['Started', formatTime(r.t)],
@@ -419,7 +433,10 @@ export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Pr
               setSel(`${s.id}:`);
               seek(s.t, s.tabId);
             }}
-            className={cx('flex cursor-default items-center gap-2 border-b border-gray-100 px-2 py-0.5 font-mono hover:bg-gray-50', s.id === socketId && 'bg-blue-50')}
+            className={cx(
+              'flex cursor-default items-center gap-2 border-b border-gray-100 px-2 py-0.5 font-mono hover:bg-gray-50',
+              s.id === socketId && 'bg-blue-50',
+            )}
           >
             <Time t={s.t} />
             <span className="w-8 shrink-0 text-gray-600">{s.status ?? '…'}</span>
@@ -436,9 +453,15 @@ export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Pr
       </div>
       <Toolbar>
         <Search value={q} onChange={setQ} placeholder="Filter payload" />
-        <Chip active={dir === 'all'} onClick={() => setDir('all')}>All</Chip>
-        <Chip active={dir === 'sent'} onClick={() => setDir('sent')}>↑ Sent</Chip>
-        <Chip active={dir === 'received'} onClick={() => setDir('received')}>↓ Received</Chip>
+        <Chip active={dir === 'all'} onClick={() => setDir('all')}>
+          All
+        </Chip>
+        <Chip active={dir === 'sent'} onClick={() => setDir('sent')}>
+          ↑ Sent
+        </Chip>
+        <Chip active={dir === 'received'} onClick={() => setDir('received')}>
+          ↓ Received
+        </Chip>
         <span className="ml-auto text-gray-500">{socket ? urlName(socket.url) : 'All sockets'}</span>
       </Toolbar>
       <RowList
@@ -600,7 +623,10 @@ export function TranscriptPanel({ bundle, clock, follow, seek, focus }: Props) {
         </div>
       )}
       {transcript.source && (
-        <div className="shrink-0 border-b border-gray-100 px-2 py-1 text-gray-400" title={`${transcript.source.at}, Blook ${transcript.source.blookVersion}`}>
+        <div
+          className="shrink-0 border-b border-gray-100 px-2 py-1 text-gray-400"
+          title={`${transcript.source.at}, Blook ${transcript.source.blookVersion}`}
+        >
           {transcript.source.method} {transcript.source.model}, by the {transcript.source.by}
         </div>
       )}

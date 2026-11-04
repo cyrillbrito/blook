@@ -23,7 +23,17 @@ import { TRANSCRIPTION_MODEL, type TranscriptChunkResult } from '@blook/core/typ
 import { bundleFolder, PASS_A_BUNDLE } from './bundle.ts';
 import { CliError, EXIT } from './errors.ts';
 import { note, warn } from './output.ts';
-import { DEFAULT_WHISPER_MODEL, decodeAudio, ensureModel, findWhisperCli, runWhisper, wav, whisperToStt, WHISPER_INSTALL_HINT, type WhisperJson } from './whisper.ts';
+import {
+  DEFAULT_WHISPER_MODEL,
+  decodeAudio,
+  ensureModel,
+  findWhisperCli,
+  runWhisper,
+  wav,
+  whisperToStt,
+  WHISPER_INSTALL_HINT,
+  type WhisperJson,
+} from './whisper.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 export type Method = 'openrouter' | 'whisper';
@@ -71,7 +81,8 @@ function readBundleFiles(path: string): BundleFiles {
   if (!sessionEntry) throw new CliError(`Not a Blook bundle: no session.json in ${path}.`, EXIT.notFound, PASS_A_BUNDLE);
   const prefix = sessionEntry.slice(0, -'session.json'.length);
   const files = new Map<string, Uint8Array>();
-  for (const [name, data] of Object.entries(raw)) if (name.startsWith(prefix) && !name.endsWith('/')) files.set(name.slice(prefix.length), data);
+  for (const [name, data] of Object.entries(raw))
+    if (name.startsWith(prefix) && !name.endsWith('/')) files.set(name.slice(prefix.length), data);
   return { kind: 'zip', path, prefix, files };
 }
 
@@ -142,7 +153,11 @@ export async function transcribeBundle(bundlePath: string, opts: TranscribeOptio
   }
   const chunks = (read<AudioChunk[]>('audio/chunks.json') ?? []).filter((c) => b.files.has(c.file));
   if (!chunks.length) {
-    throw new CliError(`No audio in ${b.path}: nothing to transcribe.`, EXIT.notFound, `The mic recorded nothing (session.json .mic: ${JSON.stringify(session.mic ?? null)}).`);
+    throw new CliError(
+      `No audio in ${b.path}: nothing to transcribe.`,
+      EXIT.notFound,
+      `The mic recorded nothing (session.json .mic: ${JSON.stringify(session.mic ?? null)}).`,
+    );
   }
   const existing = read<TranscriptOut>('transcript.json');
   const summary = (t: TranscriptOut, skipped: boolean, path: string): TranscribeSummary => ({
@@ -160,7 +175,9 @@ export async function transcribeBundle(bundlePath: string, opts: TranscribeOptio
     source: t.source,
   });
   if (existing?.status === 'ok' && !opts.force) {
-    note(`transcript.json is already ok (${existing.source ? `${existing.source.method} ${existing.source.model}` : 'no source'}): skipped. Use --force to run it again.`);
+    note(
+      `transcript.json is already ok (${existing.source ? `${existing.source.method} ${existing.source.model}` : 'no source'}): skipped. Use --force to run it again.`,
+    );
     return summary(existing, true, b.path);
   }
 
@@ -171,7 +188,13 @@ export async function transcribeBundle(bundlePath: string, opts: TranscribeOptio
   const t = transcriptJson(merged, chunks.length, ok ? {} : { status: 'failed', note: `failed: ${merged.errors?.[0]?.error}` });
   if (!ok) {
     // Keep whatever transcript the bundle had.
-    throw new CliError(`Transcription failed: ${merged.errors?.[0]?.error}`, method === 'openrouter' ? EXIT.network : EXIT.error, method === 'openrouter' ? 'Check OPENROUTER_API_KEY and the network, or use --method whisper.' : 'Run with BLOOK_DEBUG=1 for details, or try --method openrouter.');
+    throw new CliError(
+      `Transcription failed: ${merged.errors?.[0]?.error}`,
+      method === 'openrouter' ? EXIT.network : EXIT.error,
+      method === 'openrouter'
+        ? 'Check OPENROUTER_API_KEY and the network, or use --method whisper.'
+        : 'Run with BLOOK_DEBUG=1 for details, or try --method openrouter.',
+    );
   }
   if (t.errors?.length) warn(`${t.errors.length} of ${chunks.length} chunks failed: ${t.errors[0]!.error}`);
 
@@ -219,7 +242,12 @@ const label = (c: AudioChunk, n: number) => `chunk ${c.index + 1}/${n} (${c.file
 
 async function viaOpenRouter(b: BundleFiles, chunks: AudioChunk[], opts: TranscribeOptions): Promise<TranscriptChunkResult[]> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new CliError('OPENROUTER_API_KEY is not set.', EXIT.transcriber, 'Set it (https://openrouter.ai/keys), or use --method whisper for local transcription.');
+  if (!apiKey)
+    throw new CliError(
+      'OPENROUTER_API_KEY is not set.',
+      EXIT.transcriber,
+      'Set it (https://openrouter.ai/keys), or use --method whisper for local transcription.',
+    );
   const model = opts.model ?? TRANSCRIPTION_MODEL;
   const endpoint = process.env.BLOOK_OPENROUTER_URL || OPENROUTER_ENDPOINT;
   note(`Transcribing ${chunks.length} chunk(s) with OpenRouter ${model}`);
@@ -254,7 +282,12 @@ async function viaOpenRouter(b: BundleFiles, chunks: AudioChunk[], opts: Transcr
 
 async function viaWhisper(b: BundleFiles, chunks: AudioChunk[], opts: TranscribeOptions): Promise<TranscriptChunkResult[]> {
   const cli = findWhisperCli();
-  if (!cli) throw new CliError('whisper-cli is not installed.', EXIT.transcriber, `${WHISPER_INSTALL_HINT} Or set OPENROUTER_API_KEY for --method openrouter.`);
+  if (!cli)
+    throw new CliError(
+      'whisper-cli is not installed.',
+      EXIT.transcriber,
+      `${WHISPER_INSTALL_HINT} Or set OPENROUTER_API_KEY for --method openrouter.`,
+    );
   const model = await ensureModel(opts.model ?? DEFAULT_WHISPER_MODEL);
   note(`Decoding ${chunks.length} chunk(s) to 16 kHz WAV`);
   const pcm = await decodeAudio(chunks.map((c) => b.files.get(c.file)!));

@@ -2,5 +2,6 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "printWidth": 140,
   "singleQuote": true,
-  "ignorePatterns": ["references/**", "**/.output/**", "**/.wxt/**", "**/dist/**", "bun.lock"]
+  // Markdown stays hand-written: agents read the docs and the skill raw, and padded tables cost them tokens.
+  "ignorePatterns": ["references/**", "**/.output/**", "**/.wxt/**", "**/dist/**", "bun.lock", "**/*.md"]
 }

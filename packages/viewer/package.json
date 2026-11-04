@@ -14,12 +14,12 @@
     "@rrweb/types": "catalog:",
     "fflate": "catalog:"
   },
-  "peerDependencies": {
+  "devDependencies": {
+    "@types/react": "catalog:",
     "react": "catalog:",
     "tailwindcss": "catalog:"
   },
-  "devDependencies": {
-    "@types/react": "catalog:",
+  "peerDependencies": {
     "react": "catalog:",
     "tailwindcss": "catalog:"
   }

@@ -13,7 +13,10 @@ const res = await Bun.build({
   entrypoints: ['src/cli.ts'],
   minify: true,
   external: ['chromium-bidi', 'chromium-bidi/*'],
-  compile: { target: (values.target ?? `bun-${process.platform}-${process.arch}`) as Bun.Build.Target, outfile: values.outfile ?? 'dist/blook' },
+  compile: {
+    target: (values.target ?? `bun-${process.platform}-${process.arch}`) as Bun.Build.Target,
+    outfile: values.outfile ?? 'dist/blook',
+  },
   plugins: [
     {
       name: 'inline-assets',
@@ -35,10 +38,7 @@ const res = await Bun.build({
           const src = await Bun.file(path).text();
           return {
             loader: 'js',
-            contents: src.replace(
-              /require\(\w+\.default\.join\(packageRoot, "(package|browsers)\.json"\)\)/g,
-              'require("../$1.json")',
-            ),
+            contents: src.replace(/require\(\w+\.default\.join\(packageRoot, "(package|browsers)\.json"\)\)/g, 'require("../$1.json")'),
           };
         });
       },

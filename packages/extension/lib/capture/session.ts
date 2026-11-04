@@ -38,8 +38,7 @@ let status: RecordingStatus = { state: 'idle' };
 let active: Active | undefined;
 let stopping: Promise<RecordingStatus> | undefined;
 
-const send: SendCommand = (tabId, method, params) =>
-  browser.debugger.sendCommand({ tabId }, method, params as never) as Promise<any>;
+const send: SendCommand = (tabId, method, params) => browser.debugger.sendCommand({ tabId }, method, params as never) as Promise<any>;
 
 export function getStatus(): RecordingStatus {
   return status;
@@ -117,12 +116,8 @@ async function registerRecorder() {
 
 /** Fallback for documents the registered script missed. The script ignores a second injection. */
 function inject(tabId: number) {
-  browser.scripting
-    .executeScript({ target: { tabId, allFrames: true }, files: [RECORDER_MAIN_JS], world: 'MAIN' })
-    .catch(() => {});
-  browser.scripting
-    .executeScript({ target: { tabId, allFrames: true }, files: [RECORDER_JS] })
-    .catch(() => {});
+  browser.scripting.executeScript({ target: { tabId, allFrames: true }, files: [RECORDER_MAIN_JS], world: 'MAIN' }).catch(() => {});
+  browser.scripting.executeScript({ target: { tabId, allFrames: true }, files: [RECORDER_JS] }).catch(() => {});
 }
 
 export async function startSession(tabId: number): Promise<RecordingStatus> {
@@ -323,11 +318,11 @@ async function doStop(error?: string): Promise<RecordingStatus> {
   const chunks = (await getBySession('audioChunks', a.meta.id).catch(() => [])).length;
   if (a.meta.settings.mic) {
     const prev = a.meta.mic;
-    const why =
-      micStopError ??
-      prev.error ??
-      (chunks === 0 ? `no audio captured (mic state was "${prev.state}")` : undefined);
-    a.meta.mic = chunks > 0 && !micStopError ? { state: 'stopped', chunks, ...(prev.error ? { error: prev.error } : {}) } : { state: 'failed', chunks, error: why };
+    const why = micStopError ?? prev.error ?? (chunks === 0 ? `no audio captured (mic state was "${prev.state}")` : undefined);
+    a.meta.mic =
+      chunks > 0 && !micStopError
+        ? { state: 'stopped', chunks, ...(prev.error ? { error: prev.error } : {}) }
+        : { state: 'failed', chunks, error: why };
   } else {
     a.meta.mic = { state: 'off', chunks };
   }

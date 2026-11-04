@@ -1,7 +1,6 @@
 {
   "name": "blook",
   "private": true,
-  "type": "module",
   "workspaces": {
     "packages": [
       "packages/*"
@@ -20,6 +19,7 @@
       "tailwindcss": "^4.3.4"
     }
   },
+  "type": "module",
   "scripts": {
     "dev": "bun --cwd=packages/extension run dev",
     "build": "bun run --workspaces --if-present build",

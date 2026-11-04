@@ -1,8 +1,8 @@
 {
   "name": "@blook/extension",
-  "description": "Record a narrated browser session into a local bundle for coding agents",
-  "private": true,
   "version": "0.1.4",
+  "private": true,
+  "description": "Record a narrated browser session into a local bundle for coding agents",
   "type": "module",
   "scripts": {
     "dev": "wxt",

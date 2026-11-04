@@ -7,7 +7,11 @@ import { loadBundle, parseTime, checkTime, TIME_FORMATS, type Bundle } from '../
 import { ReplayEngine, type TabReplay } from '../replay.ts';
 import { printJson, printLine, warn } from '../output.ts';
 
-interface ReplayOpts { tab?: string; offline?: boolean; wait?: number }
+interface ReplayOpts {
+  tab?: string;
+  offline?: boolean;
+  wait?: number;
+}
 
 const timeArg = (v: string) => {
   try {
@@ -43,7 +47,12 @@ function outPath(out: string, r: TabReplay, t: number): string {
     mkdirSync(p, { recursive: true });
     return join(p, `blook-${r.bundle.session.id ?? 'session'}-${r.tab}-${t}.png`);
   }
-  if (extname(p).toLowerCase() !== '.png') throw new CliError(`--out must be a .png file or a folder, got ${out}.`, EXIT.usage, 'For example --out after-click.png, or --out shots/.');
+  if (extname(p).toLowerCase() !== '.png')
+    throw new CliError(
+      `--out must be a .png file or a folder, got ${out}.`,
+      EXIT.usage,
+      'For example --out after-click.png, or --out shots/.',
+    );
   mkdirSync(dirname(p), { recursive: true });
   return p;
 }

@@ -81,9 +81,7 @@ async function start(opts: StartOptions) {
       collectFonts: true,
       // Marks each input event as user-made or programmatic, so the timeline can drop the latter.
       userTriggeredOnInput: true,
-      ...(opts.canvas
-        ? { recordCanvas: true, sampling: { canvas: 2 }, dataURLOptions: { type: 'image/webp', quality: 0.5 } }
-        : {}),
+      ...(opts.canvas ? { recordCanvas: true, sampling: { canvas: 2 }, dataURLOptions: { type: 'image/webp', quality: 0.5 } } : {}),
       ...(opts.mask
         ? { maskAllInputs: true, maskTextSelector: MASK_TEXT_SELECTOR, blockClass: BLOCK_CLASS }
         : { maskInputOptions: { password: true } }),

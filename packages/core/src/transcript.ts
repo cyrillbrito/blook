@@ -43,12 +43,21 @@ export function chunkTranscript(
 ): { words: TranscriptWord[]; segments: TranscriptSegment[] } {
   const voiced = chunk.voiced ?? [];
   const rel = <T extends { start: number; end: number }>(list: T[]) =>
-    alignWords(list.map((x) => ({ ...x, start: x.start * 1000, end: x.end * 1000 })), voiced);
+    alignWords(
+      list.map((x) => ({ ...x, start: x.start * 1000, end: x.end * 1000 })),
+      voiced,
+    );
   const toSession = (ms: number) => Math.round(chunk.t + ms);
-  const words: TranscriptWord[] = rel((res.words ?? []).filter((w) => w.word.trim() && !NON_SPEECH.test(w.word)))
-    .map((w) => ({ word: w.word.trim(), start: toSession(w.start), end: toSession(w.end) }));
-  let segments: TranscriptSegment[] = rel((res.segments ?? []).filter((s) => !NON_SPEECH.test(s.text)))
-    .map((s) => ({ text: s.text.trim(), start: toSession(s.start), end: toSession(s.end) }));
+  const words: TranscriptWord[] = rel((res.words ?? []).filter((w) => w.word.trim() && !NON_SPEECH.test(w.word))).map((w) => ({
+    word: w.word.trim(),
+    start: toSession(w.start),
+    end: toSession(w.end),
+  }));
+  let segments: TranscriptSegment[] = rel((res.segments ?? []).filter((s) => !NON_SPEECH.test(s.text))).map((s) => ({
+    text: s.text.trim(),
+    start: toSession(s.start),
+    end: toSession(s.end),
+  }));
   // A segment starts at its first word: the model often starts it over noise before the speech.
   for (const s of segments) {
     const first = words.find((w) => w.start >= s.start && w.start < s.end);
@@ -66,7 +75,11 @@ export function mergeChunks(chunks: TranscriptChunkResult[]): Pick<TranscriptRow
   const ok = sorted.filter((c) => !c.error);
   const failed = sorted.filter((c) => c.error);
   // The newest run stands for the whole transcript.
-  const source = sorted.map((c) => c.source).filter((s) => !!s).sort((a, b) => a!.at.localeCompare(b!.at)).at(-1);
+  const source = sorted
+    .map((c) => c.source)
+    .filter((s) => !!s)
+    .sort((a, b) => a!.at.localeCompare(b!.at))
+    .at(-1);
   return {
     segments: ok.flatMap((c) => c.segments).sort((a, b) => a.start - b.start),
     words: ok.flatMap((c) => c.words).sort((a, b) => a.start - b.start),
@@ -159,7 +172,14 @@ export function speechEntries(segments: SegmentOut[]): SpeechEntry[] {
   return segments.map((seg) => {
     const one = seg.text.replace(/\s+/g, ' ').trim();
     const text = one.length > 300 ? `${one.slice(0, 300)}…` : one;
-    return { t: seg.t, type: 'speech', summary: `🗣 "${text}"`, text: seg.text, endT: seg.endT, ref: { file: 'transcript.json', segment: seg.index } };
+    return {
+      t: seg.t,
+      type: 'speech',
+      summary: `🗣 "${text}"`,
+      text: seg.text,
+      endT: seg.endT,
+      ref: { file: 'transcript.json', segment: seg.index },
+    };
   });
 }
 

@@ -1,4 +1,4 @@
 /* One stylesheet for every extension page: Tailwind, the shared theme, and the viewer's classes. */
-@import "tailwindcss";
-@import "@blook/ui/theme.css";
-@import "@blook/viewer/styles.css";
+@import 'tailwindcss';
+@import '@blook/ui/theme.css';
+@import '@blook/viewer/styles.css';

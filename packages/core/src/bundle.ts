@@ -13,7 +13,14 @@ import type {
   WebSocketRow,
 } from './types.ts';
 import { buildTimeline, isNetworkFailureLog } from './timeline.ts';
-import { transcriptFileNote, transcriptJson, transcriptSummary, type SegmentOut, type TranscriptOut, type TranscriptStatus } from './transcript.ts';
+import {
+  transcriptFileNote,
+  transcriptJson,
+  transcriptSummary,
+  type SegmentOut,
+  type TranscriptOut,
+  type TranscriptStatus,
+} from './transcript.ts';
 
 export type { SegmentOut, TranscriptOut, TranscriptStatus };
 
@@ -218,7 +225,7 @@ export async function zipBundle(rows: SessionRows, opts: BundleOptions = {}): Pr
   for (const events of rrwebByTab.values()) events.sort((a, b) => a.timestamp - b.timestamp);
   // Tabs in the order they were opened (session.tabs), then any other.
   const tabOrder = meta.tabs.map((t) => t.tabId);
-  const rank = (id: number) => (tabOrder.indexOf(id) + 1 || Infinity);
+  const rank = (id: number) => tabOrder.indexOf(id) + 1 || Infinity;
   const rrwebTabs = [...rrwebByTab.keys()].sort((a, b) => rank(a) - rank(b));
   if (rrwebTabs.length) {
     const tabs = rrwebTabs.map((tabId) => ({ tabId, url: meta.tabs.find((t) => t.tabId === tabId)?.url, events: rrwebByTab.get(tabId)! }));
@@ -306,10 +313,12 @@ export async function zipBundle(rows: SessionRows, opts: BundleOptions = {}): Pr
 
   const fileMap: Record<string, string> = {
     'session.json': 'This file: session meta, counts, mic outcome and this map. Read it first.',
-    'timeline.json': 'Every event in one array sorted by t (navigation, click, input, request, ws, console, speech…); ref points into the detail files.',
+    'timeline.json':
+      'Every event in one array sorted by t (navigation, click, input, request, ws, console, speech…); ref points into the detail files.',
   };
   if (rrwebTabs.length) {
-    fileMap['rrweb.json'] = `rrweb events per tab ({ tabs: [{ tabId, url, events }] }, timestamp = ms since start, one line); feed to the replay tool for DOM, screenshots and pointer at any t.`;
+    fileMap['rrweb.json'] =
+      `rrweb events per tab ({ tabs: [{ tabId, url, events }] }, timestamp = ms since start, one line); feed to the replay tool for DOM, screenshots and pointer at any t.`;
   }
   fileMap['network.json'] =
     'HTTP requests sorted by t, with headers and inline bodies (JSON bodies parsed). Can be large: query with jq, never read whole. Bodies of static files and page loads are not kept.';
@@ -363,8 +372,7 @@ function sessionJson(
     endT: durationMs,
     durationMs,
     exportedAt: new Date().toISOString(),
-    clock:
-      'Every t, endT and rrweb timestamp in this bundle is integer ms since startedAt (Unix ms). Absolute time = startedAt + t.',
+    clock: 'Every t, endT and rrweb timestamp in this bundle is integer ms since startedAt (Unix ms). Absolute time = startedAt + t.',
     firstSnapshotT: meta.firstSnapshotT,
     pageReadyT: meta.pageReadyT,
     tabs: meta.tabs,

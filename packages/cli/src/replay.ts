@@ -133,7 +133,11 @@ export class TabReplay {
     const end = events[events.length - 1]!.timestamp;
     let rt = t;
     if (state.firstSnapshotAt == null) {
-      throw new CliError(`Tab ${this.tab} has no DOM snapshot to replay.`, EXIT.notFound, 'Try another tab with --tab (`blook info` lists them), or read timeline.json.');
+      throw new CliError(
+        `Tab ${this.tab} has no DOM snapshot to replay.`,
+        EXIT.notFound,
+        'Try another tab with --tab (`blook info` lists them), or read timeline.json.',
+      );
     }
     if (t < state.firstSnapshotAt) {
       warnings.push(`t is before the first DOM snapshot (${formatTime(state.firstSnapshotAt)}); replaying that instead`);
@@ -146,23 +150,28 @@ export class TabReplay {
     const cur = this.page.viewportSize();
     if (!cur || cur.width !== viewport.width || cur.height !== viewport.height) await this.page.setViewportSize(viewport);
 
-    await this.page.evaluate(async ({ offset, settleMs }) => {
-      const r = (window as any).__replayer;
-      r.pause(offset);
-      const frame = r.iframe as HTMLIFrameElement;
-      const doc = frame.contentDocument!;
-      const raf = () => new Promise((res) => requestAnimationFrame(() => res(null)));
-      await raf();
-      await raf();
-      const pending = [...doc.images].filter((i) => !i.complete).map((i) => new Promise((res) => {
-        i.addEventListener('load', res, { once: true });
-        i.addEventListener('error', res, { once: true });
-      }));
-      await Promise.race([
-        Promise.all([...pending, doc.fonts?.ready]),
-        new Promise((res) => setTimeout(res, settleMs)),
-      ]);
-    }, { offset: rt - start, settleMs: this.settleMs });
+    await this.page.evaluate(
+      async ({ offset, settleMs }) => {
+        const r = (window as any).__replayer;
+        r.pause(offset);
+        const frame = r.iframe as HTMLIFrameElement;
+        const doc = frame.contentDocument!;
+        const raf = () => new Promise((res) => requestAnimationFrame(() => res(null)));
+        await raf();
+        await raf();
+        const pending = [...doc.images]
+          .filter((i) => !i.complete)
+          .map(
+            (i) =>
+              new Promise((res) => {
+                i.addEventListener('load', res, { once: true });
+                i.addEventListener('error', res, { once: true });
+              }),
+          );
+        await Promise.race([Promise.all([...pending, doc.fonts?.ready]), new Promise((res) => setTimeout(res, settleMs))]);
+      },
+      { offset: rt - start, settleMs: this.settleMs },
+    );
 
     const frames = canvasFramesAt(events, rt);
     if (frames.length) {
@@ -173,16 +182,25 @@ export class TabReplay {
     return { tab: this.tab, t, replayedT: rt, time: formatTime(rt), url: pageStateAt(events, rt).url, viewport, warnings };
   }
 
-  async screenshot(t: number, opts: { out?: string; cursor?: boolean } = {}): Promise<SeekResult & { path: string; mouse: MouseAt | null }> {
+  async screenshot(
+    t: number,
+    opts: { out?: string; cursor?: boolean } = {},
+  ): Promise<SeekResult & { path: string; mouse: MouseAt | null }> {
     const res = await this.seek(t);
     const mouse = mouseAt(this.bundle.events(this.tab), res.replayedT);
     const draw = opts.cursor !== false && mouse;
-    await this.page.evaluate((m) => {
-      const c = document.getElementById('ov-cursor')!;
-      if (!m) { c.style.display = 'none'; return; }
-      c.style.display = 'block';
-      c.style.transform = `translate(${m.x}px, ${m.y}px)`;
-    }, draw ? { x: mouse.x, y: mouse.y } : null);
+    await this.page.evaluate(
+      (m) => {
+        const c = document.getElementById('ov-cursor')!;
+        if (!m) {
+          c.style.display = 'none';
+          return;
+        }
+        c.style.display = 'block';
+        c.style.transform = `translate(${m.x}px, ${m.y}px)`;
+      },
+      draw ? { x: mouse.x, y: mouse.y } : null,
+    );
     const id = this.bundle.session.id ?? 'session';
     const path = opts.out ?? join(tmpdir(), `blook-${id}-${this.tab}-${res.replayedT}.png`);
     await this.page.screenshot({ path, clip: { x: 0, y: 0, ...res.viewport }, timeout: 15000, animations: 'disabled' });
@@ -193,9 +211,19 @@ export class TabReplay {
   async dom(t: number, opts: { selector?: string } = {}): Promise<SeekResult & { html: string | string[] }> {
     if (opts.selector) {
       const valid = await this.page.evaluate((s) => {
-        try { document.createDocumentFragment().querySelector(s); return true; } catch { return false; }
+        try {
+          document.createDocumentFragment().querySelector(s);
+          return true;
+        } catch {
+          return false;
+        }
       }, opts.selector);
-      if (!valid) throw new CliError(`Invalid CSS selector: ${opts.selector}`, EXIT.usage, 'Pass a CSS selector such as "#save", "button.primary" or "[data-testid=row]".');
+      if (!valid)
+        throw new CliError(
+          `Invalid CSS selector: ${opts.selector}`,
+          EXIT.usage,
+          'Pass a CSS selector such as "#save", "button.primary" or "[data-testid=row]".',
+        );
     }
     const res = await this.seek(t);
     const html = await this.page.evaluate((selector) => {
@@ -227,7 +255,9 @@ export class TabReplay {
       };
       if (selector) return [...doc.querySelectorAll(selector)].map(withValues);
       const dt = doc.doctype;
-      const doctype = dt ? `<!DOCTYPE ${dt.name}${dt.publicId ? ` PUBLIC "${dt.publicId}"` : ''}${dt.systemId ? ` "${dt.systemId}"` : ''}>\n` : '';
+      const doctype = dt
+        ? `<!DOCTYPE ${dt.name}${dt.publicId ? ` PUBLIC "${dt.publicId}"` : ''}${dt.systemId ? ` "${dt.systemId}"` : ''}>\n`
+        : '';
       return doctype + withValues(doc.documentElement);
     }, opts.selector ?? null);
     if (Array.isArray(html) && !html.length) res.warnings.push(`no element matches ${opts.selector} at ${res.time}`);
@@ -255,11 +285,21 @@ function isCanvasFrame(e: RrwebEvent): boolean {
   const d = e.data;
   if (e.type !== 3 || d?.source !== 9 || !Array.isArray(d.commands)) return false;
   const [a, b] = d.commands;
-  return d.commands.length === 2 && a?.property === 'clearRect' && b?.property === 'drawImage'
-    && b.args?.[0]?.rr_type === 'ImageBitmap' && b.args[0].args?.[0]?.rr_type === 'Blob';
+  return (
+    d.commands.length === 2 &&
+    a?.property === 'clearRect' &&
+    b?.property === 'drawImage' &&
+    b.args?.[0]?.rr_type === 'ImageBitmap' &&
+    b.args[0].args?.[0]?.rr_type === 'Blob'
+  );
 }
 
-interface CanvasFrame { id: number; clear: number[]; blob: { type: string; base64: string[] }; drawArgs: number[] }
+interface CanvasFrame {
+  id: number;
+  clear: number[];
+  blob: { type: string; base64: string[] };
+  drawArgs: number[];
+}
 
 function canvasFramesAt(events: RrwebEvent[], t: number): CanvasFrame[] {
   const latest = new Map<number, RrwebEvent>();
@@ -289,7 +329,10 @@ async function drawCanvasFrames(frames: CanvasFrame[]) {
       const canvas = mirror.getNode(f.id) as HTMLCanvasElement | null;
       if (!canvas?.isConnected) continue;
       const ctx = canvas.getContext?.('2d');
-      if (!ctx) { failed++; continue; }
+      if (!ctx) {
+        failed++;
+        continue;
+      }
       const parts = f.blob.base64.map((b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0)));
       const bmp = await createImageBitmap(new Blob(parts, { type: f.blob.type }));
       ctx.clearRect(...(f.clear as [number, number, number, number]));
@@ -308,25 +351,56 @@ function describeAt(point: { x: number; y: number } | null) {
   const mirror = r.getMirror();
   const top: Document = (r.iframe as HTMLIFrameElement).contentDocument!;
   let doc = top;
-  let ox = 0, oy = 0;
+  let ox = 0,
+    oy = 0;
   let el: Element | null = point ? doc.elementFromPoint(x, y) : null;
   // Descend into open shadow roots and same-origin iframes.
   for (let i = 0; el && i < 20; i++) {
     const sr = (el as HTMLElement).shadowRoot;
     const inner = sr?.elementFromPoint(x - ox, y - oy);
-    if (inner && inner !== el) { el = inner; continue; }
+    if (inner && inner !== el) {
+      el = inner;
+      continue;
+    }
     if (el.tagName === 'IFRAME') {
       const d = (el as HTMLIFrameElement).contentDocument;
       if (!d) break;
       const b = el.getBoundingClientRect();
-      ox += b.left; oy += b.top;
+      ox += b.left;
+      oy += b.top;
       const next = d.elementFromPoint(x - ox, y - oy);
       if (!next) break;
-      doc = d; el = next; continue;
+      doc = d;
+      el = next;
+      continue;
     }
     break;
   }
-  const KEY = ['role', 'aria-label', 'aria-labelledby', 'aria-expanded', 'aria-selected', 'aria-checked', 'aria-disabled', 'name', 'type', 'href', 'src', 'alt', 'title', 'placeholder', 'for', 'value', 'disabled', 'checked', 'data-testid', 'data-test-id', 'data-test', 'data-cy', 'data-qa'];
+  const KEY = [
+    'role',
+    'aria-label',
+    'aria-labelledby',
+    'aria-expanded',
+    'aria-selected',
+    'aria-checked',
+    'aria-disabled',
+    'name',
+    'type',
+    'href',
+    'src',
+    'alt',
+    'title',
+    'placeholder',
+    'for',
+    'value',
+    'disabled',
+    'checked',
+    'data-testid',
+    'data-test-id',
+    'data-test',
+    'data-cy',
+    'data-qa',
+  ];
   const seg = (e: Element) => {
     let s = e.tagName.toLowerCase();
     if (e.id) return `${s}#${CSS.escape(e.id)}`;
@@ -353,7 +427,12 @@ function describeAt(point: { x: number; y: number } | null) {
       const v = e.getAttribute(a);
       if (v != null) attributes[a] = v.length > 200 ? v.slice(0, 200) + '…' : v;
     }
-    if ((e as HTMLInputElement).value !== undefined && typeof (e as HTMLInputElement).value === 'string' && e.tagName !== 'BUTTON' && e.tagName !== 'LI') {
+    if (
+      (e as HTMLInputElement).value !== undefined &&
+      typeof (e as HTMLInputElement).value === 'string' &&
+      e.tagName !== 'BUTTON' &&
+      e.tagName !== 'LI'
+    ) {
       attributes.value = (e as HTMLInputElement).value;
     }
     const raw = ((e as HTMLElement).innerText ?? e.textContent ?? '').replace(/\s+/g, ' ').trim();
@@ -375,7 +454,8 @@ function describeAt(point: { x: number; y: number } | null) {
   const ancestry = [];
   for (let c = el?.parentElement; c && c.tagName !== 'HTML'; c = c.parentElement) ancestry.push(info(c));
   // The replayer re-applies recorded selections (rrweb selection events) to the top document.
-  ox = 0; oy = 0;
+  ox = 0;
+  oy = 0;
   const sel = top.getSelection();
   const selText = sel && sel.rangeCount ? sel.toString().trim() : '';
   let selection = null;

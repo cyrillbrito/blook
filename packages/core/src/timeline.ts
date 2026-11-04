@@ -161,7 +161,14 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
       map.add(e.data.node);
       lastInput.clear();
       lastScroll.clear();
-      out.push({ t, type: 'snapshot', tabId, summary: `DOM snapshot${href ? `: ${href}` : ''}`, url: href, ref: { file: 'rrweb.json', tabId, event: i } });
+      out.push({
+        t,
+        type: 'snapshot',
+        tabId,
+        summary: `DOM snapshot${href ? `: ${href}` : ''}`,
+        url: href,
+        ref: { file: 'rrweb.json', tabId, event: i },
+      });
     } else if (e.type === INCREMENTAL) {
       const d = e.data;
       if (d.source === SOURCE_MUTATION) {
@@ -205,7 +212,17 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
           Object.assign(prev, value, { endT: t, summary: `Input ${prev.target} = ${shown}`, ref: { file: 'rrweb.json', tabId, event: i } });
         } else {
           const target = map.describe(d.id);
-          const entry: TimelineEntry = { t, type: 'input', tabId, summary: `Input ${target} = ${shown}`, target, nodeId: d.id, ...value, endT: t, ref: { file: 'rrweb.json', tabId, event: i } };
+          const entry: TimelineEntry = {
+            t,
+            type: 'input',
+            tabId,
+            summary: `Input ${target} = ${shown}`,
+            target,
+            nodeId: d.id,
+            ...value,
+            endT: t,
+            ref: { file: 'rrweb.json', tabId, event: i },
+          };
           out.push(entry);
           lastInput.set(d.id, entry);
         }
@@ -215,7 +232,18 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
           Object.assign(prev, { endT: t, x: d.x, y: d.y, summary: `Scroll ${prev.target} to ${d.x},${d.y}` });
         } else {
           const target = map.describe(d.id);
-          const entry: TimelineEntry = { t, type: 'scroll', tabId, summary: `Scroll ${target} to ${d.x},${d.y}`, target, nodeId: d.id, x: d.x, y: d.y, endT: t, ref: { file: 'rrweb.json', tabId, event: i } };
+          const entry: TimelineEntry = {
+            t,
+            type: 'scroll',
+            tabId,
+            summary: `Scroll ${target} to ${d.x},${d.y}`,
+            target,
+            nodeId: d.id,
+            x: d.x,
+            y: d.y,
+            endT: t,
+            ref: { file: 'rrweb.json', tabId, event: i },
+          };
           out.push(entry);
           lastScroll.set(d.id, entry);
         }
@@ -246,15 +274,36 @@ export function buildTimeline(input: {
   const out: TimelineEntry[] = [];
 
   meta.navigations.forEach((nav, i) =>
-    out.push({ t: nav.t, type: 'navigation', tabId: nav.tabId, summary: `Navigate to ${nav.url}`, url: nav.url, ref: { file: 'session.json', navigation: i } }),
+    out.push({
+      t: nav.t,
+      type: 'navigation',
+      tabId: nav.tabId,
+      summary: `Navigate to ${nav.url}`,
+      url: nav.url,
+      ref: { file: 'session.json', navigation: i },
+    }),
   );
   if (meta.pageReadyT !== undefined) {
     const tab = meta.tabs[0]!;
-    out.push({ t: meta.pageReadyT, type: 'page-ready', tabId: tab.tabId, summary: 'Page finished loading (load event)', ref: { file: 'session.json', field: 'pageReadyT' } });
+    out.push({
+      t: meta.pageReadyT,
+      type: 'page-ready',
+      tabId: tab.tabId,
+      summary: 'Page finished loading (load event)',
+      ref: { file: 'session.json', field: 'pageReadyT' },
+    });
   }
   meta.tabs.forEach((tab, i) => {
     if (i === 0) return;
-    out.push({ t: tab.t, type: 'tab-open', tabId: tab.tabId, summary: `New tab opened from tab ${tab.openerTabId}: ${tab.url}`, url: tab.url, openerTabId: tab.openerTabId, ref: { file: 'session.json', tab: i } });
+    out.push({
+      t: tab.t,
+      type: 'tab-open',
+      tabId: tab.tabId,
+      summary: `New tab opened from tab ${tab.openerTabId}: ${tab.url}`,
+      url: tab.url,
+      openerTabId: tab.openerTabId,
+      ref: { file: 'session.json', tab: i },
+    });
   });
 
   for (const [tabId, events] of input.rrwebByTab) out.push(...rrwebEntries(tabId, events));
@@ -278,9 +327,26 @@ export function buildTimeline(input: {
   }
 
   for (const s of input.sockets) {
-    out.push({ t: s.t, type: 'ws-open', tabId: s.tabId, summary: `WebSocket open ${s.url}`, url: s.url, socketId: s.id, ...(s.status !== undefined ? { status: s.status } : {}), ref: { file: 'websockets.json', socketId: s.id } });
+    out.push({
+      t: s.t,
+      type: 'ws-open',
+      tabId: s.tabId,
+      summary: `WebSocket open ${s.url}`,
+      url: s.url,
+      socketId: s.id,
+      ...(s.status !== undefined ? { status: s.status } : {}),
+      ref: { file: 'websockets.json', socketId: s.id },
+    });
     if (s.endT !== undefined) {
-      out.push({ t: s.endT, type: 'ws-close', tabId: s.tabId, summary: `WebSocket closed ${s.url} after ${s.frameCount} frames`, url: s.url, socketId: s.id, ref: { file: 'websockets.json', socketId: s.id } });
+      out.push({
+        t: s.endT,
+        type: 'ws-close',
+        tabId: s.tabId,
+        summary: `WebSocket closed ${s.url} after ${s.frameCount} frames`,
+        url: s.url,
+        socketId: s.id,
+        ref: { file: 'websockets.json', socketId: s.id },
+      });
     }
     // Group frames: one entry per direction per FRAME_GROUP_MS window.
     let group: TimelineEntry | undefined;
@@ -293,7 +359,10 @@ export function buildTimeline(input: {
         group.summary = `WebSocket ${f.direction} ${group.count} frames (${group.bytes} B): ${group.preview}`;
         continue;
       }
-      const preview = f.payloadEncoding === 'base64' ? `<binary ${f.size} B>` : cut(f.payloadEncoding === 'json' ? JSON.stringify(f.payload) : String(f.payload));
+      const preview =
+        f.payloadEncoding === 'base64'
+          ? `<binary ${f.size} B>`
+          : cut(f.payloadEncoding === 'json' ? JSON.stringify(f.payload) : String(f.payload));
       group = {
         t: f.t,
         type: 'ws-frame',
@@ -332,5 +401,8 @@ export function buildTimeline(input: {
   for (const e of speechEntries(input.segments)) out.push({ ...e });
 
   // Stable sort by t; the per-type push order above breaks ties.
-  return out.map((e, i) => [e, i] as const).sort((a, b) => a[0].t - b[0].t || a[1] - b[1]).map(([e]) => e);
+  return out
+    .map((e, i) => [e, i] as const)
+    .sort((a, b) => a[0].t - b[0].t || a[1] - b[1])
+    .map(([e]) => e);
 }

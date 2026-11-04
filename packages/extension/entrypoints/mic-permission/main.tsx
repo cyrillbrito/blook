@@ -53,9 +53,7 @@ function App() {
           <MicIcon className="h-4 w-4" />
           Allow microphone
         </Button>
-        {s.text && (
-          <p className={s.kind === 'error' ? 'text-danger' : s.kind === 'granted' ? 'text-ok' : 'text-muted'}>{s.text}</p>
-        )}
+        {s.text && <p className={s.kind === 'error' ? 'text-danger' : s.kind === 'granted' ? 'text-ok' : 'text-muted'}>{s.text}</p>}
       </Card>
     </main>
   );

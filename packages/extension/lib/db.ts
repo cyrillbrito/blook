@@ -32,14 +32,7 @@ export interface BlookDB extends DBSchema {
 export type BlookDBHandle = IDBPDatabase<BlookDB>;
 
 /** Stores that hold per-session rows with a bySession index. */
-export const SESSION_STORES = [
-  'rrwebEvents',
-  'networkRequests',
-  'wsSockets',
-  'wsFrames',
-  'console',
-  'audioChunks',
-] as const;
+export const SESSION_STORES = ['rrwebEvents', 'networkRequests', 'wsSockets', 'wsFrames', 'console', 'audioChunks'] as const;
 
 let dbPromise: Promise<BlookDBHandle> | undefined;
 
@@ -50,25 +43,13 @@ export function openBlookDB(): Promise<BlookDBHandle> {
 
       db.createObjectStore('rrwebEvents', { keyPath: 'id', autoIncrement: true }).createIndex('bySession', 'sessionId');
 
-      db.createObjectStore('networkRequests', { keyPath: ['sessionId', 'requestId'] }).createIndex(
-        'bySession',
-        'sessionId',
-      );
-      db.createObjectStore('wsSockets', { keyPath: ['sessionId', 'socketId'] }).createIndex(
-        'bySession',
-        'sessionId',
-      );
+      db.createObjectStore('networkRequests', { keyPath: ['sessionId', 'requestId'] }).createIndex('bySession', 'sessionId');
+      db.createObjectStore('wsSockets', { keyPath: ['sessionId', 'socketId'] }).createIndex('bySession', 'sessionId');
 
       db.createObjectStore('wsFrames', { keyPath: 'id', autoIncrement: true }).createIndex('bySession', 'sessionId');
 
-      db.createObjectStore('console', { keyPath: 'id', autoIncrement: true }).createIndex(
-        'bySession',
-        'sessionId',
-      );
-      db.createObjectStore('audioChunks', { keyPath: ['sessionId', 'index'] }).createIndex(
-        'bySession',
-        'sessionId',
-      );
+      db.createObjectStore('console', { keyPath: 'id', autoIncrement: true }).createIndex('bySession', 'sessionId');
+      db.createObjectStore('audioChunks', { keyPath: ['sessionId', 'index'] }).createIndex('bySession', 'sessionId');
       db.createObjectStore('transcripts', { keyPath: 'sessionId' });
     },
   });
@@ -76,10 +57,7 @@ export function openBlookDB(): Promise<BlookDBHandle> {
 }
 
 /** Writes a batch of rows to one store in a single transaction. */
-export async function putMany<S extends (typeof SESSION_STORES)[number]>(
-  store: S,
-  rows: BlookDB[S]['value'][],
-): Promise<void> {
+export async function putMany<S extends (typeof SESSION_STORES)[number]>(store: S, rows: BlookDB[S]['value'][]): Promise<void> {
   const db = await openBlookDB();
   const tx = db.transaction(store, 'readwrite');
   await Promise.all([...rows.map((row) => tx.store.put(row as never)), tx.done]);

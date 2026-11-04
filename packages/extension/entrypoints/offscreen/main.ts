@@ -152,14 +152,7 @@ function stopChunk(): Promise<void> {
   return stopped.get(rec) ?? Promise.resolve();
 }
 
-async function saveChunk(
-  sessionId: string,
-  epoch: number,
-  index: number,
-  startedAt: number,
-  endedAt: number,
-  blob: Blob,
-) {
+async function saveChunk(sessionId: string, epoch: number, index: number, startedAt: number, endedAt: number, blob: Blob) {
   if (!blob.size) return;
   const t = startedAt - epoch;
   const voiced = await detectVoiced(blob);

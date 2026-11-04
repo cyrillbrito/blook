@@ -11,7 +11,10 @@ const MB = BODY_MAX_BYTES;
 function capture() {
   const sockets = new Map<string, WebSocketRow>();
   const frames: WebSocketFrameRow[] = [];
-  const writer = { upsertSocket: (s: WebSocketRow) => void sockets.set(s.socketId, { ...s }), addFrame: (f: WebSocketFrameRow) => void frames.push(f) } as unknown as BatchWriter;
+  const writer = {
+    upsertSocket: (s: WebSocketRow) => void sockets.set(s.socketId, { ...s }),
+    addFrame: (f: WebSocketFrameRow) => void frames.push(f),
+  } as unknown as BatchWriter;
   const cdp = new CdpCapture('s1', 1_000_000, writer, async () => ({}));
   return { cdp, sockets, frames };
 }

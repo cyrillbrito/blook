@@ -1,9 +1,5 @@
 // UI-only helpers shared by the side panel and the replay page.
-import {
-  sendToBackground,
-  type BackgroundRequests,
-  type BackgroundRequestType,
-} from '@/lib/messages';
+import { sendToBackground, type BackgroundRequests, type BackgroundRequestType } from '@/lib/messages';
 
 /**
  * Request to the background that never throws. Resolves to `undefined` when nobody

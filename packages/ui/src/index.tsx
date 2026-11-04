@@ -44,13 +44,7 @@ export function IconButton({
   ...rest
 }: ButtonProps & { label: string }) {
   return (
-    <button
-      type={type}
-      title={label}
-      aria-label={label}
-      className={cx(base, VARIANT[variant], ICON_SIZE[size], className)}
-      {...rest}
-    />
+    <button type={type} title={label} aria-label={label} className={cx(base, VARIANT[variant], ICON_SIZE[size], className)} {...rest} />
   );
 }
 
