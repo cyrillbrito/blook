@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium, type Browser, type Page } from 'playwright-core';
+import type { Browser, Page } from 'playwright-core';
+import { launchBrowser } from './browser.ts';
 import { type Bundle, type RrwebEvent, type MouseAt, mouseAt, pageStateAt, interactionsBetween, formatTime } from './bundle.ts';
 import { CliError, EXIT } from './errors.ts';
 
@@ -55,18 +56,7 @@ export class ReplayEngine {
   }
 
   static async launch(opts: EngineOptions = {}): Promise<ReplayEngine> {
-    let browser: Browser;
-    try {
-      browser = await chromium.launch({ headless: true });
-    } catch (e) {
-      // Playwright's own Chromium not installed: use the system Chrome.
-      if (!String(e).includes("Executable doesn't exist")) throw e;
-      try {
-        browser = await chromium.launch({ headless: true, channel: 'chrome' });
-      } catch {
-        throw new CliError('No browser found to replay in.', EXIT.browser, 'Run `blook install-browser` (downloads ~100 MB) or install Google Chrome.');
-      }
-    }
+    const browser = await launchBrowser('No browser found to replay in.');
     return new ReplayEngine(browser, opts);
   }
 

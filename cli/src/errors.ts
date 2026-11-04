@@ -12,8 +12,10 @@ export const EXIT = {
   timeRange: 4,
   /** No browser to replay in. */
   browser: 5,
-  /** A download failed. */
+  /** A download or a network request failed. */
   network: 6,
+  /** No speech-to-text: no OPENROUTER_API_KEY and no whisper-cli. */
+  transcriber: 7,
 } as const;
 
 export const EXIT_CODES_HELP = `Exit codes:
@@ -23,7 +25,8 @@ export const EXIT_CODES_HELP = `Exit codes:
   3  not found or invalid: bundle path, bundle contents, extension folder
   4  time outside the recording
   5  no browser: run \`blook install-browser\` or install Google Chrome
-  6  network: a download failed`;
+  6  network: a download or request failed
+  7  no speech-to-text: set OPENROUTER_API_KEY or install whisper-cli (\`brew install whisper-cpp\`)`;
 
 export class CliError extends Error {
   readonly exitCode: number;

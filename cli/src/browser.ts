@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, writeFileSync, chmodSync, renameSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { unzipSync } from 'fflate';
-import { chromium } from 'playwright-core';
+import { chromium, type Browser } from 'playwright-core';
 // Not in the package exports, hence the relative path. A static import, so a compiled binary embeds it.
 import browsers from '../node_modules/playwright-core/browsers.json' with { type: 'json' };
 import { CliError, EXIT } from './errors.ts';
@@ -80,4 +80,19 @@ export async function installBrowser(opts: { force?: boolean; log?: (msg: string
   rmSync(shell.dir, { recursive: true, force: true });
   renameSync(tmp, shell.dir);
   return { ...shell, installed: true };
+}
+
+/** Headless Chromium: Playwright's headless shell, else the installed Google Chrome. */
+export async function launchBrowser(what = 'No browser found.'): Promise<Browser> {
+  try {
+    return await chromium.launch({ headless: true });
+  } catch (e) {
+    // Playwright's own Chromium not installed: use the system Chrome.
+    if (!String(e).includes("Executable doesn't exist")) throw e;
+    try {
+      return await chromium.launch({ headless: true, channel: 'chrome' });
+    } catch {
+      throw new CliError(what, EXIT.browser, 'Run `blook install-browser` (downloads ~100 MB) or install Google Chrome.');
+    }
+  }
 }

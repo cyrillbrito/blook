@@ -1,8 +1,10 @@
 // Writes test/fixtures/blook-fixture.zip: a tiny synthetic bundle (800×600 page, a typed input,
 // mouse moves, a click on #save at 2000 that shows "Saved" at 2100, "Fixture" selected at 3000,
-// one failed request, a WebSocket with a JSON, a text and a binary frame, one console error).
+// one failed request, a WebSocket with a JSON, a text and a binary frame, one console error,
+// and one audio chunk at 1000 that says "And so my fellow Americans" (fixtures/speech.webm, cut
+// from whisper.cpp's public-domain jfk.wav), not transcribed yet (status skipped).
 // Run `bun test/make-fixture.ts` after changing it; the zip is committed.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { zipSync, strToU8 } from 'fflate';
 
 export const FIXTURE = {
@@ -11,6 +13,7 @@ export const FIXTURE = {
   tabId: 101,
   viewport: { width: 800, height: 600 },
   click: { t: 2000, x: 160, y: 120, nodeId: 10 },
+  audio: { t: 1000, durationMs: 2800, voiced: [[1000, 2980]] as [number, number][] },
 };
 
 let id = 0;
@@ -72,10 +75,10 @@ const session = {
   pageReadyT: 50,
   tabs: [{ tabId: FIXTURE.tabId, t: 0, url: 'http://localhost:4791/' }],
   navigations: [{ tabId: FIXTURE.tabId, t: 0, url: 'http://localhost:4791/' }],
-  settings: { mask: false, mic: false, canvas: false },
-  mic: { state: 'off' },
-  transcript: { status: 'none', note: 'mic was off' },
-  counts: { rrwebEvents: events.length, timeline: 8, requests: 1, failedRequests: 1, webSockets: 1, webSocketFrames: 3, console: 1, errors: 1, audioChunks: 0, transcriptSegments: 0 },
+  settings: { mask: false, mic: true, canvas: false },
+  mic: { state: 'stopped', chunks: 1 },
+  transcript: { status: 'skipped', note: 'skipped: no OpenRouter API key set' },
+  counts: { rrwebEvents: events.length, timeline: 8, requests: 1, failedRequests: 1, webSockets: 1, webSocketFrames: 3, console: 1, errors: 1, audioChunks: 1, transcriptSegments: 0 },
   files: {},
 };
 const tab = FIXTURE.tabId;
@@ -109,12 +112,16 @@ const files: Record<string, unknown> = {
   'network.json': network,
   'websockets.json': [socket],
   'console.json': consoleLog,
-  'transcript.json': { status: 'none', note: 'mic was off', segmentCount: 0, wordCount: 0, segments: [] },
+  'transcript.json': { status: 'skipped', note: 'skipped: no OpenRouter API key set', segmentCount: 0, wordCount: 0, segments: [] },
 };
-session.files = Object.fromEntries(Object.keys(files).map((f) => [f, f]));
+const speech = readFileSync(new URL('fixtures/speech.webm', import.meta.url));
+const { t: at, durationMs: len, voiced } = FIXTURE.audio;
+files['audio/chunks.json'] = [{ index: 0, t: at, endT: at + len, durationMs: len, voiced, mimeType: 'audio/webm;codecs=opus', size: speech.length, file: 'audio/000.webm' }];
+session.files = Object.fromEntries([...Object.keys(files), 'audio/'].map((f) => [f, f]));
 
 if (import.meta.main) {
-  const zip = zipSync(Object.fromEntries(Object.entries(files).map(([name, v]) => [dir + name, strToU8(JSON.stringify(v, null, name === 'rrweb.json' ? undefined : 2))])));
+  const entries = Object.entries(files).map(([name, v]) => [dir + name, strToU8(JSON.stringify(v, null, name === 'rrweb.json' ? undefined : 2))]);
+  const zip = zipSync(Object.fromEntries([...entries, [dir + 'audio/000.webm', [new Uint8Array(speech), { level: 0 }]]]));
   mkdirSync(new URL('fixtures/', import.meta.url), { recursive: true });
   writeFileSync(new URL('fixtures/blook-fixture.zip', import.meta.url), zip);
   console.log(`test/fixtures/blook-fixture.zip: ${zip.length} bytes`);

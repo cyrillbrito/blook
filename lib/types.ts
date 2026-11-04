@@ -1,5 +1,6 @@
 // Shared data shapes. Every `t` is ms since session start (see docs/architecture.md#clock).
 import type { eventWithTime } from '@rrweb/types';
+import type { TranscriptSource } from './transcribe/transcript.ts';
 
 export type SessionId = string;
 /** Ms since session start, from the epoch saved at Record. */
@@ -58,6 +59,8 @@ export interface TranscriptChunkResult {
   segments: TranscriptSegment[];
   words: TranscriptWord[];
   error?: string;
+  /** How this chunk was transcribed (missing on failed or empty chunks). */
+  source?: TranscriptSource;
 }
 
 export type MicState = 'off' | 'starting' | 'recording' | 'needs-permission' | 'failed' | 'stopped';
@@ -176,7 +179,7 @@ export interface ConsoleRow {
   stack?: string;
 }
 
-/** About 30 s of WebM/Opus mic audio. Written by the offscreen document. */
+/** 20 to 40 s of WebM/Opus mic audio, cut at a pause. Written by the offscreen document. */
 export interface AudioChunkRow {
   sessionId: SessionId;
   /** 0, 1, 2… becomes audio/NNN.webm. */
@@ -208,7 +211,8 @@ export interface TranscriptSegment {
 /** transcript.json. Times already converted to session time. */
 export interface TranscriptRow {
   sessionId: SessionId;
-  model: string;
+  /** The newest chunk's source. */
+  source?: TranscriptSource;
   segments: TranscriptSegment[];
   words: TranscriptWord[];
   /** Chunks that failed to transcribe, if any (the rest is still in segments and words). */

@@ -6,7 +6,7 @@
 
 ```bash
 # Narration (check the status first: no segments unless ok, partial or pending)
-jq -r '"status: \(.status) \(.note // "")", (.segments[] | "\(.t)-\(.endT)\t#\(.index)\t\(.text)")' "$B/transcript.json"
+jq -r '"status: \(.status) \(.note // "") source: \(.source | if . then "\(.method) \(.model) by \(.by)" else "-" end)", (.segments[] | "\(.t)-\(.endT)\t#\(.index)\t\(.text)")' "$B/transcript.json"
 
 # Timeline without DOM snapshots and static assets: speech, clicks, inputs, API calls, errors
 jq -r '.[] | select(.type != "snapshot")

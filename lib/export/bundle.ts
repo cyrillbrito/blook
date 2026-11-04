@@ -4,6 +4,9 @@ import { strToU8, zipSync, type Zippable } from 'fflate';
 import { getBySession, openBlookDB } from '../db';
 import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, SessionMeta, TranscriptRow, WebSocketFrameRow, WebSocketRow } from '../types';
 import { buildTimeline, isNetworkFailureLog } from './timeline';
+import { transcriptFileNote, transcriptJson, transcriptSummary, type SegmentOut, type TranscriptOut, type TranscriptStatus } from '../transcribe/transcript';
+
+export type { SegmentOut, TranscriptOut, TranscriptStatus };
 
 export const BUNDLE_FORMAT_VERSION = 1;
 
@@ -32,8 +35,6 @@ export function isExtensionConsole(c: { url?: string; stack?: string }): boolean
   const top = c.stack?.match(/\((\S+?):\d+:\d+\)/)?.[1];
   return !!top?.startsWith('chrome-extension://');
 }
-
-export type TranscriptStatus = 'ok' | 'partial' | 'pending' | 'none' | 'skipped' | 'failed';
 
 export interface RequestOut {
   id: string;
@@ -95,26 +96,6 @@ export interface SocketOut {
 }
 
 export type ConsoleOut = Omit<ConsoleRow, 'sessionId' | 'id'> & { index: number };
-
-export interface SegmentOut {
-  index: number;
-  t: number;
-  endT: number;
-  durationMs: number;
-  text: string;
-  words: { word: string; t: number; endT: number }[];
-}
-
-/** transcript.json. */
-export interface TranscriptOut {
-  status: TranscriptStatus;
-  note?: string;
-  model?: string;
-  errors?: { chunk: number; t: number; error: string }[];
-  segmentCount: number;
-  wordCount: number;
-  segments: SegmentOut[];
-}
 
 /** One entry of audio/chunks.json. */
 export interface AudioChunkOut {
@@ -279,40 +260,13 @@ export async function buildBundle(
     .map(({ sessionId: _s, id: _i, ...rest }, index) => ({ index, ...rest }));
 
   // transcript.json: segments with their words, all in session ms.
-  const transcript = opts.transcript;
-  const segments: SegmentOut[] = (transcript?.segments ?? []).map((s, index) => ({
-    index,
-    t: s.start,
-    endT: s.end,
-    durationMs: s.end - s.start,
-    text: s.text,
-    words: [],
-  }));
-  for (const w of transcript?.words ?? []) {
-    // The segment the word starts in, else the last one that started before it.
-    let seg = segments.find((s) => w.start >= s.t && w.start < s.endT);
-    seg ??= [...segments].reverse().find((s) => s.t <= w.start) ?? segments[0];
-    seg?.words.push({ word: w.word, t: w.start, endT: w.end });
-  }
-  const covered = transcript?.chunks.filter((c) => !c.error).length ?? 0;
-  const incomplete = !!transcript && (!!transcript.errors?.length || covered < audio.length);
-  const transcriptStatus: TranscriptStatus =
-    opts.transcriptStatus ?? (transcript ? (incomplete ? 'partial' : 'ok') : 'none');
-  let transcriptNote = opts.transcriptNote;
-  if (transcriptStatus === 'partial' && !transcriptNote && covered < audio.length) {
-    transcriptNote = `${covered} of ${audio.length} audio chunks transcribed${transcript?.errors?.length ? `; failed: ${transcript.errors[0]!.error}` : ''}`;
-  }
-  if (transcriptStatus === 'none' && meta.mic.error) transcriptNote = `no audio recorded: ${meta.mic.error}`;
-  if (transcriptStatus === 'partial' && !transcriptNote) transcriptNote = `${transcript!.errors!.length} audio chunk(s) failed to transcribe`;
-  const transcriptOut: TranscriptOut = clean({
-    status: transcriptStatus,
-    note: transcriptNote,
-    model: transcript?.model,
-    errors: transcript?.errors?.map(({ chunk, t, error }) => ({ chunk, t, error })),
-    segmentCount: segments.length,
-    wordCount: segments.reduce((n, s) => n + s.words.length, 0),
-    segments,
+  const transcriptOut = transcriptJson(opts.transcript, audio.length, {
+    status: opts.transcriptStatus,
+    note: opts.transcriptNote,
+    micError: meta.mic.error,
   });
+  const segments = transcriptOut.segments;
+  const transcriptStatus = transcriptOut.status;
 
   const audioOut: AudioChunkOut[] = audio.map((c) => ({
     index: c.index,
@@ -349,10 +303,10 @@ export async function buildBundle(
   fileMap['websockets.json'] =
     'WebSocket connections sorted by t, each with all its frames (t, direction, payload inline, JSON payloads parsed). Can be large: query with jq.';
   fileMap['console.json'] = 'Console calls, uncaught exceptions and browser log entries sorted by t.';
-  fileMap['transcript.json'] = `Narration: status "${transcriptStatus}", segments with words, all times in session ms.`;
+  fileMap['transcript.json'] = transcriptFileNote(transcriptStatus);
   if (audio.length) {
     fileMap['audio/chunks.json'] = 'Mic audio chunks: index, t, durationMs and file.';
-    fileMap['audio/'] = 'Raw mic audio, WebM/Opus, about 30 s per file.';
+    fileMap['audio/'] = 'Raw mic audio, WebM/Opus, 20 to 40 s per file, cut at pauses.';
   }
 
   const counts = {
@@ -369,7 +323,7 @@ export async function buildBundle(
     transcriptSegments: segments.length,
   };
 
-  put('session.json', json(sessionJson(meta, counts, fileMap, { status: transcriptStatus, note: transcriptNote, model: transcript?.model })));
+  put('session.json', json(sessionJson(meta, counts, fileMap, transcriptSummary(transcriptOut))));
 
   // zipSync: the async variant needs Workers, which service workers lack.
   return { folder, zip: zipSync(files) };
@@ -379,7 +333,7 @@ function sessionJson(
   meta: SessionMeta,
   counts: Record<string, number>,
   files: Record<string, string>,
-  transcript: { status: TranscriptStatus; note?: string; model?: string },
+  transcript: ReturnType<typeof transcriptSummary>,
 ) {
   const durationMs = meta.durationMs;
   return clean({
@@ -404,7 +358,7 @@ function sessionJson(
     navigations: meta.navigations,
     settings: meta.settings,
     mic: meta.mic,
-    transcript: clean(transcript),
+    transcript,
     counts,
     files,
   });

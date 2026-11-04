@@ -31,7 +31,7 @@ Typical uses: report bugs to an agent, and let an agent write E2E tests from a n
 - [WXT](https://wxt.dev) (MV3), React and Tailwind
 - [rrweb](https://github.com/rrweb-io/rrweb) for DOM recording and replay
 - `chrome.debugger` (Chrome DevTools Protocol) for network, WebSocket and console
-- OpenRouter speech-to-text for transcription
+- Transcription: OpenRouter speech-to-text (extension and CLI), or local whisper.cpp (CLI). The audio stays in the bundle, so a transcript can always be re-run.
 - Bun as package manager and for the CLI binary; Playwright in the CLI
 
 ## Commands
@@ -48,7 +48,7 @@ The replay CLI lives in `cli/`, with its own `bun install`:
 
 ```sh
 cd cli
-bun src/cli.ts pointer <bundle.zip> 00:18.5   # also: info, screenshot, dom, install-browser
+bun src/cli.ts pointer <bundle.zip> 00:18.5   # also: info, screenshot, dom, transcribe, install-browser
 bun run test                                  # tests, with a small synthetic bundle
 bun run build:bin                             # single binary: dist/blook
 ```

@@ -6,7 +6,7 @@ import { join, basename } from 'node:path';
 import { unzipSync, strFromU8 } from 'fflate';
 import { CliError, EXIT } from './errors.ts';
 
-const PASS_A_BUNDLE = 'Pass a blook-*.zip exported by the Blook extension, or its unzipped folder.';
+export const PASS_A_BUNDLE = 'Pass a blook-*.zip exported by the Blook extension, or its unzipped folder.';
 
 export interface RrwebEvent {
   type: number;
@@ -29,7 +29,7 @@ export interface Bundle {
 }
 
 /** A folder that holds one unzipped bundle (`unzip -d D`) stands for that bundle. */
-function bundleFolder(dir: string): string {
+export function bundleFolder(dir: string): string {
   if (existsSync(join(dir, 'session.json'))) return dir;
   const inner = readdirSync(dir).filter((n) => existsSync(join(dir, n, 'session.json')));
   return inner.length === 1 ? join(dir, inner[0]!) : dir;

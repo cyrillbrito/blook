@@ -2,7 +2,8 @@
 // Each entry is small and has a `ref` into the file that holds the full record.
 // The format is documented in docs/bundle-format.md; keep both in sync.
 import type { SessionMeta } from '../types';
-import type { ConsoleOut, RequestOut, SegmentOut, SocketOut } from './bundle';
+import type { ConsoleOut, RequestOut, SocketOut } from './bundle';
+import { speechEntries, type SegmentOut } from '../transcribe/transcript';
 
 // rrweb enums, inlined to avoid pulling rrweb into the service worker.
 const FULL_SNAPSHOT = 2;
@@ -328,9 +329,7 @@ export function buildTimeline(input: {
     });
   }
 
-  for (const seg of input.segments) {
-    out.push({ t: seg.t, type: 'speech', summary: `🗣 "${cut(seg.text, 300)}"`, text: seg.text, endT: seg.endT, ref: { file: 'transcript.json', segment: seg.index } });
-  }
+  for (const e of speechEntries(input.segments)) out.push({ ...e });
 
   // Stable sort by t; the per-type push order above breaks ties.
   return out.map((e, i) => [e, i] as const).sort((a, b) => a[0].t - b[0].t || a[1] - b[1]).map(([e]) => e);

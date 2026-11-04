@@ -40,7 +40,7 @@ websockets.json               WebSocket connections with their frames, payloads 
 console.json                  console calls, uncaught exceptions, browser log entries
 transcript.json               narration: segments with words
 audio/chunks.json             mic chunk index (only when there is audio)
-audio/NNN.webm                raw mic audio, WebM/Opus, ~30 s each
+audio/NNN.webm                raw mic audio, WebM/Opus, 20 to 40 s each, cut at pauses
 ```
 
 Every file except `audio/chunks.json` and `audio/*.webm` is always present, even when empty (`[]`). `rrweb.json` is present when the page was recorded. `session.json` `.files` lists exactly the files and folders in this bundle.
@@ -73,7 +73,7 @@ The entry point. Read it first.
 | `navigations` | `{ tabId, t, url }[]` | URL changes of session tabs, including SPA `pushState` changes, in `t` order. `[0]` is the start URL at `t = 0`. |
 | `settings` | `{ mask, mic, canvas }` (booleans) | Settings in effect. `mask`: inputs and marked text were masked. `mic`: the mic was on. `canvas`: canvas content was recorded at 2 fps. |
 | `mic` | `{ state, error?, chunks? }` | What happened to the mic. After Stop, `state` is `"off"` (setting off), `"stopped"` (recorded fine) or `"failed"` (no or partial audio: see `error`). A bundle built while recording (the Replay page) can show `"starting"`, `"recording"` or `"needs-permission"`. `chunks` is the number of saved audio files, set at Stop. |
-| `transcript` | `{ status, note?, model? }` | Same as the top of `transcript.json`. |
+| `transcript` | `{ status, note?, source? }` | Same as the top of `transcript.json`. |
 | `counts` | object | `rrwebEvents`, `timeline`, `requests`, `failedRequests`, `webSockets`, `webSocketFrames`, `console`, `errors` (console entries with level `error`, minus Chrome's `[network]` failed-resource lines; equals the number of timeline `error` entries), `audioChunks`, `transcriptSegments`. |
 | `files` | `{ [path]: string }` | Every file or folder in the bundle, with a one-line description. Folder keys end with `/`. |
 
@@ -333,23 +333,25 @@ Example:
 
 The narration. It's always present; check `status` first.
 
+The audio in `audio/` is the source; the transcript is one run of speech-to-text over it, and can be re-run. The extension transcribes with OpenRouter while recording when an API key is set. `blook transcribe <bundle>` fills it in or re-runs it later, with OpenRouter or locally with whisper.cpp, and rewrites this file, the `speech` entries of `timeline.json`, and `session.json` `.transcript`, `.counts` and `.files`. A bundle holds one transcript, and `source` says how it was made.
+
 | Field | Type | Meaning |
 |---|---|---|
-| `status` | `"ok"` \| `"partial"` \| `"pending"` \| `"none"` \| `"skipped"` \| `"failed"` | `ok`: every audio chunk was transcribed. `partial`: some chunks failed (see `errors`) or were left out (no API key for the rest); what was transcribed is here. `pending`: transcription is still running (only in a bundle built while it ran, e.g. the Replay page during or right after recording); the segments so far are here. `none`: there's no audio (see `note`, and `session.json` `.mic`). `skipped`: there's audio but no OpenRouter API key was set, so `audio/` has the raw files. `failed`: transcription failed (see `note`). |
+| `status` | `"ok"` \| `"partial"` \| `"pending"` \| `"none"` \| `"skipped"` \| `"failed"` | `ok`: every audio chunk was transcribed. `partial`: some chunks failed (see `errors`) or were left out (no API key for the rest); what was transcribed is here. `pending`: transcription is still running (only in a bundle built while it ran, e.g. the Replay page during or right after recording); the segments so far are here. `none`: there's no audio (see `note`, and `session.json` `.mic`). `skipped`: there's audio but no OpenRouter API key was set, so `audio/` has the raw files: run `blook transcribe`. `failed`: transcription failed (see `note`). |
 | `note` | string? | Why, for any status other than `ok`. |
-| `model` | string? | OpenRouter speech-to-text model used. |
+| `source` | object? | How the transcript was made (missing when nothing was transcribed): `method` (`"openrouter"` or `"whisper.cpp"`), `model` (the OpenRouter model id, e.g. `openai/whisper-large-v3`, or the ggml model name, e.g. `base.en`), `by` (`"extension"` while recording, `"cli"` for `blook transcribe`), `at` (ISO time of the run; for the extension, when its last chunk was transcribed) and `blookVersion`. |
 | `errors` | `{ chunk, t, error }[]`? | Chunks that failed: audio chunk index, its start `t`, and the error. |
 | `segmentCount`, `wordCount` | number | Totals. |
 | `segments` | Segment[] | Sorted by `t`. |
 
-Segment fields: `index` (0-based, `segments[i].index == i`), `t`, `endT`, `durationMs`, `text`, and `words`. Each word is `{ word, t, endT }`. A word belongs to the segment it starts in, or else to the last segment that started before it. All times are session ms, converted as `chunk.t + seconds × 1000`. When the chunk has `voiced` ranges (see [audio/](#audio)), word and segment boundaries that the model put in silence are moved to the nearest voiced edge first: a start in silence moves to the next voiced range, an end in silence back to the previous one. That fixes the first word of a chunk spanning the leading silence. Inside continuous speech, word times stay as loose as the model's (about ±0.3 s with Whisper).
+Segment fields: `index` (0-based, `segments[i].index == i`), `t`, `endT`, `durationMs`, `text`, and `words`. Each word is `{ word, t, endT }`. A word belongs to the segment it starts in, or else to the last segment that started before it. All times are session ms, converted as `chunk.t + seconds × 1000`, the same way for every `source`. When the chunk has `voiced` ranges (see [audio/](#audio)), word and segment boundaries that the model put in silence are moved to the nearest voiced edge first: a start in silence moves to the next voiced range, an end in silence back to the previous one, and the first word of a voiced range that starts within 0.8 s of its onset moves to the onset. That fixes the first word of a chunk spanning the leading silence, and late word starts after a pause. Inside continuous speech, word times stay as loose as the model's (about ±0.3 s with Whisper). With `whisper.cpp`, words come from DTW token times. Words can carry punctuation (`"loading."`).
 
 Example:
 
 ```json
 {
   "status": "ok",
-  "model": "openai/whisper-large-v3",
+  "source": { "method": "openrouter", "model": "openai/whisper-large-v3", "by": "extension", "at": "2026-11-03T19:09:04.512Z", "blookVersion": "0.1.4" },
   "segmentCount": 1,
   "wordCount": 4,
   "segments": [
@@ -372,7 +374,7 @@ Example:
 
 ## audio/
 
-Only present when the mic recorded something. `audio/NNN.webm` are standalone WebM/Opus files (32 kbit/s), about 30 s each. The last one is shorter and ends at Stop. `audio/chunks.json` indexes them:
+Only present when the mic recorded something. `audio/NNN.webm` are standalone WebM/Opus files (32 kbit/s). A chunk ends at the first pause (0.4 s below the voice level) after 20 s, or at 40 s, so words are rarely split across files; without a live mic level it ends at 30 s. The last one is shorter and ends at Stop. `audio/chunks.json` indexes them:
 
 ```json
 [{ "index": 0, "t": 127, "endT": 12867, "durationMs": 12740, "voiced": [[5167, 5707], [6787, 11127]], "mimeType": "audio/webm;codecs=opus", "size": 50026, "file": "audio/000.webm" }]

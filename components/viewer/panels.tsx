@@ -595,6 +595,11 @@ export function TranscriptPanel({ bundle, clock, follow, seek, focus }: Props) {
           ))}
         </div>
       )}
+      {transcript.source && (
+        <div className="shrink-0 border-b border-gray-100 px-2 py-1 text-gray-400" title={`${transcript.source.at}, Blook ${transcript.source.blookVersion}`}>
+          {transcript.source.method} {transcript.source.model}, by the {transcript.source.by}
+        </div>
+      )}
       <div ref={listRef} className="relative min-h-0 flex-1 overflow-auto">
         {segments.map((s, i) => (
           <div

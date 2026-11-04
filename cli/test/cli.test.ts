@@ -4,10 +4,11 @@ import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { unzipSync } from 'fflate';
+import { unzipSync, zipSync } from 'fflate';
 import { ReplayEngine } from '../src/replay.ts';
 import { parseTime } from '../src/bundle.ts';
 import { FIXTURE } from './make-fixture.ts';
+import { findWhisperCli, modelsDir, whisperToStt, dtwPreset } from '../src/whisper.ts';
 
 const CLI = join(import.meta.dir, '../src/cli.ts');
 const ZIP = join(import.meta.dir, 'fixtures/blook-fixture.zip');
@@ -45,7 +46,7 @@ describe('help', () => {
     expect(r.stdout).toContain('Exit codes:');
     expect(r.stdout).toContain('Examples:\n  blook info ');
   });
-  for (const cmd of ['info', 'pointer', 'dom', 'screenshot', 'extension', 'skill', 'install-browser', 'update']) {
+  for (const cmd of ['info', 'pointer', 'dom', 'screenshot', 'transcribe', 'extension', 'skill', 'install-browser', 'update']) {
     test(`${cmd} --help has examples`, () => {
       const r = run(cmd, '--help');
       expect(r.code).toBe(0);
@@ -247,4 +248,169 @@ describe('extension and skill', () => {
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('Usage: blook skill');
   });
+});
+
+describe('transcribe', () => {
+  /** Async, so the mock server in this process can answer while the CLI runs. */
+  async function runAsync(args: string[], env: Record<string, string | undefined> = {}) {
+    const p = Bun.spawn(['bun', CLI, ...args], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NO_COLOR: '1', OPENROUTER_API_KEY: undefined, ...env } });
+    const [stdout, stderr, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+    return { code, stdout, stderr, json: () => JSON.parse(stdout) };
+  }
+  const copy = (name: string) => {
+    const p = join(tmp, name);
+    writeFileSync(p, readFileSync(ZIP));
+    return p;
+  };
+  const entry = (zip: string, name: string) => JSON.parse(new TextDecoder().decode(unzipSync(readFileSync(zip))[`blook-${FIXTURE.id}/${name}`]!));
+
+  // A fake OpenRouter: verbose_json in seconds from the chunk start, first word in leading silence.
+  const requests: { auth: string | null; model: unknown; format: unknown; granularities: unknown[]; file: File }[] = [];
+  let reply = () => Response.json({
+    text: 'And so my fellow Americans',
+    segments: [{ start: 0, end: 2.4, text: ' And so my fellow Americans' }],
+    words: [
+      { word: 'And', start: 0, end: 0.3 },
+      { word: 'so', start: 0.3, end: 0.6 },
+      { word: 'my', start: 0.6, end: 0.9 },
+      { word: 'fellow', start: 0.9, end: 1.3 },
+      { word: 'Americans', start: 1.3, end: 2.4 },
+    ],
+  });
+  const server = Bun.serve({
+    port: 0,
+    async fetch(req) {
+      const form = await req.formData();
+      requests.push({ auth: req.headers.get('authorization'), model: form.get('model'), format: form.get('response_format'), granularities: form.getAll('timestamp_granularities[]'), file: form.get('file') as File });
+      return reply();
+    },
+  });
+  afterAll(() => server.stop(true));
+  const openrouter = { OPENROUTER_API_KEY: 'test-key', BLOOK_OPENROUTER_URL: `http://localhost:${server.port}/api/v1/audio/transcriptions` };
+
+  test('openrouter: transcript.json, timeline speech and session.json, rewritten in place', async () => {
+    const zip = copy('or.zip');
+    const r = await runAsync(['transcribe', zip], openrouter);
+    expect(r.code).toBe(0);
+    const out = r.json();
+    expect(out).toMatchObject({ path: zip, skipped: false, status: 'ok', method: 'openrouter', model: 'openai/whisper-large-v3', segments: 1, words: 5, chunks: 1 });
+    expect(out.source).toMatchObject({ method: 'openrouter', model: 'openai/whisper-large-v3', by: 'cli' });
+    expect(r.stderr).toContain('chunk 1/1 (audio/000.webm, 2.8 s): 5 words');
+    // The extension's request.
+    expect(requests.at(-1)).toMatchObject({ auth: 'Bearer test-key', model: 'openai/whisper-large-v3', format: 'verbose_json', granularities: ['word', 'segment'] });
+    expect(requests.at(-1)!.file.name).toBe('000.webm');
+    expect(requests.at(-1)!.file.size).toBe(readFileSync(join(import.meta.dir, 'fixtures/speech.webm')).length);
+
+    const t = entry(zip, 'transcript.json');
+    expect(t).toMatchObject({ status: 'ok', segmentCount: 1, wordCount: 5, source: out.source });
+    expect(t.segments[0]).toMatchObject({ index: 0, t: 1000, endT: 2980, text: 'And so my fellow Americans' });
+    // chunk.t + seconds × 1000; the last word's end in silence moves back to the voiced end (2980).
+    expect(t.segments[0].words.map((w: any) => [w.word, w.t, w.endT])).toEqual([['And', 1000, 1300], ['so', 1300, 1600], ['my', 1600, 1900], ['fellow', 1900, 2300], ['Americans', 2300, 2980]]);
+    const speech = entry(zip, 'timeline.json').filter((e: any) => e.type === 'speech');
+    expect(speech).toEqual([{ t: 1000, type: 'speech', summary: '🗣 "And so my fellow Americans"', text: 'And so my fellow Americans', endT: 2980, ref: { file: 'transcript.json', segment: 0 } }]);
+    const s = entry(zip, 'session.json');
+    expect(s.transcript).toEqual({ status: 'ok', source: out.source });
+    expect(s.counts).toMatchObject({ transcriptSegments: 1, timeline: 9 });
+    expect(s.files['transcript.json']).toContain('status "ok"');
+    // Everything else is untouched.
+    expect(entry(zip, 'network.json')).toEqual(entry(ZIP, 'network.json'));
+    expect(unzipSync(readFileSync(zip))[`blook-${FIXTURE.id}/audio/000.webm`]).toEqual(unzipSync(readFileSync(ZIP))[`blook-${FIXTURE.id}/audio/000.webm`]);
+
+    // Already ok: skipped without a request, unless --force.
+    const n = requests.length;
+    const again = await runAsync(['transcribe', zip], openrouter);
+    expect(again.json()).toMatchObject({ skipped: true, status: 'ok' });
+    expect(again.stderr).toContain('--force');
+    expect(requests.length).toBe(n);
+    expect((await runAsync(['transcribe', zip, '--force'], openrouter)).json()).toMatchObject({ skipped: false, status: 'ok' });
+    expect(requests.length).toBe(n + 1);
+  });
+
+  test('a folder is updated in place; --out writes a new zip and leaves the input alone', async () => {
+    const dir = join(tmp, 'folder-in');
+    for (const [name, data] of Object.entries(unzipSync(readFileSync(ZIP)))) {
+      mkdirSync(dirname(join(dir, name)), { recursive: true });
+      writeFileSync(join(dir, name), data);
+    }
+    const r = await runAsync(['transcribe', dir], openrouter);
+    expect(r.code).toBe(0);
+    const bundleDir = join(dir, `blook-${FIXTURE.id}`);
+    expect(r.json().path).toBe(bundleDir);
+    expect(JSON.parse(readFileSync(join(bundleDir, 'transcript.json'), 'utf8')).wordCount).toBe(5);
+
+    const src = copy('src.zip');
+    const out = join(tmp, 'out.zip');
+    const o = await runAsync(['transcribe', src, '--out', out], openrouter);
+    expect(o.json().path).toBe(out);
+    expect(entry(out, 'transcript.json').status).toBe('ok');
+    expect(entry(src, 'transcript.json').status).toBe('skipped');
+  });
+
+  test('every chunk failing: exit 6 and the bundle is left as it was', async () => {
+    const zip = copy('fail.zip');
+    const before = readFileSync(zip);
+    reply = () => new Response('{"error":"bad key"}', { status: 401 });
+    try {
+      const r = await runAsync(['transcribe', zip], openrouter);
+      expect(r.code).toBe(6);
+      expect(r.stdout).toBe('');
+      expect(r.stderr).toContain('error: Transcription failed: OpenRouter 401');
+      expect(readFileSync(zip)).toEqual(before);
+    } finally {
+      reply = () => Response.json({ text: '' });
+    }
+  });
+
+  test('no key and no whisper-cli: exit 7 naming both', async () => {
+    const r = await runAsync(['transcribe', ZIP], { PATH: dirname(process.execPath), BLOOK_WHISPER_CLI: undefined });
+    expect(r.code).toBe(7);
+    expect(r.stderr).toContain('OPENROUTER_API_KEY is not set and whisper-cli is not installed');
+    expect(r.stderr).toContain('brew install whisper-cpp');
+  });
+
+  test('a bundle without audio: exit 3', async () => {
+    const files = unzipSync(readFileSync(ZIP));
+    for (const k of Object.keys(files)) if (k.includes('/audio/')) delete files[k];
+    const zip = join(tmp, 'noaudio.zip');
+    writeFileSync(zip, zipSync(files));
+    const r = await runAsync(['transcribe', zip], openrouter);
+    expect(r.code).toBe(3);
+    expect(r.stderr).toContain('No audio in');
+  });
+
+  test('whisper.cpp JSON: words from tokens, DTW starts, special tokens dropped', () => {
+    const tok = (text: string, from: number, to: number, t_dtw = -1) => ({ text, offsets: { from, to }, t_dtw });
+    const stt = whisperToStt({
+      transcription: [{
+        offsets: { from: 0, to: 2400 },
+        text: ' And so, my fellow',
+        tokens: [tok('[_BEG_]', 0, 0), tok(' And', 0, 400, 30), tok(' so', 400, 800, 52), tok(',', 800, 800, 60), tok(' my', 800, 1200, 80), tok(' fel', 1200, 1500, 101), tok('low', 1500, 2400, 115), tok('[_TT_120]', 2400, 2400)],
+      }],
+    });
+    expect(stt.segments).toEqual([{ start: 0.3, end: 2.4, text: 'And so, my fellow' }]); // spans its DTW words
+    expect(stt.words).toEqual([
+      { word: 'And', start: 0.3, end: 0.52 },
+      { word: 'so,', start: 0.52, end: 0.8 },
+      { word: 'my', start: 0.8, end: 1.01 },
+      { word: 'fellow', start: 1.01, end: 2.4 },
+    ]);
+    expect([dtwPreset('base.en'), dtwPreset('base.en-q5_1'), dtwPreset('large-v3-turbo'), dtwPreset('custom')]).toEqual(['base.en', 'base.en', 'large.v3.turbo', undefined]);
+  });
+
+  // Needs whisper-cli and a downloaded model (tests never download one).
+  const model = join(modelsDir(), 'ggml-base.en.bin');
+  const canWhisper = !!findWhisperCli() && existsSync(model) && hasBrowser;
+  if (!canWhisper) console.warn(`Skipping the whisper.cpp test: needs whisper-cli (brew install whisper-cpp), ${model} (run \`blook transcribe <bundle> --method whisper\` once) and a browser.`);
+  test.skipIf(!canWhisper)('whisper: local transcription of the fixture chunk', async () => {
+    const zip = copy('whisper.zip');
+    const r = await runAsync(['transcribe', zip, '--method', 'whisper']);
+    expect(r.code).toBe(0);
+    expect(r.json()).toMatchObject({ status: 'ok', method: 'whisper.cpp', model: 'base.en', segments: 1, chunks: 1 });
+    const t = entry(zip, 'transcript.json');
+    expect(t.source).toMatchObject({ method: 'whisper.cpp', model: 'base.en', by: 'cli' });
+    expect(t.segments[0].text).toMatch(/and so,? my fellow americans/i);
+    const words = t.segments[0].words;
+    expect(words[0].t).toBe(1000); // snapped to the voiced onset
+    for (const w of words) expect(w.t).toBeGreaterThanOrEqual(1000), expect(w.endT).toBeLessThanOrEqual(2980);
+  }, 60_000);
 });

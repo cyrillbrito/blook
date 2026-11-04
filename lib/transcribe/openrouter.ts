@@ -3,92 +3,36 @@
 // Each chunk is transcribed as soon as it's saved (background), the rest after Stop,
 // and Export only fills in what's missing. Results live per chunk in the transcripts store.
 import { browser } from 'wxt/browser';
-import { alignWords } from './vad';
+import { chunkTranscript, mergeChunks, MIN_CHUNK_BYTES, type TranscriptSource } from './transcript';
+import { openRouterTranscribe, OPENROUTER_ENDPOINT } from './openrouter-api';
 import { getBySession, openBlookDB } from '../db';
 import type { PanelMessage } from '../messages';
 import { settingsItem } from '../settings';
-import type {
-  AudioChunkRow,
-  SessionId,
-  TranscriptChunkResult,
-  TranscriptionStatus,
-  TranscriptRow,
-  TranscriptSegment,
-  TranscriptWord,
-} from '../types';
+import type { AudioChunkRow, SessionId, TranscriptChunkResult, TranscriptionStatus, TranscriptRow } from '../types';
 import { TRANSCRIPTION_MODEL } from '../types';
 
-const ENDPOINT = 'https://openrouter.ai/api/v1/audio/transcriptions';
 /** Dev/test only: a fake endpoint URL in storage.local under this key replaces OpenRouter. */
 const ENDPOINT_OVERRIDE_KEY = 'blook-stt-endpoint';
 async function endpoint(): Promise<string> {
   const v = (await browser.storage.local.get(ENDPOINT_OVERRIDE_KEY))[ENDPOINT_OVERRIDE_KEY];
-  return typeof v === 'string' && v ? v : ENDPOINT;
+  return typeof v === 'string' && v ? v : OPENROUTER_ENDPOINT;
 }
-/** Chunks this small hold no speech worth a request. */
-const MIN_CHUNK_BYTES = 1000;
 const PARALLEL = 3;
 
-interface VerboseResponse {
-  text?: string;
-  segments?: { start: number; end: number; text: string }[];
-  words?: { word: string; start: number; end: number }[];
-}
-
 async function transcribeChunk(chunk: AudioChunkRow, apiKey: string) {
-  const form = new FormData();
   const ext = chunk.mimeType.includes('ogg') ? 'ogg' : 'webm';
-  form.append('file', new File([chunk.blob], `${String(chunk.index).padStart(3, '0')}.${ext}`, { type: chunk.mimeType.split(';')[0] }));
-  form.append('model', TRANSCRIPTION_MODEL);
-  form.append('response_format', 'verbose_json');
-  form.append('timestamp_granularities[]', 'word');
-  form.append('timestamp_granularities[]', 'segment');
-
-  const json = await postWithRetry(form, apiKey);
-
-  // Word and segment times are seconds from the chunk start. Pull them out of silence with
-  // the chunk's voiced ranges (lib/transcribe/vad.ts), then shift to session time.
-  const voiced = chunk.voiced ?? [];
-  const rel = <T extends { start: number; end: number }>(list: T[]) =>
-    alignWords(list.map((x) => ({ ...x, start: x.start * 1000, end: x.end * 1000 })), voiced);
-  const toSession = (ms: number) => Math.round(chunk.t + ms);
-  const words: TranscriptWord[] = rel(json.words ?? []).map((w) => ({ word: w.word.trim(), start: toSession(w.start), end: toSession(w.end) }));
-  let segments: TranscriptSegment[] = rel(json.segments ?? []).map((s) => ({ text: s.text.trim(), start: toSession(s.start), end: toSession(s.end) }));
-  if (!segments.length && json.text?.trim()) {
-    segments = [{ text: json.text.trim(), start: chunk.t, end: chunk.t + chunk.durationMs }];
-  }
-  return { words, segments: segments.filter((s) => s.text) };
-}
-
-/** POSTs once, and retries twice on network errors, 429 and 5xx with a growing pause. */
-async function postWithRetry(form: FormData, apiKey: string): Promise<VerboseResponse> {
-  let lastError: Error | undefined;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt) await new Promise((r) => setTimeout(r, 1500 * attempt));
-    let res: Response;
-    try {
-      res = await fetch(await endpoint(), {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'X-Title': 'Blook' },
-        body: form,
-        signal: AbortSignal.timeout(120_000),
-      });
-    } catch (err) {
-      lastError = new Error(`OpenRouter request failed: ${String((err as Error)?.message ?? err)}`);
-      continue;
-    }
-    if (res.ok) {
-      const text = await res.text();
-      try {
-        return JSON.parse(text) as VerboseResponse;
-      } catch {
-        throw new Error(`OpenRouter returned non-JSON: ${text.slice(0, 200)}`);
-      }
-    }
-    lastError = new Error(`OpenRouter ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
-    if (res.status !== 429 && res.status < 500) break; // auth, bad model, bad audio: retrying won't help
-  }
-  throw lastError ?? new Error('OpenRouter request failed');
+  const name = `${String(chunk.index).padStart(3, '0')}.${ext}`;
+  const res = await openRouterTranscribe(chunk.blob, name, { apiKey, endpoint: await endpoint() });
+  const source: TranscriptSource = {
+    method: 'openrouter',
+    model: TRANSCRIPTION_MODEL,
+    by: 'extension',
+    at: new Date().toISOString(),
+    blookVersion: browser.runtime.getManifest().version,
+  };
+  // Times are seconds from the chunk start: chunkTranscript pulls them out of silence with the
+  // chunk's voiced ranges and shifts them to session time.
+  return { ...chunkTranscript(chunk, res), source };
 }
 
 /** Chunk transcriptions running in this worker, by `${sessionId}:${index}`. */
@@ -112,17 +56,7 @@ function saveResult(sessionId: SessionId, result: TranscriptChunkResult): Promis
     const row = await db.get('transcripts', sessionId);
     const chunks = (row?.chunks ?? []).filter((c) => c.index !== result.index);
     chunks.push(result);
-    chunks.sort((a, b) => a.index - b.index);
-    const ok = chunks.filter((c) => !c.error);
-    const failed = chunks.filter((c) => c.error);
-    const next: TranscriptRow = {
-      sessionId,
-      model: TRANSCRIPTION_MODEL,
-      segments: ok.flatMap((c) => c.segments).sort((a, b) => a.start - b.start),
-      words: ok.flatMap((c) => c.words).sort((a, b) => a.start - b.start),
-      chunks,
-    };
-    if (failed.length) next.errors = failed.map((c) => ({ chunk: c.index, t: c.t, error: c.error! }));
+    const next: TranscriptRow = { sessionId, ...mergeChunks(chunks) };
     await db.put('transcripts', next);
   };
   const p = writeChain.then(run, run);

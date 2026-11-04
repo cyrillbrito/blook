@@ -16,7 +16,6 @@ const RECORDER_JS = '/content-scripts/recorder.js';
 const RECORDER_MAIN_JS = '/content-scripts/recorder-main.js';
 const RECORDER_MAIN_ID = 'blook-recorder-main';
 const RECORDER_ID = 'blook-recorder';
-const CHUNK_MS = 30_000;
 /** Saved in storage.session so a restarted service worker can resume the session. */
 const ACTIVE_KEY = 'blook-active';
 
@@ -187,7 +186,6 @@ async function startMic() {
       type: 'mic/start',
       sessionId: active.meta.id,
       startedAt: active.meta.startedAt,
-      chunkMs: CHUNK_MS,
     } as const;
     let reply: OffscreenReply = await sendToOffscreen(msg).catch((err): OffscreenReply => ({ ok: false, error: String(err) }));
     // A freshly created offscreen document may not have its listener up yet.

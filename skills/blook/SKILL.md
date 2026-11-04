@@ -22,7 +22,7 @@ When the user says "I have a recording", "check this blook", "I just put it ther
    D=$(mktemp -d) && unzip -q "$Z" -d "$D" && B=$(ls -d "$D"/blook-*)
    ```
 3. **Overview:** `blook info "$B"` (duration, tabs, clicks with their targets), and `jq '{url, durationMs, firstSnapshotT, pageReadyT, settings, transcript, counts}' "$B/session.json"`.
-4. **Read the narration, then the timeline.** The narration is the report. Print both with the first recipes in [recipes.md](recipes.md).
+4. **Read the narration, then the timeline.** The narration is the report. If `transcript.status` isn't `ok` and there is audio (`counts.audioChunks > 0`), make the transcript first: `blook transcribe "$B"` (OpenRouter with `OPENROUTER_API_KEY`, else local whisper.cpp; see below). Then print both with the first recipes in [recipes.md](recipes.md).
 5. **Go to the moments** the user talks about, with the chain below. Stop once you have the answer.
 
 ## Clock
@@ -37,7 +37,7 @@ The CLI takes `<t>` as ms (`9648`), seconds (`9.6s`) or `[hh:]mm:ss[.mmm]` (`00:
 |---|---|
 | `session.json` | Start: `url`, `durationMs`, `tabs`, `settings` (`mask`, `mic`, `canvas`), `firstSnapshotT` (no DOM before it), `pageReadyT` (load event), `transcript.status`, `counts`, `files` (every file, described) |
 | `timeline.json` | Every event in one array sorted by `t`: `{ t, type, tabId, summary, ref, ... }`. Types: `navigation`, `page-ready`, `tab-open`, `snapshot`, `click`, `input`, `scroll`, `request`, `request-failed`, `ws-open`, `ws-close`, `ws-frame`, `console`, `error`, `speech`. `ref` points to the full record |
-| `transcript.json` | `status` (`ok`, `partial`, `pending` have text; `none`, `skipped`, `failed` explain in `note`); `segments[]`: `{ index, t, endT, text, words: [{ word, t, endT }] }` |
+| `transcript.json` | `status` (`ok`, `partial`, `pending` have text; `none`, `skipped`, `failed` explain in `note`); `source`: how it was made, `{ method (openrouter, whisper.cpp), model, by (extension, cli), at }`; `segments[]`: `{ index, t, endT, text, words: [{ word, t, endT }] }` |
 | `network.json` | HTTP requests: `{ id, t, endT, method, url, resourceType, status, failed, errorText?, requestHeaders, requestBody?, responseBody?, ... }`. API calls keep their response body; static assets have `responseBodyNotKept` |
 | `websockets.json` | Sockets: `{ id, url, t, endT, frames: [{ index, t, direction, size, payload, payloadEncoding }] }`. Payloads are inline, encoded like bodies: `json` (parsed), `text` or `base64` |
 | `console.json` | `{ index, t, source (console, exception, log), level, text, url, line, stack? }` |
@@ -54,7 +54,7 @@ All fields: [bundle-format.md](https://github.com/cyrillbrito/blook/blob/main/do
 curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | BLOOK_NO_EXTENSION=1 BLOOK_NO_SKILL=1 sh
 ```
 
-All four print JSON on stdout. `blook <command> --help` has the options and output shapes.
+All print JSON on stdout. `blook <command> --help` has the options and output shapes.
 
 ```bash
 blook info       "$B"                  # duration, tabs, viewport, clicks: [{ t, type, x, y, target }]
@@ -62,12 +62,14 @@ blook pointer    "$B" 00:06.2          # mouse x/y, element under it (tag, id, t
                                        #   ancestry, selection (highlighted text), clicks within ±1 s
 blook dom        "$B" 6.7s --selector 'dialog, [role=alert]'   # replayed HTML (an array with --selector)
 blook screenshot "$B" 6.7s             # { path, ... }: view the PNG at .path with the read tool
+blook transcribe "$B"                  # no transcript yet: make it from audio/ (rewrites the bundle)
 ```
 
 - Prefer `pointer` and `dom --selector` to `screenshot`: text is cheaper and exact. Screenshot when the question is visual.
 - Check `warnings` and `replayedT`: before `firstSnapshotT` the CLI shows the first snapshot, and until `pageReadyT` the page may still be an empty shell.
 - Errors go to stderr with the fix. Exit codes worth knowing: 2 bad argument, 3 bundle not found or invalid, 4 time after the end, 5 no browser (run `blook install-browser` once).
 - `--tab <id>` for other tabs, `--offline` when the app's server is gone (images and fonts load from it).
+- `transcribe` fills `transcript.json` and the timeline's `speech` entries from the audio, in place. It uses OpenRouter when `OPENROUTER_API_KEY` is set, else whisper.cpp locally (`--method whisper`; needs `whisper-cli`, `brew install whisper-cpp`; the model downloads once, ~150 MB). Exit 7 means neither is available: tell the user both options. It skips an `ok` transcript; `--force` re-runs it. Progress goes to stderr; a run takes a few seconds per minute of audio.
 
 ## The chain
 
@@ -95,6 +97,7 @@ jq -r --argjson t $T '.[] | select(.t >= $t - 3000 and .t <= $t + 3000 and .type
 - **"This error"**: `error` and `request-failed` entries near the words; the stack from `console.json`, the failing body from `network.json`; `pointer` at the click before it.
 - **"Write an E2E test for this flow"**: steps from the `navigation`, `click` and `input` timeline entries, a `pointer` per click for roles and labels, assertions from the responses. See [workflows.md](workflows.md).
 - **"Do what I said"**: every ask in the narration becomes a task with its time, quote and `pointer` target. See [workflows.md](workflows.md).
-- **No transcript** (`transcript.status` is not `ok`): work from clicks, repeated clicks, errors and navigations, and say the narration is missing.
+- **No transcript** (`transcript.status` is not `ok`): run `blook transcribe "$B"` first. If that can't run (no audio, exit 7), work from clicks, repeated clicks, errors and navigations, and say the narration is missing.
+- **Say how the text was made** when quoting it: `transcript.source` (e.g. "transcribed locally with whisper.cpp base.en"). A small local model mishears names and jargon more often than OpenRouter's Whisper large; check a doubtful word against what the page shows.
 
 Every claim cites a time and its evidence: a quote, a request, a console line. A claim with no moment is a guess.

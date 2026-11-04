@@ -61,7 +61,7 @@ export type BackgroundMessage = {
 
 /** Background → offscreen document. Has `target: 'offscreen'` so other contexts ignore it. */
 export type OffscreenMessage =
-  | { target: 'offscreen'; type: 'mic/start'; sessionId: SessionId; startedAt: number; chunkMs: number }
+  | { target: 'offscreen'; type: 'mic/start'; sessionId: SessionId; startedAt: number }
   | { target: 'offscreen'; type: 'mic/stop' };
 
 /** Offscreen reply to `mic/start` and `mic/stop`. */

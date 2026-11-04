@@ -38,7 +38,7 @@ Prefer to download by hand? Everything is on the [releases page](https://github.
 
 ## Voice transcription (optional)
 
-To get your voice transcribed, click the gear icon in the side panel and paste an [OpenRouter API key](https://openrouter.ai/keys). Without a key, Blook still records everything else.
+To get your voice transcribed, click the gear icon in the side panel and paste an [OpenRouter API key](https://openrouter.ai/keys). Without a key, Blook still records everything else, and the recording keeps your voice. Whoever opens it can transcribe it later on their own machine with `blook transcribe <bundle>` (one-time setup: `brew install whisper-cpp`).
 
 ![The settings in the side panel, with the OpenRouter API key field](docs/images/sidepanel-settings.png)
 

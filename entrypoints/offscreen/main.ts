@@ -1,17 +1,26 @@
-// Mic recorder. Each ~30 s chunk is its own MediaRecorder run (stop, then start a new one),
+// Mic recorder. Each chunk is its own MediaRecorder run (stop, then start a new one),
 // because timeslice chunks are not standalone WebM files: only the first has the header.
+// A chunk ends at the first pause after MIN_CHUNK_MS, so no word is split, or at MAX_CHUNK_MS.
 import { openBlookDB } from '@/lib/db';
-import { voicedRanges, type Range } from '@/lib/transcribe/vad';
+import { PauseDetector, voicedRanges, type Range } from '@/lib/transcribe/vad';
 import { sendToBackground, type OffscreenMessage, type OffscreenReply } from '@/lib/messages';
 
 const MIME = 'audio/webm;codecs=opus';
+const MIN_CHUNK_MS = 20_000;
+const MAX_CHUNK_MS = 40_000;
+/** Without a live level (no AudioContext), cut at a fixed length. */
+const FIXED_CHUNK_MS = 30_000;
+const POLL_MS = 200;
 
 let stream: MediaStream | undefined;
 let recorder: MediaRecorder | undefined;
-let rotateTimer: ReturnType<typeof setTimeout> | undefined;
+let rotateTimer: ReturnType<typeof setInterval> | undefined;
+/** Live mic level for the pause check. The analyser holds the last fftSize samples (~0.7 s). */
+let audioCtx: AudioContext | undefined;
+let analyser: AnalyserNode | undefined;
+let pauses = new PauseDetector();
 let sessionId = '';
 let epoch = 0;
-let chunkMs = 30_000;
 let nextIndex = 0;
 const saves = new Set<Promise<void>>();
 /** Per recorder: resolves after its stop event fired and its chunk was written. */
@@ -37,18 +46,20 @@ async function startMic(msg: Extract<OffscreenMessage, { type: 'mic/start' }>): 
   }
   sessionId = msg.sessionId;
   epoch = msg.startedAt;
-  chunkMs = msg.chunkMs;
   nextIndex = await firstFreeIndex(sessionId);
   stream.getAudioTracks()[0]?.addEventListener('ended', () => {
     void sendToBackground({ type: 'mic/error', error: 'microphone track ended' });
     void stopMic();
   });
+  await startLevel(stream);
   startChunk();
   return { ok: true };
 }
 
 async function stopMic(): Promise<OffscreenReply> {
-  clearTimeout(rotateTimer);
+  clearInterval(rotateTimer);
+  void audioCtx?.close().catch(() => {});
+  audioCtx = analyser = undefined;
   // Wait for the recorder's final dataavailable + stop events and the IndexedDB write of the
   // partial last chunk, so the background can close this document right after.
   const last = stopChunk();
@@ -66,6 +77,30 @@ async function firstFreeIndex(id: string): Promise<number> {
   const db = await openBlookDB();
   const keys = await db.getAllKeysFromIndex('audioChunks', 'bySession', id);
   return keys.length ? Math.max(...keys.map((k) => k[1])) + 1 : 0;
+}
+
+async function startLevel(s: MediaStream) {
+  try {
+    audioCtx = new AudioContext();
+    await audioCtx.resume();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 32768;
+    audioCtx.createMediaStreamSource(s).connect(analyser);
+    pauses = new PauseDetector();
+  } catch (err) {
+    console.warn('[blook] live mic level', err);
+    audioCtx = analyser = undefined;
+  }
+}
+
+/** True when the chunk should end now. The analyser buffer covers ~0.7 s, so a 1 s poll (a throttled timer) still sees the pause. */
+function shouldCut(ageMs: number): boolean {
+  if (ageMs >= MAX_CHUNK_MS) return true;
+  if (!analyser || audioCtx?.state !== 'running') return ageMs >= FIXED_CHUNK_MS;
+  if (ageMs < MIN_CHUNK_MS) return false;
+  const buf = new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(buf);
+  return pauses.isPause(buf, audioCtx.sampleRate);
 }
 
 function startChunk() {
@@ -100,10 +135,13 @@ function startChunk() {
   });
   rec.start();
   recorder = rec;
-  rotateTimer = setTimeout(() => {
+  clearInterval(rotateTimer);
+  const begun = Date.now();
+  rotateTimer = setInterval(() => {
+    if (recorder !== rec || !shouldCut(Date.now() - begun)) return;
     void stopChunk();
     startChunk();
-  }, chunkMs);
+  }, POLL_MS);
 }
 
 /** Stops the current recorder. Resolves once its chunk is saved (or failed to save). */

@@ -25,9 +25,9 @@ flowchart TD
 
 **CDP capture** (`lib/capture/cdp.ts`). Turns `chrome.debugger` events into requests with bodies, sockets with frames, and console entries.
 
-**Mic** (`entrypoints/offscreen/`, `entrypoints/mic-permission/`). An offscreen document records the mic in chunks of about 30 s. The first mic permission needs a visible page.
+**Mic** (`entrypoints/offscreen/`, `entrypoints/mic-permission/`). An offscreen document records the mic in chunks of 20 to 40 s, cut at a pause (an AnalyserNode level check, `PauseDetector` in `lib/transcribe/vad.ts`). The first mic permission needs a visible page.
 
-**Transcription** (`lib/transcribe/openrouter.ts`). Sends each audio chunk to OpenRouter and stores word times per chunk.
+**Transcription** (`lib/transcribe/`). `openrouter.ts` sends each audio chunk to OpenRouter and stores word times per chunk. `transcript.ts` (mapping to session ms, transcript.json, speech entries) and `openrouter-api.ts` (the request) are pure and shared with `blook transcribe`, which re-runs transcription on a bundle with OpenRouter or local whisper.cpp.
 
 **Export** (`lib/export/`). Builds the ZIP from IndexedDB, including `timeline.json`, which merges every source into one sorted list.
 
@@ -47,8 +47,8 @@ flowchart TD
 - **Bodies only for API calls.** Response bodies are kept for XHR, Fetch, EventSource and failed page loads, cut at 1 MB. Scripts, CSS, fonts, images and normal page loads are most of the bytes and rarely the bug, so their bodies aren't fetched. Request bodies are always kept. One function decides: `lib/capture/body-policy.ts`.
 - **One network.json.** Bodies are inline and JSON bodies are parsed, so jq walks straight into them. The file is queried, not read whole.
 - **One clock.** Every `t` is ms since Record, from one `Date.now()` epoch. rrweb timestamps are shifted to it at export.
-- **One MediaRecorder per chunk.** Each ~30 s chunk is its own recorder run, so every file is a standalone WebM.
-- **Transcription.** Whisper on OpenRouter with word timestamps. Chunks are transcribed as they are saved, and Export fills in gaps. An energy VAD (`lib/transcribe/vad.ts`) moves word edges out of silence.
+- **One MediaRecorder per chunk.** Each chunk is its own recorder run, so every file is a standalone WebM.
+- **Transcription.** The audio is the source; a transcript is a re-runnable process over it, with its `source` recorded in transcript.json. Whisper on OpenRouter with word timestamps in the extension: chunks are transcribed as they are saved, and Export fills in gaps. The CLI can do the same later, or locally with whisper.cpp. An energy VAD (`lib/transcribe/vad.ts`) moves word edges out of silence.
 - **No screenshots or video.** The replay can rebuild any moment, so the bundle stays small and the agent asks for visuals only when it needs them.
 
 ## Known limits

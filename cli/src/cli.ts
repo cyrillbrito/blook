@@ -9,6 +9,7 @@ import { registerReplay } from './commands/replay.ts';
 import { registerSetup } from './commands/setup.ts';
 import { registerExtension } from './commands/extension.ts';
 import { registerSkill } from './commands/skill.ts';
+import { registerTranscribe } from './commands/transcribe.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 // `... | head` closes stdout early: exit quietly instead of crashing.
@@ -35,6 +36,7 @@ const program = new Command('blook')
 
 registerInfo(program);
 registerReplay(program);
+registerTranscribe(program);
 registerExtension(program);
 registerSkill(program);
 registerSetup(program);
@@ -50,6 +52,7 @@ Examples:
   blook pointer blook-2026-11-03_21-12-51.zip 00:06.2   # what the mouse was on
   blook dom blook-2026-11-03_21-12-51.zip 6193 --selector 'dialog'
   blook screenshot blook-2026-11-03_21-12-51.zip 6.7s   # look at it
+  blook transcribe blook-2026-11-03_21-12-51.zip        # no transcript yet: make one from audio/
 Run \`blook <command> --help\` for its options and output. \`blook skill print\` has the full guide
 for reading a bundle (timeline.json, network, console, transcript).`);
 
