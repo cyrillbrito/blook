@@ -1,9 +1,9 @@
 // Builds timeline.json: one array, sorted by t, merging everything an agent needs to scan first.
 // Each entry is small and has a `ref` into the file that holds the full record.
 // The format is documented in docs/bundle-format.md; keep both in sync.
-import type { SessionMeta } from '../types';
-import type { ConsoleOut, RequestOut, SocketOut } from './bundle';
-import { speechEntries, type SegmentOut } from '../transcribe/transcript';
+import type { SessionMeta } from './types.ts';
+import type { ConsoleOut, RequestOut, SocketOut } from './bundle.ts';
+import { speechEntries, type SegmentOut } from './transcript.ts';
 
 // rrweb enums, inlined to avoid pulling rrweb into the service worker.
 const FULL_SNAPSHOT = 2;

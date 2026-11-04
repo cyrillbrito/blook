@@ -5,8 +5,7 @@
 // - /replay.html: the file picker, the fallback when the handoff is gone.
 import { buildBundle } from '@/lib/export/bundle';
 import { storedTranscriptOptions } from '@/lib/transcribe/openrouter';
-import { bundleFromUserFiles, bundleFromZip, type Bundle } from '@/components/viewer/bundle';
-import { ViewerApp, type ViewerAppProps } from '@/components/viewer/ViewerApp';
+import { bundleFromUserFiles, bundleFromZip, ViewerApp, type Bundle, type ViewerAppProps } from '@blook/viewer';
 import { claimFile } from '@/components/handoff';
 import { tryBackground } from '@/components/util';
 

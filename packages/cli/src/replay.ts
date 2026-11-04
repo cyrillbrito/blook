@@ -1,31 +1,15 @@
 // Headless replay of a Blook bundle: Playwright Chromium + @rrweb/replay.
 // One ReplayEngine owns the browser; open() gives a TabReplay that can seek to
 // any t repeatedly (an MCP server can keep it alive between calls).
-import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Browser, Page } from 'playwright-core';
 import { launchBrowser } from './browser.ts';
 import { type Bundle, type RrwebEvent, type MouseAt, mouseAt, pageStateAt, interactionsBetween, formatTime } from './bundle.ts';
 import { CliError, EXIT } from './errors.ts';
+import { assets } from './assets.ts';
 
-// Under Bun, text imports embed the rrweb assets in a `bun build --compile` binary
-// (the umd file isn't in the package exports, hence the relative path).
-// Node has no text imports, so it reads them from node_modules.
-const { REPLAY_JS, REPLAY_CSS }: { REPLAY_JS: string; REPLAY_CSS: string } = process.versions.bun
-  ? {
-      REPLAY_JS: (await import('../node_modules/@rrweb/replay/umd/replay.min.js' as string, { with: { type: 'text' } })).default,
-      REPLAY_CSS: (await import('@rrweb/replay/dist/style.css' as string, { with: { type: 'text' } })).default,
-    }
-  : (() => {
-      const require = createRequire(import.meta.url);
-      const dir = require.resolve('@rrweb/replay/dist/style.css').replace(/dist[\\/]style\.css$/, '');
-      return {
-        REPLAY_JS: readFileSync(join(dir, 'umd/replay.min.js'), 'utf8'),
-        REPLAY_CSS: readFileSync(join(dir, 'dist/style.css'), 'utf8'),
-      };
-    })();
+const { replayJs: REPLAY_JS, replayCss: REPLAY_CSS } = assets();
 
 const HOST_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
 ${REPLAY_CSS}

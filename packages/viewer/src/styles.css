@@ -1,0 +1,4 @@
+/* Import in the host's Tailwind stylesheet, after "tailwindcss" and "@blook/ui/theme.css":
+   the rrweb replayer CSS, and an @source so Tailwind sees the viewer's classes. */
+@import "@rrweb/replay/dist/style.css";
+@source "./";

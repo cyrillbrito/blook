@@ -4,7 +4,7 @@ import { browser } from 'wxt/browser';
 import { getBySession, openBlookDB, putSession } from '../db';
 import type { OffscreenReply, PanelMessage, RecordingStatus } from '../messages';
 import { settingsItem } from '../settings';
-import type { MicInfo, RrwebEventRow, SessionMeta } from '../types';
+import type { MicInfo, RrwebEventRow, SessionMeta } from '@blook/core/types';
 import { CdpCapture, enableDomains, type SendCommand } from './cdp';
 import { closeOffscreen, ensureOffscreen, sendToOffscreen } from './offscreen';
 import { BatchWriter } from './writer';

@@ -2,8 +2,8 @@
 // (IndexedDB or a file handed over by the side panel). Only while nothing is loaded can the user
 // drop or pick a bundle .zip or unzipped folder; once a bundle is open there are no load-other controls.
 import { useEffect, useRef, useState } from 'react';
-import { Button, Card } from '@/components/ui';
-import { FolderOpenIcon, SpinnerIcon } from '@/components/ui/icons';
+import { Button, Card } from '@blook/ui';
+import { FolderOpenIcon, SpinnerIcon } from '@blook/ui/icons';
 import { bundleFromUserFiles, filesFromDrop, filesFromInput, type Bundle } from './bundle';
 import { Viewer } from './Viewer';
 

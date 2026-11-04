@@ -1,7 +1,7 @@
 // Turns chrome.debugger (CDP) events into stored rows: HTTP requests with bodies,
 // WebSocket sockets and frames, console calls, exceptions and browser log entries.
-import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, WebSocketRow } from '../types';
-import { BODY_MAX_BYTES, bodyPolicy, capBase64, capText } from './body-policy';
+import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, WebSocketRow } from '@blook/core/types';
+import { BODY_MAX_BYTES, bodyPolicy, capBase64, capText } from '@blook/core/body-policy';
 import type { BatchWriter } from './writer';
 
 export type SendCommand = (tabId: number, method: string, params?: object) => Promise<any>;

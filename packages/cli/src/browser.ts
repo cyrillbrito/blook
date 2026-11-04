@@ -6,9 +6,10 @@ import { existsSync, mkdirSync, writeFileSync, chmodSync, renameSync, rmSync } f
 import { dirname, join } from 'node:path';
 import { unzipSync } from 'fflate';
 import { chromium, type Browser } from 'playwright-core';
-// Not in the package exports, hence the relative path. A static import, so a compiled binary embeds it.
-import browsers from '../node_modules/playwright-core/browsers.json' with { type: 'json' };
+import { assets } from './assets.ts';
 import { CliError, EXIT } from './errors.ts';
+
+const browsers = JSON.parse(assets().browsersJson) as { browsers: { name: string; revision: string; browserVersion?: string }[] };
 
 const CDNS = ['https://cdn.playwright.dev', 'https://playwright.download.prss.microsoft.com/dbazure/download/playwright'];
 

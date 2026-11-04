@@ -5,4 +5,4 @@ node_modules/
 dist/
 .DS_Store
 *.zip
-!cli/test/fixtures/*.zip
+!packages/cli/test/fixtures/*.zip

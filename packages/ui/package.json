@@ -1,0 +1,21 @@
+{
+  "name": "@blook/ui",
+  "private": true,
+  "description": "Blook UI primitives, icons, logo and Tailwind theme",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./icons": "./src/icons.tsx",
+    "./theme.css": "./src/theme.css",
+    "./icon.svg": "./src/icon.svg"
+  },
+  "peerDependencies": {
+    "react": "catalog:",
+    "tailwindcss": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "tailwindcss": "catalog:"
+  }
+}

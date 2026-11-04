@@ -1,6 +1,7 @@
-@import "tailwindcss";
+/* Design tokens shared by the side panel, the viewer and the small pages. See packages/ui/README.md.
+   Import after "tailwindcss": @import "@blook/ui/theme.css". The @source scans these primitives. */
+@source "./";
 
-/* Design tokens shared by the side panel, the viewer and the small pages. See components/ui/README.md. */
 @theme {
   --color-surface: var(--color-white);
   --color-surface-muted: var(--color-gray-50);
@@ -9,7 +10,7 @@
   --color-line-strong: var(--color-gray-300);
   --color-fg: var(--color-gray-900);
   --color-muted: var(--color-gray-500);
-  /* Brand pair from the app icon (assets/icon/icon.svg): ultramarine and vermilion. */
+  /* Brand pair from the app icon (icon.svg): ultramarine and vermilion. */
   --color-accent: #2545c9; /* 7.6:1 with white */
   --color-accent-strong: #1d38a8;
   --color-accent-soft: var(--color-blue-50);

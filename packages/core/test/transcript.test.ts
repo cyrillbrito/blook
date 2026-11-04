@@ -1,10 +1,9 @@
-/// <reference types="bun" />
 // Transcript logic shared by the extension and `blook transcribe`: chunk results to session ms,
 // merging, transcript.json, the timeline's speech entries, and the live pause check.
 import { describe, expect, test } from 'bun:test';
-import { chunkTranscript, mergeChunks, replaceSpeech, transcriptJson, type TranscriptSource } from '../lib/transcribe/transcript';
-import { alignWords, PauseDetector } from '../lib/transcribe/vad';
-import type { TranscriptChunkResult } from '../lib/types';
+import { chunkTranscript, mergeChunks, replaceSpeech, transcriptJson, type TranscriptSource } from '../src/transcript.ts';
+import { alignWords, PauseDetector } from '../src/vad.ts';
+import type { TranscriptChunkResult } from '../src/types.ts';
 
 const source = (at: string): TranscriptSource => ({ method: 'openrouter', model: 'm', by: 'extension', at, blookVersion: '0.0.0' });
 

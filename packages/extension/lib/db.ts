@@ -10,7 +10,7 @@ import type {
   TranscriptRow,
   WebSocketFrameRow,
   WebSocketRow,
-} from './types';
+} from '@blook/core/types';
 
 export interface BlookDB extends DBSchema {
   sessions: { key: SessionId; value: SessionMeta; indexes: { byStartedAt: number } };

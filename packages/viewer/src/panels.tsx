@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Bundle, ConsoleOut, FrameOut, RequestOut, SocketOut, TimelineEntry } from './bundle';
 import { lastAtOrBefore } from './playback';
 import { Body, Chip, Detail, KeyValues, RowList, Search, Section, SubTabs, TabBadge, Time, Toolbar, includes, type PanelProps } from './ui';
-import { cx, formatBytes, formatMs, formatTime, urlName, useNow } from './util';
+import { formatBytes, formatMs, formatTime, urlName } from '@blook/core/format';
+import { cx, useNow } from './util';
 
 export type PanelId = 'timeline' | 'transcript' | 'network' | 'websockets' | 'console';
 

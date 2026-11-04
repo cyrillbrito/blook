@@ -1,8 +1,11 @@
 // Compile the single `blook` binary. Usage: bun build.ts [--target=bun-linux-x64] [--outfile=dist/blook-linux-x64]
-// playwright-core loads its package.json and browsers.json with require(path.join(packageRoot, ...)).
-// Bun can't embed a computed path, so the binary would look for the build machine's node_modules.
-// The plugin turns those into static requires, which get bundled.
+// Two plugins keep the binary free of paths on the build machine:
+// - src/assets.ts reads files from node_modules and skills/ at runtime; it is replaced by a module
+//   with their contents inlined.
+// - playwright-core loads its package.json and browsers.json with require(path.join(packageRoot, ...)).
+//   Bun can't embed a computed path, so those become static requires, which get bundled.
 import { parseArgs } from 'node:util';
+import { readAssets, SKILL_FILES } from './src/assets.ts';
 
 const { values } = parseArgs({ options: { target: { type: 'string' }, outfile: { type: 'string' } } });
 
@@ -12,6 +15,19 @@ const res = await Bun.build({
   external: ['chromium-bidi', 'chromium-bidi/*'],
   compile: { target: (values.target ?? `bun-${process.platform}-${process.arch}`) as Bun.Build.Target, outfile: values.outfile ?? 'dist/blook' },
   plugins: [
+    {
+      name: 'inline-assets',
+      setup(build) {
+        build.onLoad({ filter: /cli[\\/]src[\\/]assets\.ts$/ }, () => ({
+          loader: 'js',
+          contents: [
+            `export const SKILL_FILES = ${JSON.stringify(SKILL_FILES)};`,
+            `const ASSETS = ${JSON.stringify(readAssets())};`,
+            'export const assets = () => ASSETS;',
+          ].join('\n'),
+        }));
+      },
+    },
     {
       name: 'playwright-static-json',
       setup(build) {

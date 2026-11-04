@@ -120,7 +120,7 @@ export function alignWords<W extends TimedWord>(words: W[], voiced: Range[]): W[
 }
 
 /**
- * Live pause check on the mic, so audio chunks are cut between words (entrypoints/offscreen).
+ * Live pause check on the mic, so audio chunks are cut between words (the extension's entrypoints/offscreen).
  * Feed it the latest samples (an AnalyserNode's time-domain buffer): it's a pause when the
  * last `pauseMs` are all below the voiced threshold. The noise floor is the lowest seen so far.
  */

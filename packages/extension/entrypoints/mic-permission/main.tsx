@@ -3,8 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { sendToBackground } from '@/lib/messages';
-import { Button, Card } from '@/components/ui';
-import { MicIcon } from '@/components/ui/icons';
+import { Button, Card } from '@blook/ui';
+import { MicIcon } from '@blook/ui/icons';
 import '@/assets/tailwind.css';
 
 type State = { kind: 'asking' | 'idle' | 'granted' | 'error'; text?: string };

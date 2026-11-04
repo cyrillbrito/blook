@@ -4,7 +4,7 @@ import { InvalidArgumentError, Option, type Command } from 'commander';
 import { printJson } from '../output.ts';
 import { transcribeBundle, type Method } from '../transcribe.ts';
 import { DEFAULT_WHISPER_MODEL, modelsDir } from '../whisper.ts';
-import { TRANSCRIPTION_MODEL } from '../../../lib/types.ts';
+import { TRANSCRIPTION_MODEL } from '@blook/core/types';
 
 export function registerTranscribe(program: Command) {
   program

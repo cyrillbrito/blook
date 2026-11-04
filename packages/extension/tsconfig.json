@@ -2,7 +2,8 @@
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
     "allowImportingTsExtensions": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "types": ["bun"]
   },
-  "exclude": ["references", "cli", "node_modules", ".output"]
+  "exclude": ["node_modules", ".output"]
 }

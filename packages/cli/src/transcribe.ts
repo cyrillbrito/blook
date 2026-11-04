@@ -1,6 +1,6 @@
 // `blook transcribe` engine: transcribe a bundle's audio chunks and rewrite transcript.json plus
 // what derives from it (timeline.json speech entries, session.json transcript, counts, files).
-// The mapping to session ms and the output shapes are the extension's (lib/transcribe/transcript.ts).
+// The mapping to session ms and the output shapes are the extension's (@blook/core/transcript).
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
@@ -16,10 +16,10 @@ import {
   type SttResult,
   type TranscriptOut,
   type TranscriptSource,
-} from '../../lib/transcribe/transcript.ts';
-import { openRouterTranscribe, OPENROUTER_ENDPOINT } from '../../lib/transcribe/openrouter-api.ts';
-import { voicedRanges, type Range } from '../../lib/transcribe/vad.ts';
-import { TRANSCRIPTION_MODEL, type TranscriptChunkResult } from '../../lib/types.ts';
+} from '@blook/core/transcript';
+import { openRouterTranscribe, OPENROUTER_ENDPOINT } from '@blook/core/openrouter';
+import { voicedRanges, type Range } from '@blook/core/vad';
+import { TRANSCRIPTION_MODEL, type TranscriptChunkResult } from '@blook/core/types';
 import { bundleFolder, PASS_A_BUNDLE } from './bundle.ts';
 import { CliError, EXIT } from './errors.ts';
 import { note, warn } from './output.ts';

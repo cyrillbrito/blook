@@ -233,7 +233,7 @@ describe('extension and skill', () => {
     const r = run('skill', 'print');
     expect(r.code).toBe(0);
     expect(r.stdout).toStartWith('---\nname: blook\n');
-    expect(existsSync(join(import.meta.dir, '../../skills/blook/SKILL.md'))).toBe(true);
+    expect(existsSync(join(import.meta.dir, '../../../skills/blook/SKILL.md'))).toBe(true);
   });
   test('skill install without a terminal copies the skill', () => {
     const home = join(tmp, 'home');

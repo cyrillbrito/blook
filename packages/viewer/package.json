@@ -1,0 +1,26 @@
+{
+  "name": "@blook/viewer",
+  "private": true,
+  "description": "React viewer for a Blook bundle: replay, timeline, transcript, network, WebSockets, console",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
+  },
+  "dependencies": {
+    "@blook/core": "workspace:*",
+    "@blook/ui": "workspace:*",
+    "@rrweb/replay": "catalog:",
+    "@rrweb/types": "catalog:",
+    "fflate": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "catalog:",
+    "tailwindcss": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "tailwindcss": "catalog:"
+  }
+}

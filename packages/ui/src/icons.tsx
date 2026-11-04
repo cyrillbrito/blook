@@ -20,7 +20,7 @@ function Svg({ className = 'h-4 w-4', children }: { className?: string; children
 
 type P = { className?: string };
 
-/** The app icon (assets/icon/icon.svg), in its own colours. */
+/** The app icon (icon.svg), in its own colours. */
 export const BlookIcon = ({ className = 'h-4 w-4' }: P) => (
   <svg viewBox="0 0 16 16" className={className} aria-hidden>
     <rect y="1" width="16" height="14" rx="3" fill="#2545c9" />

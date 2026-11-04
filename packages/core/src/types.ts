@@ -1,6 +1,6 @@
 // Shared data shapes. Every `t` is ms since session start (see docs/architecture.md#clock).
 import type { eventWithTime } from '@rrweb/types';
-import type { TranscriptSource } from './transcribe/transcript.ts';
+import type { TranscriptSource } from './transcript.ts';
 
 export type SessionId = string;
 /** Ms since session start, from the epoch saved at Record. */
@@ -29,7 +29,7 @@ export interface SessionMeta {
   mic: MicInfo;
   /**
    * Transcription progress. Not stored: the background fills it in for `sessions/list`
-   * from the transcripts store (see lib/transcribe/openrouter.ts transcriptionStatus).
+   * from the transcripts store (see the extension's lib/transcribe/openrouter.ts transcriptionStatus).
    */
   transcription?: TranscriptionStatus;
   /** Session time of the first rrweb full snapshot of the first tab (DOM available from here). */
@@ -129,7 +129,7 @@ export interface NetworkRequestRow {
   truncated?: boolean;
   /** Decoded response size in bytes, summed from Network.dataReceived, kept body or not. */
   responseBodySize?: number;
-  /** Why the response body wasn't kept (lib/capture/body-policy.ts). */
+  /** Why the response body wasn't kept (body-policy.ts). */
   responseBodyNotKept?: string;
   errorText?: string;
 }
@@ -221,7 +221,7 @@ export interface TranscriptRow {
   chunks: TranscriptChunkResult[];
 }
 
-/** User settings, kept in browser.storage.local (see lib/settings.ts). */
+/** User settings, kept in browser.storage.local (see the extension's lib/settings.ts). */
 export interface Settings {
   /** rrweb masking (maskAllInputs, maskTextSelector, blockClass) on or off. */
   mask: boolean;
@@ -231,13 +231,6 @@ export interface Settings {
   canvas: boolean;
   openRouterApiKey: string;
 }
-
-export const DEFAULT_SETTINGS: Settings = {
-  mask: false,
-  mic: true,
-  canvas: false,
-  openRouterApiKey: '',
-};
 
 /** OpenRouter speech-to-text model. Whisper, because it returns word timestamps with verbose_json. */
 export const TRANSCRIPTION_MODEL = 'openai/whisper-large-v3';

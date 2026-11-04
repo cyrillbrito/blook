@@ -1,5 +1,5 @@
 {
-  "name": "blook",
+  "name": "@blook/cli",
   "private": true,
   "version": "0.1.4",
   "description": "Replay a Blook bundle at time T: screenshot, DOM, pointer",
@@ -8,22 +8,19 @@
     "blook": "./src/cli.ts"
   },
   "scripts": {
-    "replay": "node src/cli.ts",
-    "replay:bun": "bun src/cli.ts",
-    "build:bin": "bun build.ts",
-    "compile": "tsc --noEmit",
+    "build": "bun build.ts",
     "test": "bun test",
     "fixture": "bun test/make-fixture.ts"
   },
   "dependencies": {
-    "@rrweb/replay": "^2.2.0",
+    "@blook/core": "workspace:*",
+    "@rrweb/replay": "catalog:",
     "commander": "^15",
-    "fflate": "^0.8.3",
+    "fflate": "catalog:",
     "playwright-core": "^1.64.1"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.4",
-    "@types/node": "^26.6.6",
-    "typescript": "~7.0.2"
+    "@types/bun": "catalog:",
+    "@types/node": "^26.6.6"
   }
 }

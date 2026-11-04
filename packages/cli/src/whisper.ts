@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { accessSync, constants, createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { availableParallelism, homedir } from 'node:os';
 import { basename, delimiter, join } from 'node:path';
-import type { SttResult } from '../../lib/transcribe/transcript.ts';
+import type { SttResult } from '@blook/core/transcript';
 import { launchBrowser } from './browser.ts';
 import { CliError, EXIT } from './errors.ts';
 import { note } from './output.ts';

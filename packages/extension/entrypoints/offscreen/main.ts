@@ -2,7 +2,7 @@
 // because timeslice chunks are not standalone WebM files: only the first has the header.
 // A chunk ends at the first pause after MIN_CHUNK_MS, so no word is split, or at MAX_CHUNK_MS.
 import { openBlookDB } from '@/lib/db';
-import { PauseDetector, voicedRanges, type Range } from '@/lib/transcribe/vad';
+import { PauseDetector, voicedRanges, type Range } from '@blook/core/vad';
 import { sendToBackground, type OffscreenMessage, type OffscreenReply } from '@/lib/messages';
 
 const MIME = 'audio/webm;codecs=opus';

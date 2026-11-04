@@ -1,10 +1,19 @@
-// Builds the session bundle ZIP with fflate. The layout and every field are documented in
-// docs/bundle-format.md: keep both in sync, an agent skill is written from that doc.
+// Builds the session bundle ZIP with fflate, from the recorded rows. The layout and every field are
+// documented in docs/bundle-format.md: keep both in sync, an agent skill is written from that doc.
 import { strToU8, zipSync, type Zippable } from 'fflate';
-import { getBySession, openBlookDB } from '../db';
-import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, SessionMeta, TranscriptRow, WebSocketFrameRow, WebSocketRow } from '../types';
-import { buildTimeline, isNetworkFailureLog } from './timeline';
-import { transcriptFileNote, transcriptJson, transcriptSummary, type SegmentOut, type TranscriptOut, type TranscriptStatus } from '../transcribe/transcript';
+import type {
+  AudioChunkRow,
+  ConsoleRow,
+  Headers,
+  NetworkRequestRow,
+  RrwebEventRow,
+  SessionMeta,
+  TranscriptRow,
+  WebSocketFrameRow,
+  WebSocketRow,
+} from './types.ts';
+import { buildTimeline, isNetworkFailureLog } from './timeline.ts';
+import { transcriptFileNote, transcriptJson, transcriptSummary, type SegmentOut, type TranscriptOut, type TranscriptStatus } from './transcript.ts';
 
 export type { SegmentOut, TranscriptOut, TranscriptStatus };
 
@@ -165,22 +174,26 @@ export function socketsOut(socketRows: WebSocketRow[], frameRows: WebSocketFrame
   });
 }
 
-export async function buildBundle(
-  sessionId: SessionId,
-  opts: { transcript?: TranscriptRow; transcriptStatus?: TranscriptStatus; transcriptNote?: string } = {},
-): Promise<{ folder: string; zip: Uint8Array }> {
-  const db = await openBlookDB();
-  const meta = await db.get('sessions', sessionId);
-  if (!meta) throw new Error(`session ${sessionId} not found`);
+/** Everything recorded for one session, as stored. */
+export interface SessionRows {
+  meta: SessionMeta;
+  rrweb: RrwebEventRow[];
+  requests: NetworkRequestRow[];
+  sockets: WebSocketRow[];
+  frames: WebSocketFrameRow[];
+  console: ConsoleRow[];
+  audio: AudioChunkRow[];
+}
 
-  const [rrweb, requestRows, socketRows, frameRows, consoleRows, audio] = await Promise.all([
-    getBySession('rrwebEvents', sessionId),
-    getBySession('networkRequests', sessionId),
-    getBySession('wsSockets', sessionId),
-    getBySession('wsFrames', sessionId),
-    getBySession('console', sessionId),
-    getBySession('audioChunks', sessionId),
-  ]);
+export interface BundleOptions {
+  transcript?: TranscriptRow;
+  transcriptStatus?: TranscriptStatus;
+  transcriptNote?: string;
+}
+
+/** The bundle ZIP of one session. Sorts the row arrays in place. */
+export async function zipBundle(rows: SessionRows, opts: BundleOptions = {}): Promise<{ folder: string; zip: Uint8Array }> {
+  const { meta, rrweb, requests: requestRows, sockets: socketRows, frames: frameRows, console: consoleRows, audio } = rows;
   requestRows.sort((a, b) => a.t - b.t);
   socketRows.sort((a, b) => a.t - b.t);
   frameRows.sort((a, b) => a.t - b.t || (a.id ?? 0) - (b.id ?? 0));
@@ -218,7 +231,7 @@ export async function buildBundle(
 
   // network.json, bodies inline.
   const requests: RequestOut[] = [];
-  for (const r of requestRows as NetworkRequestRow[]) {
+  for (const r of requestRows) {
     const out: RequestOut = clean({
       id: r.requestId,
       tabId: r.tabId,

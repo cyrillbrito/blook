@@ -2,8 +2,8 @@
 // Loaders build it from a ZIP, from dropped files or folders, or from a map of paths to bytes.
 import { strFromU8, unzipSync } from 'fflate';
 import type { eventWithTime } from '@rrweb/types';
-import type { AudioChunkOut, ConsoleOut, RequestOut, SegmentOut, SessionOut, SocketOut, TranscriptOut } from '@/lib/export/bundle';
-import type { TimelineEntry } from '@/lib/export/timeline';
+import type { AudioChunkOut, ConsoleOut, RequestOut, SegmentOut, SessionOut, SocketOut, TranscriptOut } from '@blook/core/bundle';
+import type { TimelineEntry } from '@blook/core/timeline';
 
 export type { AudioChunkOut, ConsoleOut, RequestOut, SegmentOut, SessionOut, SocketOut, TimelineEntry, TranscriptOut };
 export type FrameOut = SocketOut['frames'][number];

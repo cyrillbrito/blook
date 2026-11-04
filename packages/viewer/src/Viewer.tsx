@@ -2,9 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { Bundle } from './bundle';
 import { AudioSync, Clock, TabReplay, lastAtOrBefore } from './playback';
 import { ConsolePanel, NetworkPanel, TimelinePanel, TranscriptPanel, WebSocketsPanel, type Focus, type PanelId } from './panels';
-import { cx, formatDuration, formatTime, shortUrl, useNow, usePlaying } from './util';
-import { Badge, Button, Switch } from '@/components/ui';
-import { BlookIcon, DownloadIcon, PauseIcon, PlayIcon, SpinnerIcon, VolumeIcon } from '@/components/ui/icons';
+import { formatDuration, formatTime, shortUrl } from '@blook/core/format';
+import { cx, useNow, usePlaying } from './util';
+import { Badge, Button, Switch } from '@blook/ui';
+import { BlookIcon, DownloadIcon, PauseIcon, PlayIcon, SpinnerIcon, VolumeIcon } from '@blook/ui/icons';
 
 const SPEEDS = [0.5, 1, 2, 4, 8];
 

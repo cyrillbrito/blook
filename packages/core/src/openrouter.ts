@@ -1,7 +1,7 @@
 // The OpenRouter speech-to-text request, shared by the extension and `blook transcribe`:
 // POST /api/v1/audio/transcriptions, verbose_json with word and segment timestamps.
 import type { SttResult } from './transcript.ts';
-import { TRANSCRIPTION_MODEL } from '../types.ts';
+import { TRANSCRIPTION_MODEL } from './types.ts';
 
 export const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/audio/transcriptions';
 

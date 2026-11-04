@@ -1,6 +1,6 @@
 // Message contracts between extension contexts. All go through browser.runtime messaging.
 import type { eventWithTime } from '@rrweb/types';
-import type { MicState, SessionId, SessionMeta, SessionTime, Settings } from './types';
+import type { MicState, SessionId, SessionMeta, SessionTime, Settings } from '@blook/core/types';
 
 /** What the side panel shows. Pushed by the background on every change. */
 export interface RecordingStatus {

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Clock } from './playback';
 import { lastAtOrBefore } from './playback';
-import { cx, formatBytes, formatTime, prettyJson, useActiveRow, useNow } from './util';
+import { formatBytes, formatTime } from '@blook/core/format';
+import { cx, prettyJson, useActiveRow, useNow } from './util';
 
 export interface PanelProps {
   clock: Clock;

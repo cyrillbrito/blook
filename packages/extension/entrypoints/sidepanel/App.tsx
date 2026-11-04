@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteSession, listSessions } from '@/lib/db';
 import type { PanelMessage, RecordingStatus } from '@/lib/messages';
-import { settingsItem } from '@/lib/settings';
-import { DEFAULT_SETTINGS, TRANSCRIPTION_MODEL, type MicState, type SessionMeta, type Settings } from '@/lib/types';
-import { formatDate, formatDuration, shortUrl, tryBackground } from '@/components/util';
+import { DEFAULT_SETTINGS, settingsItem } from '@/lib/settings';
+import { TRANSCRIPTION_MODEL, type MicState, type SessionMeta, type Settings } from '@blook/core/types';
+import { formatDuration, shortUrl } from '@blook/core/format';
+import { formatDate, tryBackground } from '@/components/util';
 import { offerFile } from '@/components/handoff';
-import { Alert, Badge, Button, Card, Field, IconButton, Input, LiveDot, SectionTitle, Switch, cx } from '@/components/ui';
+import { Alert, Badge, Button, Card, Field, IconButton, Input, LiveDot, SectionTitle, Switch, cx } from '@blook/ui';
 import {
   DownloadIcon,
   FolderOpenIcon,
@@ -17,7 +18,7 @@ import {
   StopIcon,
   TrashIcon,
   BlookIcon,
-} from '@/components/ui/icons';
+} from '@blook/ui/icons';
 
 const NO_ANSWER = 'The background worker did not answer.';
 

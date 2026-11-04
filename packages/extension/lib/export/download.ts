@@ -1,10 +1,11 @@
 // session/export: transcribe if possible, build the ZIP and download it.
 import { browser } from 'wxt/browser';
 import { getStatus } from '../capture/session';
-import type { SessionId, TranscriptRow } from '../types';
+import type { SessionId, TranscriptRow } from '@blook/core/types';
 import { ensureTranscript } from '../transcribe/openrouter';
 import { settingsItem } from '../settings';
-import { buildBundle, type TranscriptStatus } from './bundle';
+import type { TranscriptStatus } from '@blook/core/transcript';
+import { buildBundle } from './bundle';
 import { getBySession } from '../db';
 
 /** Service workers have no URL.createObjectURL, so the download uses a base64 data URL. */

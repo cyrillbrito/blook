@@ -1,8 +1,8 @@
-// Transcript logic shared by the extension (lib/transcribe/openrouter.ts, lib/export/bundle.ts)
+// Transcript logic shared by the extension (its lib/transcribe/openrouter.ts, and bundle.ts here)
 // and the CLI (`blook transcribe`): speech-to-text results to session ms, transcript.json, and
 // the timeline's speech entries. Pure, so it runs in the service worker, under Bun and in tests.
 import { alignWords, type Range } from './vad.ts';
-import type { TranscriptChunkResult, TranscriptRow, TranscriptSegment, TranscriptWord } from '../types.ts';
+import type { TranscriptChunkResult, TranscriptRow, TranscriptSegment, TranscriptWord } from './types.ts';
 
 export type TranscriptStatus = 'ok' | 'partial' | 'pending' | 'none' | 'skipped' | 'failed';
 

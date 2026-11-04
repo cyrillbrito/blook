@@ -1,36 +1,20 @@
 // `blook skill install|path|print`: put the agent skill (skills/blook/) where agents find it.
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Command } from 'commander';
+import { assets } from '../assets.ts';
 import { note, printLine } from '../output.ts';
 import { CliError, EXIT } from '../errors.ts';
 
 const REPO = 'cyrillbrito/blook';
-const FILES = ['SKILL.md', 'recipes.md', 'rrweb.md', 'workflows.md'] as const;
-
-/** The skill files: embedded in the compiled binary (Bun text imports), read from the repo under Node. */
-async function skillFiles(): Promise<Record<string, string>> {
-  if (process.versions.bun) {
-    const mods = await Promise.all([
-      import('../../../skills/blook/SKILL.md', { with: { type: 'text' } }),
-      import('../../../skills/blook/recipes.md', { with: { type: 'text' } }),
-      import('../../../skills/blook/rrweb.md', { with: { type: 'text' } }),
-      import('../../../skills/blook/workflows.md', { with: { type: 'text' } }),
-    ]);
-    return Object.fromEntries(FILES.map((f, i) => [f, mods[i].default]));
-  }
-  const dir = new URL('../../../skills/blook/', import.meta.url);
-  return Object.fromEntries(FILES.map((f) => [f, readFileSync(new URL(f, dir), 'utf8')]));
-}
-
 const copyDir = () => join(homedir(), '.agents', 'skills', 'blook');
 
 async function copyInstall() {
   const dir = copyDir();
   mkdirSync(dir, { recursive: true });
-  for (const [name, text] of Object.entries(await skillFiles())) writeFileSync(join(dir, name), text);
+  for (const [name, text] of Object.entries(assets().skill)) writeFileSync(join(dir, name), text);
   note(`Installed the blook skill to ${dir}`);
   printLine(dir);
 }
@@ -90,5 +74,5 @@ Examples:
   skill
     .command('print')
     .description('print SKILL.md to stdout')
-    .action(async () => printLine((await skillFiles())['SKILL.md']));
+    .action(async () => printLine(assets().skill['SKILL.md']));
 }

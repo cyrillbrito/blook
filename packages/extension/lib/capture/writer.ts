@@ -7,7 +7,7 @@ import type {
   RrwebEventRow,
   WebSocketFrameRow,
   WebSocketRow,
-} from '../types';
+} from '@blook/core/types';
 
 export class BatchWriter {
   private rrweb: RrwebEventRow[] = [];

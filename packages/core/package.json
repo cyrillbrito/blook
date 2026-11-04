@@ -1,0 +1,19 @@
+{
+  "name": "@blook/core",
+  "private": true,
+  "description": "The Blook bundle format and the logic shared by the extension, the viewer and the CLI",
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@rrweb/types": "catalog:",
+    "fflate": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:"
+  }
+}

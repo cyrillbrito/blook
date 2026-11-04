@@ -3,13 +3,13 @@
 // Each chunk is transcribed as soon as it's saved (background), the rest after Stop,
 // and Export only fills in what's missing. Results live per chunk in the transcripts store.
 import { browser } from 'wxt/browser';
-import { chunkTranscript, mergeChunks, MIN_CHUNK_BYTES, type TranscriptSource } from './transcript';
-import { openRouterTranscribe, OPENROUTER_ENDPOINT } from './openrouter-api';
+import { chunkTranscript, mergeChunks, MIN_CHUNK_BYTES, type TranscriptSource } from '@blook/core/transcript';
+import { openRouterTranscribe, OPENROUTER_ENDPOINT } from '@blook/core/openrouter';
 import { getBySession, openBlookDB } from '../db';
 import type { PanelMessage } from '../messages';
 import { settingsItem } from '../settings';
-import type { AudioChunkRow, SessionId, TranscriptChunkResult, TranscriptionStatus, TranscriptRow } from '../types';
-import { TRANSCRIPTION_MODEL } from '../types';
+import type { AudioChunkRow, SessionId, TranscriptChunkResult, TranscriptionStatus, TranscriptRow } from '@blook/core/types';
+import { TRANSCRIPTION_MODEL } from '@blook/core/types';
 
 /** Dev/test only: a fake endpoint URL in storage.local under this key replaces OpenRouter. */
 const ENDPOINT_OVERRIDE_KEY = 'blook-stt-endpoint';
