@@ -45,7 +45,11 @@ bun run build          # every package's build: the extension (.output/chrome-mv
 bun run zip            # packages/extension/.output/blook-chrome.zip
 bun run typecheck      # bun check (TypeScript 7) on every package's tsconfig.json
 bun run test           # bun test in every package: format logic, capture, CLI against a synthetic bundle
+bun run lint           # oxlint, one root config (.oxlintrc.json)
+bun run format         # oxfmt, one root config (.oxfmtrc.json); format:check in CI. Markdown is not formatted.
 ```
+
+`bun check` is Bun's built-in type checker, so no package needs TypeScript to check. The root `typescript` devDependency is only for editors: keep it on the version `bun -p process.versions.typescript` prints.
 
 One package: `bun run --filter @blook/cli test`, or run its script from its folder. The CLI from source:
 
@@ -87,7 +91,7 @@ The extension, the bundle, the viewer, the CLI, the skill and the docs describe 
 - **Skill change**: run its commands and jq recipes against a real bundle.
 - **Any change**: update the docs it touches (README.md for users, AGENTS.md and docs/ for developers).
 
-Before calling it done, validate across parts: `bun run typecheck`, `bun run test` and `bun run build` at the root; record a short session with the built extension and check it in the Replay page, with `blook info`/`pointer`, and with the skill recipes that touch what changed.
+Before calling it done, validate across parts: `bun run format:check`, `bun run lint`, `bun run typecheck`, `bun run test` and `bun run build` at the root; record a short session with the built extension and check it in the Replay page, with `blook info`/`pointer`, and with the skill recipes that touch what changed.
 
 ## Prior art
 
