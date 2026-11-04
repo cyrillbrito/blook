@@ -99,4 +99,4 @@ Before calling it done, validate across parts: `bun run format:check`, `bun run 
 
 ## Prior art
 
-`~/Repos/session-recorder-chrome-extension` is a fork of Proofline Session Recorder (AGPL-3.0). Read it for ideas. Don't copy code from it without considering the license. Cloned references are in `references/` (git-ignored, never edit).
+Similar tools are listed in [docs/references.md](docs/references.md) and cloned in `references/` (git-ignored, never edit). Read them for ideas; don't copy code from the AGPL ones.
