@@ -23,7 +23,7 @@ The export is a ZIP with one folder, `blook-<sessionId>/`. All paths below are r
 | WebSocket frame | `index` (0-based, per socket, in `t` order) | its socket | `websockets.json` `.frames` |
 | Console entry | `index` (0-based position in the array) | the session | `console.json` |
 | Transcript segment | `index` (0-based position in the array) | the session | `transcript.json` `.segments` |
-| rrweb event | position in its tab's `events` (0-based) | its tab | `rrweb.json` `.tabs[] | select(.tabId == T) | .events` |
+| rrweb event | position in its tab's `events` (0-based) | its tab | `rrweb.json` `.tabs[] \| select(.tabId == T) \| .events` |
 | Tab | `tabId` (Chrome tab id, number) | the session | `session.json` `.tabs` |
 
 - A redirect reuses the CDP requestId. Each earlier hop gets its own record with id `<requestId>#redirect<N>`, where N = 1, 2, ….
