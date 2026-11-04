@@ -9,6 +9,10 @@ on:
         type: choice
         options: [patch, minor, major]
         default: patch
+      version:
+        description: Exact version (e.g. 0.3.0); overrides bump
+        type: string
+        required: false
 
 permissions:
   contents: write
@@ -24,7 +28,7 @@ jobs:
       - name: Bump version
         id: version
         run: |
-          (cd packages/extension && bun pm version ${{ inputs.bump }} --no-git-tag-version)
+          (cd packages/extension && bun pm version ${{ inputs.version || inputs.bump }} --no-git-tag-version)
           V=$(jq -r .version packages/extension/package.json)
           jq --arg v "$V" '.version = $v' packages/cli/package.json > packages/cli/package.tmp && mv packages/cli/package.tmp packages/cli/package.json
           echo "v=$V" >> "$GITHUB_OUTPUT"
