@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // One config for every package. Correctness rules as errors, with the React and TypeScript plugins.
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "react", "import", "promise"],
+  "categories": { "correctness": "error" },
+  "env": { "browser": true, "node": true, "es2024": true },
+  "ignorePatterns": ["references/**", "**/.output/**", "**/.wxt/**", "**/dist/**"],
+  "rules": {
+    // React Compiler rules. We don't use the compiler, and the flagged code is deliberate:
+    // effects that sync state from the replay clock, refs read while rendering the scrubber tooltip.
+    "react/set-state-in-effect": "off",
+    "react/purity": "off",
+    "react/immutability": "off",
+    "react/refs": "off"
+  }
+}

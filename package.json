@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "workspaces": {
-    "packages": ["packages/*"],
+    "packages": [
+      "packages/*"
+    ],
     "catalog": {
       "@rrweb/record": "^2.2.0",
       "@rrweb/replay": "^2.2.0",
@@ -23,9 +25,14 @@
     "build": "bun run --workspaces --if-present build",
     "zip": "bun --cwd=packages/extension run zip",
     "typecheck": "bun check -p packages/core && bun check -p packages/ui && bun check -p packages/viewer && bun check -p packages/extension && bun check -p packages/cli",
-    "test": "bun run --workspaces --if-present test"
+    "test": "bun run --workspaces --if-present test",
+    "lint": "oxlint",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check"
   },
   "devDependencies": {
+    "oxfmt": "^0.76.0",
+    "oxlint": "^1.91.0",
     "typescript": "~7.0.2"
   }
 }

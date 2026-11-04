@@ -80,7 +80,10 @@ export function TimelinePanel({ bundle, tabs, clock, follow, seek, open, focus }
   const toggle = (g: (typeof TL_GROUPS)[number]) => {
     const next = new Set(hidden);
     const off = groupOff(g);
-    for (const t of g.types) off ? next.delete(t) : next.add(t);
+    for (const t of g.types) {
+      if (off) next.delete(t);
+      else next.add(t);
+    }
     setHidden(next);
   };
 
@@ -295,7 +298,7 @@ export function NetworkPanel({ bundle, tabs, clock, follow, seek, focus }: Props
                     ['URL', r.url],
                     ['Method', r.method],
                     ['Status', r.status != null ? `${r.status} ${r.statusText ?? ''}` : undefined],
-                    ['Error', r.errorText && <span className="text-red-700">{r.errorText}</span>],
+                    ['Error', r.errorText && <span key="error" className="text-red-700">{r.errorText}</span>],
                     ['Type', r.resourceType],
                     ['MIME', r.mimeType],
                     ['Started', formatTime(r.t)],

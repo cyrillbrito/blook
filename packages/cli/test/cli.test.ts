@@ -411,6 +411,9 @@ describe('transcribe', () => {
     expect(t.segments[0].text).toMatch(/and so,? my fellow americans/i);
     const words = t.segments[0].words;
     expect(words[0].t).toBe(1000); // snapped to the voiced onset
-    for (const w of words) expect(w.t).toBeGreaterThanOrEqual(1000), expect(w.endT).toBeLessThanOrEqual(2980);
+    for (const w of words) {
+      expect(w.t).toBeGreaterThanOrEqual(1000);
+      expect(w.endT).toBeLessThanOrEqual(2980);
+    }
   }, 60_000);
 });

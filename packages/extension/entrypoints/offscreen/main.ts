@@ -68,7 +68,7 @@ async function stopMic(): Promise<OffscreenReply> {
   stream?.getTracks().forEach((t) => t.stop());
   stream = undefined;
   const errors: string[] = [];
-  for (const r of await Promise.allSettled([...saves])) if (r.status === 'rejected') errors.push(String(r.reason));
+  for (const r of await Promise.allSettled(saves)) if (r.status === 'rejected') errors.push(String(r.reason));
   return errors.length ? { ok: false, error: `saving audio failed: ${errors[0]}` } : { ok: true };
 }
 

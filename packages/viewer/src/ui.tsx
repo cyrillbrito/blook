@@ -190,7 +190,7 @@ export function Body({
   const [raw, setRaw] = useState(false);
   const binary = base64 !== undefined;
   const data = useMemo(() => (base64 !== undefined ? Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)) : undefined), [base64]);
-  const isImage = binary && /^image\//.test(mime ?? '');
+  const isImage = binary && (mime ?? '').startsWith('image/');
   const imgUrl = useMemo(
     () => (isImage && data ? URL.createObjectURL(new Blob([data as BlobPart], { type: mime })) : undefined),
     [isImage, data, mime],

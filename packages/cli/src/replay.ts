@@ -210,10 +210,10 @@ export class TabReplay {
         src.forEach((s: any, i) => {
           const d = dst[i]!;
           if (s.tagName === 'INPUT') {
-            if (s.type === 'checkbox' || s.type === 'radio') s.checked ? d.setAttribute('checked', '') : d.removeAttribute('checked');
+            if (s.type === 'checkbox' || s.type === 'radio') d.toggleAttribute('checked', s.checked);
             else if (s.value !== (s.getAttribute('value') ?? '')) d.setAttribute('value', s.value);
           } else if (s.tagName === 'TEXTAREA') d.textContent = s.value;
-          else if (s.tagName === 'OPTION') s.selected ? d.setAttribute('selected', '') : d.removeAttribute('selected');
+          else if (s.tagName === 'OPTION') d.toggleAttribute('selected', s.selected);
         });
         // Drop what the replayer itself adds: its <style> under <html> and the paused class.
         if (clone.tagName === 'HTML') {
