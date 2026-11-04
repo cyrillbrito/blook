@@ -18,12 +18,13 @@ export default defineConfig({
       'debugger',
       'storage',
       'offscreen',
-      'tabs',
       'scripting',
       'unlimitedStorage',
       'downloads',
     ],
     host_permissions: ['<all_urls>'],
+    // sidePanel.setPanelBehavior needs Chrome 116.
+    minimum_chrome_version: '116',
     action: { default_title: 'Blook' },
   },
 });
