@@ -73,18 +73,21 @@ Packages share TypeScript source through `package.json` `exports` (`@blook/core/
 - `packages/site` (`@blook/site`): the Astro website on GitHub Pages (https://cyrillbrito.github.io/blook/): the landing page and `/viewer`, which hosts `@blook/viewer`. `bun run dev` in its folder; `.github/workflows/site.yml` deploys it on push to main.
 - `skills/blook/`: the agent skill (at the root, where the skills CLI finds it)
 - `install.sh`, `.github/workflows/release.yml`: the one-line installer and the release build
+- `store/`, `PRIVACY.md`: the Chrome Web Store listing, its images and the privacy policy (data, not a package; the site imports the images)
 
 A new package: a folder in `packages/` with a `package.json` (`"name": "@blook/<name>"`, `"private": true`, `exports` to its source) and a `tsconfig.json` that extends `../../tsconfig.base.json`; add it to the root `typecheck` script.
 
 ## Docs
 
-- [docs/](docs/README.md): architecture, the bundle format, and references
-- Technical detail lives next to the code: short comments, and READMEs like [packages/cli/README.md](packages/cli/README.md). Keep docs short, current and free of history.
+- [docs/](docs/README.md): the index. Architecture, the bundle format, the CLI design, and references.
+- Package READMEs: [cli](packages/cli/README.md), [viewer](packages/viewer/README.md), [ui](packages/ui/README.md).
+- Keep docs light: short, plain, current, no history. `docs/` stays high level; detail lives next to the code as short comments. Contracts stay exact: `docs/bundle-format.md`, `packages/core/src/types.ts`, `packages/extension/lib/messages.ts`.
+- Update the docs in the same change as the code. A stale doc is a bug.
 - The bundle format version is `BUNDLE_FORMAT_VERSION` in `packages/core/src/bundle.ts`.
 
 ## Keep every part in sync
 
-The extension, the bundle, the viewer, the CLI, the skill and the docs describe one product. A change in one part is done only when the others still match it:
+The extension, the bundle, the viewer, the CLI, the site, the skill and the docs describe one product. Implement every change across all of them in one go: a change is done only when every package, the skill and the docs match it. No half-done features, no compatibility shims, no old names left behind:
 
 - **Bundle change** (capture, export, a field, a file; mostly `packages/core`): update [docs/bundle-format.md](docs/bundle-format.md), the viewer, the CLI (`packages/cli/src/bundle.ts` and its test fixture), and the skill's files table and recipes.
 - **CLI change** (a command, option, output shape or exit code): update `--help`, [packages/cli/README.md](packages/cli/README.md), the tests, and the skill's CLI section.
