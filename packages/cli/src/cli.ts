@@ -10,7 +10,7 @@ import { registerSetup } from './commands/setup.ts';
 import { registerExtension } from './commands/extension.ts';
 import { registerSkill } from './commands/skill.ts';
 import { registerTranscribe } from './commands/transcribe.ts';
-import pkg from '../package.json' with { type: 'json' };
+import pkg from '../../../package.json' with { type: 'json' };
 
 // `... | head` closes stdout early: exit quietly instead of crashing.
 process.stdout.on('error', (e: NodeJS.ErrnoException) => {

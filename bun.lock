@@ -12,7 +12,6 @@
     },
     "packages/cli": {
       "name": "@blook/cli",
-      "version": "0.1.4",
       "bin": {
         "blook": "./src/cli.ts",
       },
@@ -40,7 +39,6 @@
     },
     "packages/extension": {
       "name": "@blook/extension",
-      "version": "0.1.4",
       "dependencies": {
         "@blook/core": "workspace:*",
         "@blook/ui": "workspace:*",

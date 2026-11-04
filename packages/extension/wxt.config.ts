@@ -1,5 +1,6 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
+import root from '../../package.json' with { type: 'json' };
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -12,6 +13,8 @@ export default defineConfig({
   zip: { artifactTemplate: 'blook-chrome.zip' },
   manifest: {
     name: 'Blook',
+    // One version for the product, in the root package.json.
+    version: root.version,
     description: 'Record a narrated browser session into a local bundle for coding agents',
     permissions: ['sidePanel', 'debugger', 'storage', 'offscreen', 'scripting', 'unlimitedStorage', 'downloads'],
     host_permissions: ['<all_urls>'],

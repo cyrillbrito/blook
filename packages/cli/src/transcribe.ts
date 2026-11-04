@@ -34,7 +34,7 @@ import {
   WHISPER_INSTALL_HINT,
   type WhisperJson,
 } from './whisper.ts';
-import pkg from '../package.json' with { type: 'json' };
+import pkg from '../../../package.json' with { type: 'json' };
 
 export type Method = 'openrouter' | 'whisper';
 
