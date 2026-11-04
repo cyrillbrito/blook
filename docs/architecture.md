@@ -7,10 +7,11 @@ The code is a Bun workspaces monorepo. Paths below are inside `packages/extensio
 | Package | What | Used by |
 | --- | --- | --- |
 | `core` | Bundle format: data types, bundle and timeline builders, transcript mapping, VAD, OpenRouter request, body policy, formatting | extension, viewer, cli |
-| `ui` | UI primitives, icons, logo, Tailwind theme | extension, viewer |
-| `viewer` | The React viewer and the zip/folder loader | extension |
+| `ui` | UI primitives, icons, logo, Tailwind theme | extension, viewer, site |
+| `viewer` | The React viewer and the zip/folder loader | extension, site |
 | `extension` | The WXT extension: capture, IndexedDB, side panel, Replay page | |
 | `cli` | The `blook` replay CLI and binary | |
+| `site` | The Astro website on GitHub Pages: landing page and `/viewer` | |
 
 ```mermaid
 flowchart TD
@@ -43,7 +44,7 @@ flowchart TD
 
 ## Reviewing
 
-**Viewer** (`packages/viewer`). A React app that plays the rrweb replay with the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. It runs in the extension's Replay page (`entrypoints/replay/`), which reads a recorded session straight from IndexedDB, or opens a ZIP or folder picked with the side panel's "Open bundle…". The viewer has no extension APIs, so another host (a website) can use it as is.
+**Viewer** (`packages/viewer`). A React app that plays the rrweb replay with the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. It runs in the extension's Replay page (`entrypoints/replay/`), which reads a recorded session straight from IndexedDB, or opens a ZIP or folder picked with the side panel's "Open bundle…". The viewer has no extension APIs, so the website's `/viewer` (`packages/site`) hosts it as is, reading the ZIP in the browser.
 
 **Agent skill** (`skills/blook/`). Tells an agent how to read a bundle: read order, jq recipes, and workflows for bug triage, task lists and E2E tests.
 
@@ -66,7 +67,3 @@ flowchart TD
 - rrweb doesn't replay video or cross-origin iframes. Canvas replays only with the canvas setting (2 fps).
 - Pointing is the mouse position. There is no "mark this element" hotkey.
 - Images and fonts in the replay load from the original server.
-
-## Later
-
-- If people without the extension need to open bundles: a site that hosts `@blook/viewer` and reads the ZIP locally in the browser.

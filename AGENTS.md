@@ -41,7 +41,7 @@ A Bun workspaces monorepo: every package is in `packages/`, with one `bun instal
 ```sh
 bun install
 bun run dev            # extension in dev mode, load packages/extension/.output/chrome-mv3-dev unpacked
-bun run build          # every package's build: the extension (.output/chrome-mv3) and the CLI binary (dist/blook)
+bun run build          # every package's build: the extension (.output/chrome-mv3), the CLI binary (dist/blook), the site (dist/)
 bun run zip            # packages/extension/.output/blook-chrome.zip
 bun run typecheck      # bun check (TypeScript 7) on every package's tsconfig.json
 bun run test           # bun test in every package: format logic, capture, CLI against a synthetic bundle
@@ -70,6 +70,7 @@ Packages share TypeScript source through `package.json` `exports` (`@blook/core/
 - `packages/viewer` (`@blook/viewer`): the React viewer and its zip/folder loader. No `chrome.*`: hosts pass the initial loader and download handler as props. Hosts add `@import "@blook/viewer/styles.css"` to their Tailwind stylesheet.
 - `packages/ui` (`@blook/ui`): UI primitives, icons, the logo (`src/icon.svg`) and the Tailwind theme (`@blook/ui/theme.css`).
 - `packages/cli` (`@blook/cli`): the replay CLI; `src/assets.ts` holds the files the binary embeds.
+- `packages/site` (`@blook/site`): the Astro website on GitHub Pages (https://cyrillbrito.github.io/blook/): the landing page and `/viewer`, which hosts `@blook/viewer`. `bun run dev` in its folder; `.github/workflows/site.yml` deploys it on push to main.
 - `skills/blook/`: the agent skill (at the root, where the skills CLI finds it)
 - `install.sh`, `.github/workflows/release.yml`: the one-line installer and the release build
 
@@ -87,7 +88,7 @@ The extension, the bundle, the viewer, the CLI, the skill and the docs describe 
 
 - **Bundle change** (capture, export, a field, a file; mostly `packages/core`): update [docs/bundle-format.md](docs/bundle-format.md), the viewer, the CLI (`packages/cli/src/bundle.ts` and its test fixture), and the skill's files table and recipes.
 - **CLI change** (a command, option, output shape or exit code): update `--help`, [packages/cli/README.md](packages/cli/README.md), the tests, and the skill's CLI section.
-- **Viewer or UI change**: check every host still works (the extension's Replay page and side panel today).
+- **Viewer or UI change**: check every host still works (the extension's Replay page and side panel, and the site's `/viewer`).
 - **Skill change**: run its commands and jq recipes against a real bundle.
 - **Any change**: update the docs it touches (README.md for users, AGENTS.md and docs/ for developers).
 

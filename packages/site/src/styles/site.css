@@ -1,0 +1,4 @@
+/* Tailwind, the shared theme, and the viewer's classes (same as the extension's pages). */
+@import 'tailwindcss';
+@import '@blook/ui/theme.css';
+@import '@blook/viewer/styles.css';

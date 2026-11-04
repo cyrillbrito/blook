@@ -1,0 +1,12 @@
+---
+import Base from '../layouts/Base.astro';
+import SiteViewer from '../components/SiteViewer';
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+---
+
+<Base title="Blook viewer" description="Open a Blook recording in your browser. The file never leaves your computer." bare>
+  <SiteViewer client:only="react" home={base} />
+  <noscript>
+    <p class="p-6 text-sm">The viewer needs JavaScript. It runs only in this tab: the bundle is never uploaded.</p>
+  </noscript>
+</Base>

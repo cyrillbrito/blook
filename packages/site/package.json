@@ -1,0 +1,25 @@
+{
+  "name": "@blook/site",
+  "private": true,
+  "description": "Blook's website: the landing page and a viewer for bundles, on GitHub Pages",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/react": "^7.1.2",
+    "@blook/ui": "workspace:*",
+    "@blook/viewer": "workspace:*",
+    "astro": "^7.4.5",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "tailwindcss": "catalog:"
+  }
+}

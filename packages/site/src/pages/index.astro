@@ -1,0 +1,190 @@
+---
+import Base from '../layouts/Base.astro';
+import timeline from '../../../../store/images/screenshot-1-timeline.png';
+import network from '../../../../store/images/screenshot-2-network.png';
+import sidepanel from '../../../../store/images/screenshot-4-sidepanel.png';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const repo = 'https://github.com/cyrillbrito/blook';
+const install = 'curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh';
+
+const files = [
+  ['rrweb.json', 'A DOM replay of the page, with mouse moves, clicks, scrolls and typing'],
+  ['network.json', 'HTTP requests and responses, with API bodies inline'],
+  ['websockets.json', 'WebSocket connections and their messages'],
+  ['console.json', 'Console logs, errors and uncaught exceptions'],
+  ['transcript.json', 'Your narration, word by word, plus the audio in audio/'],
+  ['timeline.json', 'All of the above in one list, sorted by time'],
+];
+
+const link = 'underline underline-offset-2 hover:text-accent-strong';
+const h2 = 'text-2xl font-semibold tracking-tight';
+const shot = 'rounded-card border border-line shadow-sm';
+---
+
+<Base title="Blook: record your browser while you talk" description="A Chrome extension that records a narrated browser session into one local ZIP, for a developer or a coding agent to replay.">
+  <main class="mx-auto max-w-5xl px-5">
+    <section class="py-14 sm:py-20">
+      <h1 class="max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">Record your browser while you talk.</h1>
+      <p class="mt-5 max-w-2xl text-lg text-muted">
+        Blook is a Chrome extension. Press Record, use your web app and say what you see. On Stop you get one ZIP with the page, the network,
+        the console and your voice on one clock, ready for a developer or a coding agent.
+      </p>
+      <div class="mt-8 flex flex-wrap gap-3">
+        <a href="#install" class="inline-flex h-11 items-center rounded-control bg-fg px-5 font-medium text-white hover:bg-gray-700">Install</a>
+        <a
+          href={`${base}viewer/`}
+          class="inline-flex h-11 items-center rounded-control border border-line-strong px-5 font-medium hover:bg-surface-sunken"
+          >Open a recording</a
+        >
+      </div>
+      <img
+        src={timeline.src}
+        width={timeline.width}
+        height={timeline.height}
+        alt="The Blook viewer: the page replay on the left, the timeline of clicks, requests and console errors on the right"
+        class:list={[shot, 'mt-12 w-full']}
+      />
+    </section>
+
+    <section class="border-t border-line py-14">
+      <h2 class={h2}>What it's for</h2>
+      <div class="mt-6 grid gap-5 sm:grid-cols-2">
+        <div class="rounded-card border border-line bg-surface-muted p-6">
+          <h3 class="font-semibold">Report a bug to an agent</h3>
+          <p class="mt-2 text-muted">
+            Reproduce the bug and describe it out loud. The agent reads the ZIP: what you said, what you clicked, which request failed and what
+            the console printed at that moment.
+          </p>
+        </div>
+        <div class="rounded-card border border-line bg-surface-muted p-6">
+          <h3 class="font-semibold">Turn a flow into an E2E test</h3>
+          <p class="mt-2 text-muted">
+            Walk through a flow and say what should happen. The agent gets the steps, the elements you used and the responses it can assert
+            on, and writes the test.
+          </p>
+        </div>
+      </div>
+      <p class="mt-5 text-muted">A person can open the same ZIP in the viewer, for example from a bug ticket.</p>
+    </section>
+
+    <section class="border-t border-line py-14">
+      <div>
+        <h2 class={h2}>What's in a recording</h2>
+        <p class="mt-3 text-muted">One folder of JSON files, zipped. Every event has a <code>t</code>: milliseconds since you pressed Record.</p>
+        <dl class="mt-6 grid gap-x-10 gap-y-4 sm:grid-cols-2">
+          {
+            files.map(([name, what]) => (
+              <div>
+                <dt class="font-mono text-sm font-semibold">{name}</dt>
+                <dd class="text-muted">{what}</dd>
+              </div>
+            ))
+          }
+        </dl>
+        <p class="mt-6 max-w-3xl text-muted">
+          There is no video. The replay rebuilds the page at any moment, so a recording stays small and an agent asks for a screenshot only
+          when it needs one. Details: <a class={link} href={`${repo}/blob/main/docs/bundle-format.md`}>the bundle format</a>.
+        </p>
+      </div>
+      <img
+        src={network.src}
+        width={network.width}
+        height={network.height}
+        loading="lazy"
+        alt="The Network tab of the viewer: a request list with status codes, and the headers and body of the selected request"
+        class:list={[shot, 'mt-8 w-full']}
+      />
+    </section>
+
+    <section class="grid items-start gap-10 border-t border-line py-14 md:grid-cols-2">
+      <div>
+        <h2 class={h2}>Local first</h2>
+        <ul class="mt-6 list-disc space-y-2 pl-5 text-muted">
+          <li>Blook records only the tab you start it on, and tabs opened from it, between Record and Stop.</li>
+          <li>Recordings stay on your computer. They leave it only when you download the ZIP and share it.</li>
+          <li>No account, no analytics, no tracking.</li>
+          <li>Transcription is optional. With your own OpenRouter key, the audio goes to OpenRouter. Without one, the CLI can transcribe later on your machine with whisper.cpp.</li>
+          <li>An option masks typed text and page text in the replay.</li>
+        </ul>
+        <p class="mt-6 text-muted">
+          The <a class={link} href={`${base}viewer/`}>web viewer</a> works the same way: it opens the ZIP in your browser tab and uploads nothing.
+          More in the <a class={link} href={`${repo}/blob/main/PRIVACY.md`}>privacy policy</a>.
+        </p>
+      </div>
+      <img
+        src={sidepanel.src}
+        width={sidepanel.width}
+        height={sidepanel.height}
+        loading="lazy"
+        alt="The Blook side panel next to a web app: Recording 0:09 with a Stop recording button, settings, and past recordings"
+        class={shot}
+      />
+    </section>
+
+    <section id="install" class="scroll-mt-4 border-t border-line py-14">
+      <h2 class={h2}>Install</h2>
+      <p class="mt-3 text-muted">On macOS or Linux, run:</p>
+      <div class="mt-3 flex items-stretch overflow-hidden rounded-card border border-line-strong bg-surface-sunken">
+        <pre class="min-w-0 flex-1 overflow-x-auto px-4 py-3 font-mono text-sm"><code>{install}</code></pre>
+        <button
+          type="button"
+          data-copy={install}
+          class="shrink-0 cursor-pointer border-l border-line-strong px-4 text-sm font-medium hover:bg-line">Copy</button
+        >
+      </div>
+      <p class="mt-4 text-muted">
+        It installs the <code>blook</code> command-line tool and the Chrome extension files in <code>~/Blook/extension</code>, and offers to add
+        the agent skill. Run <code>blook update</code> to update.
+      </p>
+      <p class="mt-6 font-medium">Then load the extension in Chrome once:</p>
+      <ol class="mt-2 list-decimal space-y-1 pl-5 text-muted">
+        <li>Open <code>chrome://extensions</code>.</li>
+        <li>Turn on <strong class="font-medium text-fg">Developer mode</strong> (top right).</li>
+        <li>Click <strong class="font-medium text-fg">Load unpacked</strong> and pick <code>~/Blook/extension</code>.</li>
+        <li>Pin Blook from the puzzle icon, and click it to open the side panel.</li>
+      </ol>
+      <p class="mt-6 text-muted">Or download the files from the <a class={link} href={`${repo}/releases/latest`}>latest release</a>.</p>
+    </section>
+
+    <section class="border-t border-line py-14">
+      <h2 class={h2}>For coding agents</h2>
+      <p class="mt-3 max-w-2xl text-muted">
+        The <code>blook</code> skill tells an agent how to read a recording: <code>jq</code> over the JSON files, and the <code>blook</code> CLI
+        to see the page at any moment. The installer sets up both. Give the agent the ZIP and ask.
+      </p>
+      <pre class="mt-5 overflow-x-auto rounded-card border border-line bg-surface-sunken px-4 py-3 font-mono text-sm"><code><span class="text-muted"># what the mouse was over at 18.5 s</span>
+blook pointer    blook-2026-11-03_21-12-51.zip 00:18.5
+<span class="text-muted"># the page at that moment, as a PNG</span>
+blook screenshot blook-2026-11-03_21-12-51.zip 00:18.5
+<span class="text-muted"># the DOM, or re-run the transcript locally</span>
+blook dom        blook-2026-11-03_21-12-51.zip 00:18.5
+blook transcribe blook-2026-11-03_21-12-51.zip</code></pre>
+      <p class="mt-4 text-muted">
+        Reference: <a class={link} href={`${repo}/tree/main/packages/cli#readme`}>the CLI</a> and <a
+          class={link}
+          href={`${repo}/tree/main/skills/blook`}>the skill</a
+        >.
+      </p>
+    </section>
+  </main>
+
+  <footer class="border-t border-line">
+    <div class="mx-auto flex max-w-5xl flex-wrap gap-x-6 gap-y-2 px-5 py-8 text-sm text-muted">
+      <span>Blook is open source. Chrome only.</span>
+      <a class={link} href={repo}>GitHub</a>
+      <a class={link} href={`${repo}/issues`}>Issues</a>
+    </div>
+  </footer>
+</Base>
+
+<script>
+  // Copy the install command; the button text says it worked.
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
+    btn.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(btn.dataset.copy!);
+      btn.textContent = 'Copied';
+      setTimeout(() => (btn.textContent = 'Copy'), 1500);
+    });
+  }
+</script>

@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // bun check sees the .ts/.tsx files; Astro checks the .astro pages when it builds them.
+  "include": ["src", "astro.config.ts"]
+}

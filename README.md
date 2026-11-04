@@ -2,6 +2,8 @@
 
 Blook is a Chrome extension that records what happens in your browser while you talk, so a person or a coding agent can replay it later.
 
+Website, and a viewer that opens a recording in your browser: https://cyrillbrito.github.io/blook/
+
 ![The Replay page: the page replay on the left, the timeline on the right](docs/images/replay.png)
 
 ## What it captures
