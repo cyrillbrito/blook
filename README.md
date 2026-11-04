@@ -19,13 +19,13 @@ A recording is one local ZIP file. Nothing is uploaded, and there are no account
 
 ## Install
 
-On macOS or Linux, run:
+On macOS (Apple silicon or Intel) or Linux (x64), run:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh
 ```
 
-It sets up the `blook` command-line tool and the Chrome extension files in `~/Blook/extension`, and can add the `blook` skill to your coding agents. Run `blook update` to update.
+It sets up the `blook` command-line tool and the Chrome extension files in `~/Blook/extension`, and can add the `blook` skill to your coding agents. Run `blook update` to update, then click the reload icon on Blook's card in `chrome://extensions`.
 
 Blook isn't on the Chrome Web Store, so load the extension once (`blook extension` shows these steps again):
 

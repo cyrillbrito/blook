@@ -51,7 +51,7 @@ bun run format         # oxfmt, one root config (.oxfmtrc.json); format:check in
 
 `bun check` is Bun's built-in type checker, so no package needs TypeScript to check. The root `typescript` devDependency is only for editors: keep it on the version `bun -p process.versions.typescript` prints.
 
-One version for the product, in the root `package.json` (the extension manifest and `blook --version` read it; packages have none). The manual release workflow (`.github/workflows/release.yml`, input `bump`: patch, minor or major) bumps it, tags, and publishes the zip and CLI binaries.
+One version for the product, in the root `package.json` (the extension manifest and `blook --version` read it; packages have none). The manual release workflow (`.github/workflows/release.yml`, input `bump`: patch, minor or major) bumps it, tags, and publishes the zip and CLI binaries. Release notes are a short changelog, never install steps: pass the optional `notes` input (one sentence, then 2 to 6 user-visible bullets), or it lists the commit subjects since the last tag.
 
 One package: `bun run --filter @blook/cli test`, or run its script from its folder. The CLI from source:
 
