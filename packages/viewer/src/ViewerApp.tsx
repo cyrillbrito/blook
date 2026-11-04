@@ -1,7 +1,7 @@
 // The viewer with its loading states. It shows one replay: hosts pass an optional initial loader
 // (IndexedDB or a file handed over by the side panel). Only while nothing is loaded can the user
 // drop or pick a bundle .zip or unzipped folder; once a bundle is open there are no load-other controls.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Card } from '@blook/ui';
 import { FolderOpenIcon, SpinnerIcon } from '@blook/ui/icons';
 import { bundleFromUserFiles, filesFromDrop, filesFromInput, type Bundle } from './bundle';
@@ -18,9 +18,11 @@ export interface ViewerAppProps {
   initial?: { label: string; load: () => Promise<Bundle | undefined> };
   /** Shows "Download bundle" in the viewer header. */
   onDownload?: () => Promise<void>;
+  /** Host content under the picker, while nothing is loaded. */
+  note?: ReactNode;
 }
 
-export function ViewerApp({ initial, onDownload }: ViewerAppProps) {
+export function ViewerApp({ initial, onDownload, note }: ViewerAppProps) {
   const [s, setS] = useState<State>(initial ? { state: 'loading', what: initial.label } : { state: 'empty' });
   const [dragging, setDragging] = useState(false);
   const zipInput = useRef<HTMLInputElement>(null);
@@ -130,6 +132,7 @@ export function ViewerApp({ initial, onDownload }: ViewerAppProps) {
               <Button onClick={() => dirInput.current?.click()}>Choose folder…</Button>
             </div>
             <p className="text-xs text-muted">Everything stays in this browser tab. Nothing is uploaded.</p>
+            {note}
           </>
         )}
       </Card>

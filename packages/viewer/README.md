@@ -17,4 +17,4 @@ import { ViewerApp } from '@blook/viewer';
 @import "@blook/viewer/styles.css";
 ```
 
-The extension's Replay page (`packages/extension/entrypoints/replay/`) is the reference host.
+`note` adds host content under the picker. The extension's Replay page (`packages/extension/entrypoints/replay/`) is the reference host; the website's `/viewer` (`packages/site`) is the other.
