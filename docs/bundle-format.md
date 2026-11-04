@@ -1,6 +1,6 @@
 # Bundle format
 
-What Blook exports, file by file and field by field. Format version **1** (`session.json` `.version`). The agent skill is written from this doc, so it stays exact. The code that writes it is `lib/export/bundle.ts` and `lib/export/timeline.ts`.
+What Blook exports, file by file and field by field. Format version **1** (`session.json` `.version`). The agent skill is written from this doc, so it stays exact. The code that writes it is `packages/core/src/bundle.ts` and `packages/core/src/timeline.ts`.
 
 The export is a ZIP with one folder, `blook-<sessionId>/`. All paths below are relative to that folder.
 
@@ -205,7 +205,7 @@ Array of HTTP requests sorted by `t`. `data:` and `blob:` URLs are not recorded.
 | `responseBodyTruncated` | `true`? | The body was cut at 1 MB during capture (a `text` or `base64` prefix). |
 | `responseBodyNotKept` | string? | Why there's no `responseBody`, e.g. `static resource (Script)`, `page load (Document) that did not fail`, `static asset (image/png)`. |
 
-Which response bodies are kept (one rule, `lib/capture/body-policy.ts`):
+Which response bodies are kept (one rule, `packages/core/src/body-policy.ts`):
 
 - Kept: API calls, meaning `resourceType` `XHR`, `Fetch` or `EventSource`, whatever the content type (JSON, XML, text, or HTML such as htmx fragments or a proxy's 502 page). `Other`, `Ping`, `Preflight`, `CSPViolationReport` and a missing type count as API calls too, unless `mimeType` is an image, font, audio or video.
 - Kept: a `Document` (page load) with `status >= 400`.

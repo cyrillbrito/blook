@@ -2,6 +2,16 @@
 
 Blook has a recording side (the extension) and a reviewing side (the viewer for people, the skill and replay CLI for agents). The bundle ZIP sits between them. Its fields are in [bundle-format.md](bundle-format.md).
 
+The code is a Bun workspaces monorepo. Paths below are inside `packages/extension/` unless they name another package.
+
+| Package | What | Used by |
+| --- | --- | --- |
+| `core` | Bundle format: data types, bundle and timeline builders, transcript mapping, VAD, OpenRouter request, body policy, formatting | extension, viewer, cli |
+| `ui` | UI primitives, icons, logo, Tailwind theme | extension, viewer |
+| `viewer` | The React viewer and the zip/folder loader | extension |
+| `extension` | The WXT extension: capture, IndexedDB, side panel, Replay page | |
+| `cli` | The `blook` replay CLI and binary | |
+
 ```mermaid
 flowchart TD
   P["Side panel"] -->|"Record / Stop / Export"| BG["Background worker"]
@@ -25,30 +35,30 @@ flowchart TD
 
 **CDP capture** (`lib/capture/cdp.ts`). Turns `chrome.debugger` events into requests with bodies, sockets with frames, and console entries.
 
-**Mic** (`entrypoints/offscreen/`, `entrypoints/mic-permission/`). An offscreen document records the mic in chunks of 20 to 40 s, cut at a pause (an AnalyserNode level check, `PauseDetector` in `lib/transcribe/vad.ts`). The first mic permission needs a visible page.
+**Mic** (`entrypoints/offscreen/`, `entrypoints/mic-permission/`). An offscreen document records the mic in chunks of 20 to 40 s, cut at a pause (an AnalyserNode level check, `PauseDetector` in `core/src/vad.ts`). The first mic permission needs a visible page.
 
-**Transcription** (`lib/transcribe/`). `openrouter.ts` sends each audio chunk to OpenRouter and stores word times per chunk. `transcript.ts` (mapping to session ms, transcript.json, speech entries) and `openrouter-api.ts` (the request) are pure and shared with `blook transcribe`, which re-runs transcription on a bundle with OpenRouter or local whisper.cpp.
+**Transcription** (`lib/transcribe/openrouter.ts`). Sends each audio chunk to OpenRouter and stores word times per chunk. The pure parts are in core and shared with `blook transcribe`, which re-runs transcription on a bundle with OpenRouter or local whisper.cpp: `transcript.ts` (mapping to session ms, transcript.json, speech entries) and `openrouter.ts` (the request).
 
-**Export** (`lib/export/`). Builds the ZIP from IndexedDB, including `timeline.json`, which merges every source into one sorted list.
+**Export** (`lib/export/`). Reads a session's rows from IndexedDB and hands them to core's `bundle.ts`, which builds the ZIP, including `timeline.json` (`timeline.ts`), which merges every source into one sorted list.
 
 ## Reviewing
 
-**Viewer** (`components/viewer/`). A React app that plays the rrweb replay with the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. It runs in the extension's Replay page (`entrypoints/replay/`), which reads a recorded session straight from IndexedDB, or opens a ZIP or folder picked with the side panel's "Open bundle…".
+**Viewer** (`packages/viewer`). A React app that plays the rrweb replay with the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. It runs in the extension's Replay page (`entrypoints/replay/`), which reads a recorded session straight from IndexedDB, or opens a ZIP or folder picked with the side panel's "Open bundle…". The viewer has no extension APIs, so another host (a website) can use it as is.
 
 **Agent skill** (`skills/blook/`). Tells an agent how to read a bundle: read order, jq recipes, and workflows for bug triage, task lists and E2E tests.
 
-**Replay CLI** (`cli/`). Replays the rrweb file in headless Chromium (Playwright) and answers `screenshot`, `dom` and `pointer` at time T. See [cli/README.md](../cli/README.md).
+**Replay CLI** (`packages/cli`). Replays the rrweb file in headless Chromium (Playwright) and answers `screenshot`, `dom` and `pointer` at time T. See [packages/cli/README.md](../packages/cli/README.md).
 
 ## Key decisions
 
 - **CDP over patching.** `chrome.debugger` sees every request, including ones made before page scripts run, gets full bodies and WebSocket frames, and needs no code in the page. The cost is Chrome's "debugging this browser" banner, and recording fails if DevTools is already attached to the tab.
 - **rrweb in the MAIN world.** rrweb patches `insertRule`, adopted stylesheets and canvas, and those patches only see the page's calls in the page's own world. Without it, CSS-in-JS styles would be missing from the replay.
 - **Reload on Record.** The tab reloads after the debugger attaches, so the first snapshot is fresh and every request and socket is seen from the start. The reload uses the HTTP cache. The side panel shows "Loading page…" until the load event (`pageReadyT`).
-- **Bodies only for API calls.** Response bodies are kept for XHR, Fetch, EventSource and failed page loads, cut at 1 MB. Scripts, CSS, fonts, images and normal page loads are most of the bytes and rarely the bug, so their bodies aren't fetched. Request bodies are always kept. One function decides: `lib/capture/body-policy.ts`.
+- **Bodies only for API calls.** Response bodies are kept for XHR, Fetch, EventSource and failed page loads, cut at 1 MB. Scripts, CSS, fonts, images and normal page loads are most of the bytes and rarely the bug, so their bodies aren't fetched. Request bodies are always kept. One function decides: `core/src/body-policy.ts`.
 - **One network.json.** Bodies are inline and JSON bodies are parsed, so jq walks straight into them. The file is queried, not read whole.
 - **One clock.** Every `t` is ms since Record, from one `Date.now()` epoch. rrweb timestamps are shifted to it at export.
 - **One MediaRecorder per chunk.** Each chunk is its own recorder run, so every file is a standalone WebM.
-- **Transcription.** The audio is the source; a transcript is a re-runnable process over it, with its `source` recorded in transcript.json. Whisper on OpenRouter with word timestamps in the extension: chunks are transcribed as they are saved, and Export fills in gaps. The CLI can do the same later, or locally with whisper.cpp. An energy VAD (`lib/transcribe/vad.ts`) moves word edges out of silence.
+- **Transcription.** The audio is the source; a transcript is a re-runnable process over it, with its `source` recorded in transcript.json. Whisper on OpenRouter with word timestamps in the extension: chunks are transcribed as they are saved, and Export fills in gaps. The CLI can do the same later, or locally with whisper.cpp. An energy VAD (`core/src/vad.ts`) moves word edges out of silence.
 - **No screenshots or video.** The replay can rebuild any moment, so the bundle stays small and the agent asks for visuals only when it needs them.
 
 ## Known limits
@@ -59,4 +69,4 @@ flowchart TD
 
 ## Later
 
-- If people without the extension need to open bundles: a viewer hosted on GitHub Pages that reads the ZIP locally in the browser.
+- If people without the extension need to open bundles: a site that hosts `@blook/viewer` and reads the ZIP locally in the browser.

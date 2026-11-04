@@ -36,50 +36,58 @@ Typical uses: report bugs to an agent, and let an agent write E2E tests from a n
 
 ## Commands
 
+A Bun workspaces monorepo: every package is in `packages/`, with one `bun install` and one `bun.lock` at the root.
+
 ```sh
 bun install
-bun run dev            # extension in dev mode, load .output/chrome-mv3-dev unpacked
-bun run build          # .output/chrome-mv3
-bun run compile        # type-check
-bun run test           # bun test ./test/: capture rules, bundle export and timeline, no browser
+bun run dev            # extension in dev mode, load packages/extension/.output/chrome-mv3-dev unpacked
+bun run build          # every package's build: the extension (.output/chrome-mv3) and the CLI binary (dist/blook)
+bun run zip            # packages/extension/.output/blook-chrome.zip
+bun run typecheck      # bun check (TypeScript 7) on every package's tsconfig.json
+bun run test           # bun test in every package: format logic, capture, CLI against a synthetic bundle
 ```
 
-The replay CLI lives in `cli/`, with its own `bun install`:
+One package: `bun run --filter @blook/cli test`, or run its script from its folder. The CLI from source:
 
 ```sh
-cd cli
+cd packages/cli
 bun src/cli.ts pointer <bundle.zip> 00:18.5   # also: info, screenshot, dom, transcribe, install-browser
-bun run test                                  # tests, with a small synthetic bundle
-bun run build:bin                             # single binary: dist/blook
+bun run build                                 # single binary: dist/blook
 ```
 
-Details in [cli/README.md](cli/README.md).
+Details in [packages/cli/README.md](packages/cli/README.md).
 
 ## Where things are
 
-- `entrypoints/`: extension pages and scripts (side panel, background, recorder, offscreen mic, Replay page)
-- `lib/`: capture, export, transcription, IndexedDB. `lib/types.ts` and `lib/messages.ts` are the contracts.
-- `components/viewer/`: the viewer, used by the extension's Replay page; `components/ui/`: shared UI primitives
-- `cli/`: the replay CLI
-- `skills/blook/`: the agent skill
+Packages share TypeScript source through `package.json` `exports` (`@blook/core/bundle`, `@blook/ui`), with no build step. Shared dependency versions are in the root `package.json` catalog (`"react": "catalog:"`); packages link each other with `workspace:*`.
+
+- `packages/core` (`@blook/core`): the bundle format and logic shared by more than one package. Types of the recorded data (`types.ts`), the bundle builder and `BUNDLE_FORMAT_VERSION` (`bundle.ts`), `timeline.ts`, `transcript.ts` and `vad.ts`, the OpenRouter request, the body policy, display formatting. Pure: no browser-extension APIs.
+- `packages/extension` (`@blook/extension`): the WXT extension. `entrypoints/` (side panel, background, recorder, offscreen mic, Replay page), `lib/` (capture, IndexedDB, messages, settings, export and transcription glue). `lib/messages.ts` is the contract between extension contexts.
+- `packages/viewer` (`@blook/viewer`): the React viewer and its zip/folder loader. No `chrome.*`: hosts pass the initial loader and download handler as props. Hosts add `@import "@blook/viewer/styles.css"` to their Tailwind stylesheet.
+- `packages/ui` (`@blook/ui`): UI primitives, icons, the logo (`src/icon.svg`) and the Tailwind theme (`@blook/ui/theme.css`).
+- `packages/cli` (`@blook/cli`): the replay CLI; `src/assets.ts` holds the files the binary embeds.
+- `skills/blook/`: the agent skill (at the root, where the skills CLI finds it)
 - `install.sh`, `.github/workflows/release.yml`: the one-line installer and the release build
+
+A new package: a folder in `packages/` with a `package.json` (`"name": "@blook/<name>"`, `"private": true`, `exports` to its source) and a `tsconfig.json` that extends `../../tsconfig.base.json`; add it to the root `typecheck` script.
 
 ## Docs
 
 - [docs/](docs/README.md): architecture, the bundle format, and references
-- Technical detail lives next to the code: short comments, and READMEs like [cli/README.md](cli/README.md). Keep docs short, current and free of history.
-- The bundle format version is `BUNDLE_FORMAT_VERSION` in `lib/export/bundle.ts`.
+- Technical detail lives next to the code: short comments, and READMEs like [packages/cli/README.md](packages/cli/README.md). Keep docs short, current and free of history.
+- The bundle format version is `BUNDLE_FORMAT_VERSION` in `packages/core/src/bundle.ts`.
 
 ## Keep every part in sync
 
 The extension, the bundle, the viewer, the CLI, the skill and the docs describe one product. A change in one part is done only when the others still match it:
 
-- **Extension or bundle change** (capture, export, a field, a file): update [docs/bundle-format.md](docs/bundle-format.md), the viewer, the CLI (`cli/src/bundle.ts` and its test fixture), and the skill's files table and recipes.
-- **CLI change** (a command, option, output shape or exit code): update `--help`, [cli/README.md](cli/README.md), the tests, and the skill's CLI section.
+- **Bundle change** (capture, export, a field, a file; mostly `packages/core`): update [docs/bundle-format.md](docs/bundle-format.md), the viewer, the CLI (`packages/cli/src/bundle.ts` and its test fixture), and the skill's files table and recipes.
+- **CLI change** (a command, option, output shape or exit code): update `--help`, [packages/cli/README.md](packages/cli/README.md), the tests, and the skill's CLI section.
+- **Viewer or UI change**: check every host still works (the extension's Replay page and side panel today).
 - **Skill change**: run its commands and jq recipes against a real bundle.
 - **Any change**: update the docs it touches (README.md for users, AGENTS.md and docs/ for developers).
 
-Before calling it done, validate across parts: `bun run compile`, `bun run test` and `bun run build` at the root; `bun run test` in `cli/`; record a short session with the built extension and check it in the Replay page, with `blook info`/`pointer`, and with the skill recipes that touch what changed.
+Before calling it done, validate across parts: `bun run typecheck`, `bun run test` and `bun run build` at the root; record a short session with the built extension and check it in the Replay page, with `blook info`/`pointer`, and with the skill recipes that touch what changed.
 
 ## Prior art
 

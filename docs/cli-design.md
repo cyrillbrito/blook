@@ -10,4 +10,4 @@ The `blook` CLI's main users are coding agents that learn it from `blook --help`
 - **Ask, don't guess.** An input with two readings fails with both spelled out (`3.2` → "use 3.2s for seconds, or 3200 for ms"). Inputs with one obvious reading are accepted (a folder holding one unzipped bundle).
 - **Never block on a prompt.** Without a terminal, `skill install` copies the skill instead of asking, and `extension` doesn't open Chrome.
 - **Output shapes are a contract.** Field names change only with the skill and the docs, in the same change.
-- **One file per command** in `src/commands/`, shared loading, time parsing and errors in `src/bundle.ts` and `src/errors.ts`. Tests in `test/` run the CLI as a subprocess against a small synthetic bundle and check stdout, stderr and the exit code.
+- **One file per command** in `packages/cli/src/commands/`, shared loading, time parsing and errors in `src/bundle.ts` and `src/errors.ts`. Tests in `test/` run the CLI as a subprocess against a small synthetic bundle and check stdout, stderr and the exit code.

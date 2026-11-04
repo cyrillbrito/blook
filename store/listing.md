@@ -60,7 +60,7 @@ Open source: https://github.com/cyrillbrito/blook
 
 | Asset | File | Required |
 | --- | --- | --- |
-| Store icon 128×128 | `store-icon-128.png` (96 px artwork, 16 px transparent padding; same as `public/icon/128.png`) | yes |
+| Store icon 128×128 | `store-icon-128.png` (96 px artwork, 16 px transparent padding; same as `packages/extension/public/icon/128.png`) | yes |
 | Screenshots 1280×800 | `screenshot-1-timeline.png`, `screenshot-2-network.png`, `screenshot-3-console.png`, `screenshot-4-sidepanel.png` | at least 1 |
 | Small promo tile 440×280 | `promo-small-440x280.png` | no, but listings without it rank lower |
 | Marquee 1400×560 | none | no |
