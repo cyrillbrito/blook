@@ -14,7 +14,7 @@ const res = await Bun.build({
   minify: true,
   external: ['chromium-bidi', 'chromium-bidi/*'],
   compile: {
-    target: (values.target ?? `bun-${process.platform}-${process.arch}`) as Bun.Build.Target,
+    target: (values.target ?? `bun-${process.platform}-${process.arch}`) as Bun.Build.CompileTarget,
     outfile: values.outfile ?? 'dist/blook',
   },
   plugins: [

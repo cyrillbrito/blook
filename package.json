@@ -25,7 +25,7 @@
     "dev": "bun --cwd=packages/extension run dev",
     "build": "bun run --workspaces --if-present build",
     "zip": "bun --cwd=packages/extension run zip",
-    "typecheck": "bun check -p packages/core && bun check -p packages/ui && bun check -p packages/viewer && bun check -p packages/extension && bun check -p packages/cli && bun check -p packages/site",
+    "typecheck": "bun run --workspaces --if-present typecheck",
     "test": "bun run --workspaces --if-present test",
     "lint": "oxlint",
     "format": "oxfmt",

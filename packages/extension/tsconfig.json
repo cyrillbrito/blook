@@ -1,7 +1,7 @@
 {
+  // WXT generates the base config (the shared strict options, paths, auto-import types) on `wxt prepare`.
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
-    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "types": ["bun"]
   },

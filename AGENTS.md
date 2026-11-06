@@ -43,7 +43,7 @@ bun install
 bun run dev            # extension in dev mode, load packages/extension/.output/chrome-mv3-dev unpacked
 bun run build          # the extension (.output/chrome-mv3), the CLI binary (dist/blook), the site (dist/)
 bun run zip            # packages/extension/.output/blook-chrome.zip
-bun run typecheck      # bun check (TypeScript 7) on every package's tsconfig.json
+bun run typecheck      # each package's typecheck script: bun check (TypeScript 7) on its tsconfig.json
 bun run test           # bun test in core, extension and cli
 bun run lint           # oxlint, one root config (.oxlintrc.json)
 bun run format         # oxfmt, one root config (.oxfmtrc.json); format:check in CI. Markdown is not formatted.
@@ -53,7 +53,7 @@ One package: `bun run --filter @blook/cli test`, or run its script from its fold
 
 `bun check` is Bun's built-in type checker, so no package needs TypeScript to check. The root `typescript` devDependency is only for editors: keep it on the version `bun -p process.versions.typescript` prints.
 
-Packages share TypeScript source through `package.json` `exports` (`@blook/core/bundle`, `@blook/ui`), with no build step. Shared dependency versions are in the root `package.json` catalog (`"react": "catalog:"`), and packages link each other with `workspace:*`. A new package is a folder in `packages/` with a `package.json` (`"name": "@blook/<name>"`, `"private": true`, `exports` to its source) and a `tsconfig.json` that extends `../../tsconfig.base.json`. Add it to the root `typecheck` script.
+Packages share TypeScript source through `package.json` `exports` (`@blook/core/bundle`, `@blook/ui`), with no build step. Shared dependency versions are in the root `package.json` catalog (`"react": "catalog:"`), and packages link each other with `workspace:*`. A new package is a folder in `packages/` with a `package.json` (`"name": "@blook/<name>"`, `"private": true`, `exports` to its source), a `tsconfig.json` that extends `../../tsconfig.base.json`, and a `"typecheck": "bun check"` script.
 
 The product has one version, in the root `package.json`. The extension manifest and `blook --version` read it, and packages have none. The manual release workflow (`.github/workflows/release.yml`, input `bump`: patch, minor or major) bumps it, tags, and publishes the zip and CLI binaries. Release notes are a short changelog, never install steps: pass the optional `notes` input (one sentence, then 2 to 6 user-visible bullets), or it lists the commit subjects since the last tag.
 

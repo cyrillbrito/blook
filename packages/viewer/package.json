@@ -7,6 +7,9 @@
     ".": "./src/index.ts",
     "./styles.css": "./src/styles.css"
   },
+  "scripts": {
+    "typecheck": "bun check"
+  },
   "dependencies": {
     "@blook/core": "workspace:*",
     "@blook/ui": "workspace:*",

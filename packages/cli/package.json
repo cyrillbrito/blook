@@ -9,6 +9,7 @@
   "scripts": {
     "build": "bun build.ts",
     "test": "bun test",
+    "typecheck": "bun check",
     "fixture": "bun test/make-fixture.ts"
   },
   "dependencies": {

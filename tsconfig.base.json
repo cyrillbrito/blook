@@ -1,5 +1,5 @@
 {
-  // Shared compiler options. Each package has its own tsconfig.json; `bun run typecheck` checks them all.
+  // Shared compiler options. Each package extends it in its own tsconfig.json and checks it with its `typecheck` script (`bun check`).
   "compilerOptions": {
     "target": "ESNext",
     "module": "Preserve",
