@@ -1,7 +1,10 @@
 <!-- Blook icon. 16-unit grid so edges land on whole pixels at 16/32/48/128 px. Frame and eye built on Lucide "app-window" and "eye" (https://lucide.dev), ISC License, Copyright (c) Lucide Contributors. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
-  <rect x="0" y="1" width="16" height="14" rx="3" fill="#2545c9"/>
-  <g fill="#fff"><circle cx="3" cy="4" r="1"/><circle cx="6" cy="4" r="1"/></g>
+  <defs><radialGradient id="glint"><stop offset="0" stop-color="#fff"/><stop offset=".7" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+  <rect x="0" y="1" width="16" height="14" rx="3" fill="#334155"/>
+  <g fill="#94a3b8"><circle cx="2.75" cy="3.75" r="1"/><circle cx="5.75" cy="3.75" r="1"/></g>
   <path d="M1.5 9.5Q8 2.5 14.5 9.5Q8 16.5 1.5 9.5Z" fill="#fff"/>
-  <circle cx="8" cy="9.5" r="2.25" fill="#f2542d"/>
+  <circle cx="8" cy="9.5" r="2.5" fill="#f2542d"/>
+  <circle cx="8" cy="9.5" r="1.1" fill="#334155"/>
+  <circle cx="9.1" cy="8.5" r=".65" fill="url(#glint)"/>
 </svg>
