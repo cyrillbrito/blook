@@ -22,11 +22,12 @@ const files = [
 
 // An example stretch of timeline.json, styled like the viewer's Timeline tab.
 const clock: { t: string; type: string; text: string; tone: string }[] = [
-  { t: '0:11.8', type: 'speech', text: 'I tick "Write the release notes" and it should save.', tone: 'bg-blue-100 text-blue-800' },
-  { t: '0:12.9', type: 'click', text: 'Click input[type=checkbox] .toggle', tone: 'bg-sky-100 text-sky-800' },
-  { t: '0:13.0', type: 'request-failed', text: 'GET /todos/sync-missing → 404 (153 ms)', tone: 'bg-red-100 text-red-800' },
-  { t: '0:13.0', type: 'error', text: 'console.error: Sync failed: 404 from /todos/sync-missing', tone: 'bg-red-100 text-red-800' },
-  { t: '0:14.6', type: 'speech', text: 'It looks done, but after a reload it is gone again.', tone: 'bg-blue-100 text-blue-800' },
+  { t: '0:09.9', type: 'speech', text: 'Plain text works. Now one with an emoji.', tone: 'bg-blue-100 text-blue-800' },
+  { t: '0:16.0', type: 'click', text: 'Click button "Send"', tone: 'bg-sky-100 text-sky-800' },
+  { t: '0:16.0', type: 'request-failed', text: 'POST /api/channels/launch/messages → 500 (223 ms)', tone: 'bg-red-100 text-red-800' },
+  { t: '0:16.2', type: 'error', text: "console.error: Message not saved (500): Incorrect string value for column 'body'", tone: 'bg-red-100 text-red-800' },
+  { t: '0:17.6', type: 'ws-frame', text: 'WebSocket received: {"type":"channel.sync",…}', tone: 'bg-teal-100 text-teal-800' },
+  { t: '0:18.5', type: 'speech', text: "And now it's gone. No error, the message just disappears.", tone: 'bg-blue-100 text-blue-800' },
 ];
 
 const link = 'underline underline-offset-2 hover:text-accent-strong';

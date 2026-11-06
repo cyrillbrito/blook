@@ -65,7 +65,7 @@ Open source: https://github.com/cyrillbrito/blook
 | Small promo tile 440×280 | `promo-small-440x280.png` | no, but listings without it rank lower |
 | Marquee 1400×560 | none | no |
 
-The screenshots come from a real recording of the public TodoMVC demo (`demo.playwright.dev`), so no private URLs or keys. They show no transcript, since that needs a key and a voice; a retake with narration would show the Transcript tab too.
+The screenshots come from a real recording of the team chat demo in [`demo-app/`](demo-app/), served locally, so no private URLs, keys or third-party brands. The story: a message with an emoji shows up, its `POST` fails with a 500 and a `console.error`, and the WebSocket sync quietly removes it. The narration is macOS `say` played through Chrome's fake microphone, transcribed with `blook transcribe --method whisper`.
 
 ## Distribution
 
