@@ -1,24 +1,91 @@
-// Load a Blook bundle (folder or .zip) and answer pure-data questions
-// about its rrweb events: viewport, URL and mouse position at time t.
-// Only session.json, rrweb.json and timeline.json are read.
+// Read a Blook bundle (folder or .zip), and answer pure-data questions about its rrweb events:
+// viewport, URL and mouse position at time t.
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join, relative } from 'node:path';
 import { unzipSync, strFromU8 } from 'fflate';
+import { EventType, IncrementalSource, MouseInteractions, type eventWithTime } from '@rrweb/types';
+import { bundleRoot, type SessionOut } from '@blook/core/bundle';
+import type { TimelineEntry } from '@blook/core/timeline';
 import { CliError, EXIT } from './errors.ts';
 
 export const PASS_A_BUNDLE = 'Pass a blook-*.zip exported by the Blook extension, or its unzipped folder.';
 
-export interface RrwebEvent {
-  type: number;
-  data: any;
-  timestamp: number; // ms since session start
+/** An rrweb event with `timestamp` in ms since session start. */
+export type RrwebEvent = eventWithTime & { data: any };
+
+/** A bundle's files by their path in the bundle folder, and where they came from. */
+export interface BundleFiles {
+  kind: 'zip' | 'folder';
+  /** The zip file, or the bundle folder. */
+  path: string;
+  /** Folder prefix inside the zip (`blook-<id>/`), or ''. */
+  prefix: string;
+  files: Map<string, Uint8Array>;
+  session: SessionOut;
+  /** A JSON file of the bundle, undefined when it isn't there. */
+  json<T>(name: string): T | undefined;
+}
+
+/** A folder that holds one unzipped bundle (`unzip -d D`) stands for that bundle. */
+function bundleFolder(dir: string): string {
+  if (existsSync(join(dir, 'session.json'))) return dir;
+  const inner = readdirSync(dir).filter((n) => existsSync(join(dir, n, 'session.json')));
+  return inner.length === 1 ? join(dir, inner[0]!) : dir;
+}
+
+/** Reads a bundle zip or folder: every file, or only `names`. Checks that it is a Blook bundle. */
+export function readBundleFiles(path: string, names?: string[]): BundleFiles {
+  if (!existsSync(path)) throw new CliError(`Bundle not found: ${path}`, EXIT.notFound, PASS_A_BUNDLE);
+  const wanted = (name: string) => !names || names.some((n) => name === n || name.endsWith(`/${n}`));
+  let kind: BundleFiles['kind'];
+  let raw: Map<string, Uint8Array>;
+  if (statSync(path).isDirectory()) {
+    kind = 'folder';
+    path = bundleFolder(path);
+    raw = new Map();
+    const dir = path;
+    const walk = (d: string) => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        const p = join(d, e.name);
+        const name = relative(dir, p).split('\\').join('/');
+        if (e.isDirectory()) walk(p);
+        else if (wanted(name)) raw.set(name, readFileSync(p));
+      }
+    };
+    walk(dir);
+  } else {
+    kind = 'zip';
+    try {
+      raw = new Map(Object.entries(unzipSync(readFileSync(path), { filter: (f) => !f.name.endsWith('/') && wanted(f.name) })));
+    } catch {
+      throw new CliError(`Not a Blook bundle: ${path} is not a zip file.`, EXIT.notFound, PASS_A_BUNDLE);
+    }
+  }
+  const root = bundleRoot(raw);
+  if (!root) throw new CliError(`Not a Blook bundle: no session.json in ${path}.`, EXIT.notFound, PASS_A_BUNDLE);
+  const { prefix, files } = root;
+
+  const json = <T>(name: string): T | undefined => {
+    const data = files.get(name);
+    if (!data) return undefined;
+    try {
+      return JSON.parse(strFromU8(data)) as T;
+    } catch {
+      throw new CliError(`Not a Blook bundle: ${name} in ${path} is not valid JSON.`, EXIT.notFound, PASS_A_BUNDLE);
+    }
+  };
+  const session = json<SessionOut>('session.json');
+  if (session?.format !== 'blook-bundle') {
+    throw new CliError(`Not a Blook bundle: ${path} has a session.json without "format": "blook-bundle".`, EXIT.notFound, PASS_A_BUNDLE);
+  }
+  return { kind, path, prefix, files, session, json };
 }
 
 export interface Bundle {
   path: string;
-  session: any;
+  session: SessionOut;
   /** timeline.json entries ([] when missing). */
-  timeline: any[];
+  timeline: TimelineEntry[];
   /** Session length in ms: session.json durationMs, else the last rrweb event. */
   durationMs: number;
   /** Tab ids with rrweb events, in session.tabs order. */
@@ -28,34 +95,16 @@ export interface Bundle {
   resolveTab(tabId?: string): string;
 }
 
-/** A folder that holds one unzipped bundle (`unzip -d D`) stands for that bundle. */
-export function bundleFolder(dir: string): string {
-  if (existsSync(join(dir, 'session.json'))) return dir;
-  const inner = readdirSync(dir).filter((n) => existsSync(join(dir, n, 'session.json')));
-  return inner.length === 1 ? join(dir, inner[0]!) : dir;
-}
-
+/** The bundle as the replay commands use it: session.json, rrweb.json and timeline.json. */
 export function loadBundle(path: string): Bundle {
-  if (!existsSync(path)) throw new CliError(`Bundle not found: ${path}`, EXIT.notFound, PASS_A_BUNDLE);
-  if (statSync(path).isDirectory()) path = bundleFolder(path);
-  const files = statSync(path).isDirectory() ? readFolder(path) : readZip(path);
-  const json = (name: string, text: string) => {
-    try {
-      return JSON.parse(text);
-    } catch {
-      throw new CliError(`Not a Blook bundle: ${name} in ${path} is not valid JSON.`, EXIT.notFound, PASS_A_BUNDLE);
-    }
-  };
-  const session = json('session.json', files.session);
-  if (session?.format !== 'blook-bundle') {
-    throw new CliError(`Not a Blook bundle: ${path} has a session.json without "format": "blook-bundle".`, EXIT.notFound, PASS_A_BUNDLE);
-  }
-  const { tabs } = json('rrweb.json', files.rrweb) as { tabs: { tabId: number; events: RrwebEvent[] }[] };
-  const byTab = new Map((tabs ?? []).filter((t) => t.events?.length).map((t) => [String(t.tabId), t.events]));
+  const b = readBundleFiles(path, ['session.json', 'rrweb.json', 'timeline.json']);
+  const rrweb = b.json<{ tabs: { tabId: number; events: RrwebEvent[] }[] }>('rrweb.json');
+  if (!rrweb) throw new CliError(`Not a Blook bundle: no rrweb.json in ${b.path}.`, EXIT.notFound, PASS_A_BUNDLE);
+  const byTab = new Map((rrweb.tabs ?? []).filter((t) => t.events?.length).map((t) => [String(t.tabId), t.events]));
   const tabIds = [...byTab.keys()];
   if (!tabIds.length)
     throw new CliError(
-      `No page recording in ${path}: rrweb.json has no events.`,
+      `No page recording in ${b.path}: rrweb.json has no events.`,
       EXIT.notFound,
       'The bundle has no DOM to replay; read timeline.json and the other files instead.',
     );
@@ -67,52 +116,16 @@ export function loadBundle(path: string): Bundle {
     return tabId;
   };
   const lastEvent = Math.max(...[...byTab.values()].map((ev) => ev[ev.length - 1]!.timestamp));
+  const { session } = b;
   return {
-    path,
+    path: b.path,
     session,
-    timeline: files.timeline ? json('timeline.json', files.timeline) : [],
+    timeline: b.json<TimelineEntry[]>('timeline.json') ?? [],
     durationMs: typeof session.durationMs === 'number' ? Math.max(session.durationMs, lastEvent) : lastEvent,
     tabIds,
     resolveTab,
     events: (tabId) => byTab.get(resolveTab(tabId))!,
   };
-}
-
-interface BundleFiles {
-  session: string;
-  rrweb: string;
-  timeline?: string;
-}
-
-function readFolder(dir: string): BundleFiles {
-  const read = (name: string, required = true) => {
-    const file = join(dir, name);
-    if (!existsSync(file)) {
-      if (!required) return undefined;
-      throw new CliError(`Not a Blook bundle: no ${name} in ${dir}.`, EXIT.notFound, PASS_A_BUNDLE);
-    }
-    return readFileSync(file, 'utf8');
-  };
-  return { session: read('session.json')!, rrweb: read('rrweb.json')!, timeline: read('timeline.json', false) };
-}
-
-function readZip(file: string): BundleFiles {
-  // Unzip only the files we read (skip audio and network).
-  let raw: Record<string, Uint8Array>;
-  try {
-    raw = unzipSync(readFileSync(file), { filter: (f) => /(^|\/)(session|rrweb|timeline)\.json$/.test(f.name) });
-  } catch {
-    throw new CliError(`Not a Blook bundle: ${file} is not a zip file.`, EXIT.notFound, PASS_A_BUNDLE);
-  }
-  const get = (name: string, required = true) => {
-    const entry = Object.keys(raw).find((n) => n === name || n.endsWith('/' + name));
-    if (!entry) {
-      if (!required) return undefined;
-      throw new CliError(`Not a Blook bundle: no ${name} in ${basename(file)}.`, EXIT.notFound, PASS_A_BUNDLE);
-    }
-    return strFromU8(raw[entry]!);
-  };
-  return { session: get('session.json')!, rrweb: get('rrweb.json')!, timeline: get('timeline.json', false) };
 }
 
 export const TIME_FORMATS = 'ms since the recording started (18036), seconds (18.5s) or [hh:]mm:ss[.mmm] (00:18.5)';
@@ -143,34 +156,21 @@ export function parseTime(s: string): number {
 export function checkTime(bundle: Bundle, t: number, input: string = String(t)) {
   if (t <= bundle.durationMs) return;
   throw new CliError(
-    `Time ${input} is after the end of the recording (${formatTime(bundle.durationMs)}).`,
+    `Time ${input} is after the end of the recording (${formatClock(bundle.durationMs)}).`,
     EXIT.timeRange,
-    `Use a time between 00:00 and ${formatTime(bundle.durationMs)}; \`blook info ${bundle.path}\` lists click times.`,
+    `Use a time between 00:00 and ${formatClock(bundle.durationMs)}; \`blook info ${bundle.path}\` lists click times.`,
   );
 }
 
-export function formatTime(ms: number): string {
+/** mm:ss.mmm, the CLI's `time` fields (the viewer's formatTime is m:ss.t). */
+export function formatClock(ms: number): string {
   const s = Math.max(0, ms) / 1000;
   const m = Math.floor(s / 60);
   return `${String(m).padStart(2, '0')}:${(s - m * 60).toFixed(3).padStart(6, '0')}`;
 }
 
-// rrweb enums (from @rrweb/types), kept local so this file has no deps.
-const EventType = { FullSnapshot: 2, IncrementalSnapshot: 3, Meta: 4 } as const;
-const Source = { MouseMove: 1, MouseInteraction: 2, ViewportResize: 4, TouchMove: 6, Drag: 12 } as const;
-const Interaction = [
-  'MouseUp',
-  'MouseDown',
-  'Click',
-  'ContextMenu',
-  'DblClick',
-  'Focus',
-  'Blur',
-  'TouchStart',
-  'TouchMove_Departed',
-  'TouchEnd',
-  'TouchCancel',
-];
+/** MouseInteractions names, lowercased in `mouse.source`, as they are in `nearbyInteractions[].type`. */
+const interactionName = (type: number) => MouseInteractions[type] ?? String(type);
 
 export interface PageState {
   url: string | null;
@@ -190,7 +190,7 @@ export function pageStateAt(events: RrwebEvent[], t: number): PageState {
     if (e.type === EventType.Meta && (before || !viewport)) {
       url = e.data.href;
       viewport = { width: e.data.width, height: e.data.height };
-    } else if (before && e.type === EventType.IncrementalSnapshot && e.data.source === Source.ViewportResize) {
+    } else if (before && e.type === EventType.IncrementalSnapshot && e.data.source === IncrementalSource.ViewportResize) {
       viewport = { width: e.data.width, height: e.data.height };
     }
   }
@@ -226,11 +226,11 @@ export function mouseAt(events: RrwebEvent[], t: number): MouseAt | null {
   for (const e of events) {
     if (e.type !== EventType.IncrementalSnapshot) continue;
     const d = e.data;
-    if (d.source === Source.MouseMove || d.source === Source.TouchMove || d.source === Source.Drag) {
-      const name = d.source === Source.MouseMove ? 'mousemove' : d.source === Source.TouchMove ? 'touchmove' : 'drag';
+    if (d.source === IncrementalSource.MouseMove || d.source === IncrementalSource.TouchMove || d.source === IncrementalSource.Drag) {
+      const name = d.source === IncrementalSource.MouseMove ? 'mousemove' : d.source === IncrementalSource.TouchMove ? 'touchmove' : 'drag';
       for (const p of d.positions ?? []) take(p.x, p.y, e.timestamp + (p.timeOffset ?? 0), name, p.id ?? null);
-    } else if (d.source === Source.MouseInteraction && typeof d.x === 'number') {
-      take(d.x, d.y, e.timestamp, Interaction[d.type]?.toLowerCase() ?? 'interaction', d.id ?? null);
+    } else if (d.source === IncrementalSource.MouseInteraction && typeof d.x === 'number') {
+      take(d.x, d.y, e.timestamp, interactionName(d.type).toLowerCase(), d.id ?? null);
     }
   }
   return best;
@@ -242,11 +242,11 @@ export function interactionsBetween(events: RrwebEvent[], from: number, to: numb
   for (const e of events) {
     if (e.timestamp < from) continue;
     if (e.timestamp > to) break;
-    if (e.type === EventType.IncrementalSnapshot && e.data.source === Source.MouseInteraction) {
+    if (e.type === EventType.IncrementalSnapshot && e.data.source === IncrementalSource.MouseInteraction) {
       const d = e.data;
       out.push({
         t: e.timestamp,
-        type: Interaction[d.type] ?? String(d.type),
+        type: interactionName(d.type),
         nodeId: d.id,
         ...(typeof d.x === 'number' ? { x: d.x, y: d.y } : {}),
       });

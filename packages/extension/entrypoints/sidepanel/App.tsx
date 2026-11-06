@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { deleteSession, listSessions } from '@/lib/db';
 import type { PanelMessage, RecordingStatus } from '@/lib/messages';
 import { DEFAULT_SETTINGS, settingsItem } from '@/lib/settings';
 import { TRANSCRIPTION_MODEL, type MicState, type SessionMeta, type Settings } from '@blook/core/types';
-import { formatDuration, shortUrl } from '@blook/core/format';
+import { formatDuration, shortUrl, urlHost } from '@blook/core/format';
 import { formatDate, tryBackground } from '@/components/util';
 import { offerFile } from '@/components/handoff';
 import { Alert, Badge, Button, Card, Field, IconButton, Input, LiveDot, SectionTitle, Switch, cx } from '@blook/ui';
@@ -28,9 +27,8 @@ export default function App() {
   const [error, setError] = useState<string>();
 
   const refreshSessions = useCallback(async () => {
-    // Prefer the background's list; fall back to reading IndexedDB directly.
-    const list = (await tryBackground({ type: 'sessions/list' })) ?? (await listSessions().catch(() => []));
-    setSessions(list);
+    const list = await tryBackground({ type: 'sessions/list' });
+    if (list) setSessions(list);
   }, []);
 
   useEffect(() => {
@@ -158,7 +156,7 @@ function IdleCard({ onRecord }: { onRecord: () => void }) {
   );
 }
 
-// Mic state as quiet muted text; colour only when something is wrong.
+// Mic state in muted text; colour only when something is wrong.
 const MIC: Record<MicState, { label: string; tone?: 'warn' | 'danger'; on: boolean }> = {
   off: { label: 'Mic off', on: false },
   starting: { label: 'Mic starting…', on: true },
@@ -168,15 +166,7 @@ const MIC: Record<MicState, { label: string; tone?: 'warn' | 'danger'; on: boole
   stopped: { label: 'Mic stopped', on: false },
 };
 
-function hostOf(url: string): string {
-  try {
-    return new URL(url).host || url;
-  } catch {
-    return url;
-  }
-}
-
-/** While starting, recording or stopping: a calm status line, the page, and Stop. */
+/** While starting, recording or stopping: a status line, the page, and Stop. */
 function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: () => void }) {
   const { state, session, phase } = status;
   const recording = state === 'recording';
@@ -216,12 +206,12 @@ function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: () => v
       {/* Fixed-height lines so starting → loading → recording doesn't jump. */}
       <div className="min-w-0 space-y-0.5 text-xs leading-4 text-muted">
         <div className="h-4 truncate text-fg" title={session?.title}>
-          {session ? session.title || hostOf(session.url) : ''}
+          {session ? session.title || urlHost(session.url) : ''}
         </div>
         <div className="flex h-4 items-center gap-1.5">
           {session && (
             <span className="min-w-0 truncate" title={session.url}>
-              {hostOf(session.url)}
+              {urlHost(session.url)}
             </span>
           )}
           {session && session.tabs.length > 1 && <Badge>{session.tabs.length} tabs</Badge>}
@@ -254,7 +244,7 @@ function SettingsCard({ locked }: { locked: boolean }) {
   return (
     <Card className="p-3">
       <div className="flex items-start gap-2">
-        <div className="flex flex-1 flex-wrap gap-x-4 gap-y-2 text-xs">
+        <div className="flex flex-1 flex-col items-start gap-2 text-xs">
           <Switch label="Microphone" checked={settings.mic} disabled={locked} onChange={(mic) => update({ mic })} />
           <Switch label="Mask inputs and text" checked={settings.mask} disabled={locked} onChange={(mask) => update({ mask })} />
           <Switch label="Canvas (2 fps)" checked={settings.canvas} disabled={locked} onChange={(canvas) => update({ canvas })} />
@@ -313,11 +303,9 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
   const [busy, setBusy] = useState<'export' | 'delete'>();
   const [confirming, setConfirming] = useState(false);
   const [note, setNote] = useState<{ text: string; tone: 'danger' | 'warn' }>();
-  // status 'recording' without being the live session means it ended without Stop (browser closed or crashed).
   const live = active;
   const duration = session.durationMs ?? (session.endedAt ? session.endedAt - session.startedAt : undefined);
 
-  // Drop a pending confirm after a few seconds.
   useEffect(() => {
     if (!confirming) return;
     const id = setTimeout(() => setConfirming(false), 4000);
@@ -334,21 +322,21 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
     setBusy(undefined);
     if (!res) setNote({ text: NO_ANSWER, tone: 'danger' });
     else if (!res.ok) setNote({ text: res.error ?? 'Download failed.', tone: 'danger' });
-    else if (res.error) setNote({ text: res.error, tone: 'warn' });
+    else if (res.warning) setNote({ text: res.warning, tone: 'warn' });
   };
 
   const remove = async () => {
     setConfirming(false);
     setBusy('delete');
     const res = await tryBackground({ type: 'session/delete', sessionId: session.id });
-    if (!res) await deleteSession(session.id).catch((e) => setNote({ text: String(e), tone: 'danger' }));
+    if (!res) setNote({ text: NO_ANSWER, tone: 'danger' });
     setBusy(undefined);
     onChanged();
   };
 
   const t = session.transcription;
-  const tLabel = t && t.state !== 'none' ? transcriptionLabel(t) : '';
-  const tTone = t ? TRANSCRIPTION_TONE[t.state] : undefined;
+  const tLabel = t ? TRANSCRIPTION[t.state].label(t) : '';
+  const tTone = t ? TRANSCRIPTION[t.state].tone : undefined;
   // Row actions stay quiet until hover or keyboard focus; busy or confirming keeps them shown.
   const actionsShown = !!busy || confirming;
   return (
@@ -389,7 +377,7 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
       </div>
       <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
         <span className="max-w-[45%] truncate" title={session.url}>
-          {hostOf(session.url)}
+          {urlHost(session.url)}
         </span>
         <span>·</span>
         <span>{formatDate(session.startedAt)}</span>
@@ -410,6 +398,7 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
         )}
         {busy === 'export' && <span>· preparing download…</span>}
       </div>
+      {/* Stored as recording but not the live session: the browser closed or crashed before Stop. */}
       {!live && session.status === 'recording' && <div className="mt-0.5 text-xs text-warn">Ended without Stop.</div>}
       {confirming && <div className="mt-1 text-xs text-danger">Delete this recording? This can't be undone.</div>}
       {note && <div className={cx('mt-1 text-xs', note.tone === 'danger' ? 'text-danger' : 'text-warn')}>{note.text}</div>}
@@ -417,30 +406,14 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
   );
 }
 
-const TRANSCRIPTION_TONE: Record<NonNullable<SessionMeta['transcription']>['state'], 'neutral' | 'accent' | 'ok' | 'warn' | 'danger'> = {
-  none: 'neutral',
-  'no-key': 'warn',
-  pending: 'accent',
-  transcribing: 'accent',
-  done: 'ok',
-  partial: 'warn',
-  failed: 'danger',
-};
+type Transcription = NonNullable<SessionMeta['transcription']>;
 
-function transcriptionLabel(t: NonNullable<SessionMeta['transcription']>): string {
-  switch (t.state) {
-    case 'transcribing':
-    case 'pending':
-      return `transcribing ${t.done}/${t.total}`;
-    case 'done':
-      return 'transcribed';
-    case 'no-key':
-      return 'not transcribed: no API key';
-    case 'partial':
-      return `transcribed ${t.done}/${t.total}`;
-    case 'failed':
-      return 'transcription failed';
-    default:
-      return '';
-  }
-}
+const TRANSCRIPTION: Record<Transcription['state'], { label: (t: Transcription) => string; tone?: 'accent' | 'warn' | 'danger' }> = {
+  none: { label: () => '' },
+  'no-key': { label: () => 'not transcribed: no API key', tone: 'warn' },
+  pending: { label: (t) => `transcribing ${t.done}/${t.total}`, tone: 'accent' },
+  transcribing: { label: (t) => `transcribing ${t.done}/${t.total}`, tone: 'accent' },
+  done: { label: () => 'transcribed' },
+  partial: { label: (t) => `transcribed ${t.done}/${t.total}`, tone: 'warn' },
+  failed: { label: () => 'transcription failed', tone: 'danger' },
+};

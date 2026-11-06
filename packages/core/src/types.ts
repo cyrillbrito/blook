@@ -1,4 +1,4 @@
-// Shared data shapes. Every `t` is ms since session start (see docs/architecture.md#clock).
+// Shared data shapes. Every `t` is ms since session start (see docs/bundle-format.md#clock-rules).
 import type { eventWithTime } from '@rrweb/types';
 import type { TranscriptSource } from './transcript.ts';
 
@@ -88,7 +88,7 @@ export interface NavigationEntry {
   url: string;
 }
 
-/** rrweb event as stored. `event.timestamp` stays absolute; export subtracts `startedAt`. */
+/** rrweb event as stored. `event.timestamp` stays absolute; `t` is session time, which export writes as the timestamp. */
 export interface RrwebEventRow {
   id?: number;
   sessionId: SessionId;
@@ -131,6 +131,7 @@ export interface NetworkRequestRow {
   responseBodySize?: number;
   /** Why the response body wasn't kept (body-policy.ts). */
   responseBodyNotKept?: string;
+  /** loadingFailed's error; `canceled…` when the browser canceled it (see isCanceled in bundle.ts). */
   errorText?: string;
 }
 

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Clock } from './playback';
 import { lastAtOrBefore } from './playback';
 import { formatBytes, formatTime } from '@blook/core/format';
-import { cx, prettyJson, useActiveRow, useNow } from './util';
+import { cx, IconButton } from '@blook/ui';
+import { CloseIcon } from '@blook/ui/icons';
+import { prettyJson, useActiveRow, useNow } from './util';
 
 export interface PanelProps {
   clock: Clock;
@@ -51,8 +53,8 @@ export function RowList<T extends { t: number }>({
             data-i={i}
             onClick={() => onSelect(item)}
             className={cx(
-              'cursor-default border-b border-gray-100 border-l-2 border-l-transparent hover:bg-gray-50 data-active:border-l-amber-500 data-active:bg-amber-50',
-              selected && 'bg-blue-50! hover:bg-blue-50',
+              'cursor-default border-b border-gray-100 border-l-2 border-l-transparent hover:bg-surface-muted data-active:border-l-playhead data-active:bg-playhead-soft',
+              selected && 'bg-accent-soft! hover:bg-accent-soft',
             )}
           >
             {render(item, selected)}
@@ -73,14 +75,14 @@ export function RowList<T extends { t: number }>({
 
   return (
     <div ref={listRef} className="relative min-h-0 flex-1 overflow-auto">
-      {header && <div className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50">{header}</div>}
-      {items.length === 0 ? <div className="p-4 text-center text-gray-400">{empty}</div> : rows}
+      {header && <div className="sticky top-0 z-10 border-b border-line bg-surface-muted">{header}</div>}
+      {items.length === 0 ? <div className="p-4 text-center text-muted">{empty}</div> : rows}
     </div>
   );
 }
 
 export function Toolbar({ children }: { children: ReactNode }) {
-  return <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-gray-200 bg-white px-2 py-1">{children}</div>;
+  return <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-line bg-surface px-2 py-1">{children}</div>;
 }
 
 export function Search({
@@ -98,7 +100,7 @@ export function Search({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="h-6 w-44 rounded border border-gray-300 px-1.5 text-xs outline-none focus:border-blue-500"
+      className="h-6 w-44 rounded border border-line-strong px-1.5 text-xs outline-none focus:border-accent"
     />
   );
 }
@@ -108,7 +110,11 @@ export function Chip({ active, onClick, children, title }: { active: boolean; on
     <button
       title={title}
       onClick={onClick}
-      className={cx('h-6 rounded px-1.5 text-xs', active ? 'bg-gray-200 font-medium text-gray-900' : 'text-gray-500 hover:bg-gray-100')}
+      aria-pressed={active}
+      className={cx(
+        'h-6 cursor-pointer rounded-control px-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-accent/50',
+        active ? 'bg-accent-soft font-medium text-accent-strong' : 'text-muted hover:bg-surface-sunken hover:text-fg',
+      )}
     >
       {children}
     </button>
@@ -116,18 +122,17 @@ export function Chip({ active, onClick, children, title }: { active: boolean; on
 }
 
 export function Time({ t }: { t: number }) {
-  return <span className="w-14 shrink-0 tabular-nums text-gray-400">{formatTime(t)}</span>;
+  return <span className="w-14 shrink-0 tabular-nums text-muted">{formatTime(t)}</span>;
 }
 
-/** Bottom detail pane with a title bar and a close button. */
 export function Detail({ title, onClose, children }: { title: ReactNode; onClose: () => void; children: ReactNode }) {
   return (
-    <div className="flex h-[48%] min-h-32 shrink-0 flex-col border-t-2 border-gray-300 bg-white">
-      <div className="flex items-center gap-2 border-b border-gray-200 bg-gray-50 px-2 py-1">
+    <div className="flex h-[48%] min-h-32 shrink-0 flex-col border-t-2 border-line-strong bg-surface">
+      <div className="flex items-center gap-2 border-b border-line bg-surface-muted px-2 py-1">
         <div className="min-w-0 flex-1 truncate font-medium">{title}</div>
-        <button onClick={onClose} className="rounded px-1 text-gray-500 hover:bg-gray-200" title="Close (Esc)">
-          ✕
-        </button>
+        <IconButton label="Close (Esc)" onClick={onClose}>
+          <CloseIcon className="h-3.5 w-3.5" />
+        </IconButton>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">{children}</div>
     </div>
@@ -136,14 +141,14 @@ export function Detail({ title, onClose, children }: { title: ReactNode; onClose
 
 export function SubTabs<K extends string>({ tabs, value, onChange }: { tabs: [K, string][]; value: K; onChange: (k: K) => void }) {
   return (
-    <div className="sticky top-0 flex gap-1 border-b border-gray-200 bg-white px-2">
+    <div className="sticky top-0 flex gap-1 border-b border-line bg-surface px-2">
       {tabs.map(([k, label]) => (
         <button
           key={k}
           onClick={() => onChange(k)}
           className={cx(
             'border-b-2 px-1.5 py-1 text-xs',
-            k === value ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-600 hover:text-gray-900',
+            k === value ? 'border-accent font-medium text-accent-strong' : 'border-transparent text-gray-600 hover:text-fg',
           )}
         >
           {label}
@@ -155,13 +160,13 @@ export function SubTabs<K extends string>({ tabs, value, onChange }: { tabs: [K,
 
 export function KeyValues({ entries }: { entries: [string, ReactNode][] }) {
   const shown = entries.filter(([, v]) => v !== undefined && v !== '' && v !== null);
-  if (!shown.length) return <div className="px-2 py-1 text-gray-400">None</div>;
+  if (!shown.length) return <div className="px-2 py-1 text-muted">None</div>;
   return (
     <table className="w-full font-mono text-xs">
       <tbody>
         {shown.map(([k, v], i) => (
           <tr key={`${k}-${i}`} className="align-top">
-            <td className="w-1/3 py-px pr-2 pl-2 break-all text-gray-500">{k}</td>
+            <td className="w-1/3 py-px pr-2 pl-2 break-all text-muted">{k}</td>
             <td className="py-px pr-2 break-all whitespace-pre-wrap">{v}</td>
           </tr>
         ))}
@@ -173,7 +178,7 @@ export function KeyValues({ entries }: { entries: [string, ReactNode][] }) {
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="border-b border-gray-100 py-1">
-      <h4 className="px-2 py-0.5 text-[11px] font-semibold tracking-wide text-gray-500 uppercase">{title}</h4>
+      <h4 className="px-2 py-0.5 text-2xs font-semibold text-fg">{title}</h4>
       {children}
     </section>
   );
@@ -208,12 +213,12 @@ export function Body({
   const body = text;
   const pretty = useMemo(() => (body !== undefined && !raw ? prettyJson(body) : { text: body ?? '', json: false }), [body, raw]);
 
-  if (text === undefined && base64 === undefined) return <div className="px-2 py-1 text-gray-400">{note ?? 'No body.'}</div>;
+  if (text === undefined && base64 === undefined) return <div className="px-2 py-1 text-muted">{note ?? 'No body.'}</div>;
   if (binary) {
     return (
       <div className="space-y-2 p-2">
-        <div className="text-gray-500">Binary, {formatBytes(data?.length)}</div>
-        {imgUrl && <img src={imgUrl} className="max-h-80 max-w-full border border-gray-200" />}
+        <div className="text-muted">Binary, {formatBytes(data?.length)}</div>
+        {imgUrl && <img src={imgUrl} className="max-h-80 max-w-full border border-line" />}
         {note}
       </div>
     );
@@ -221,21 +226,21 @@ export function Body({
   const shown = all ? pretty.text : pretty.text.slice(0, SHOW_MAX);
   return (
     <div>
-      <div className="flex items-center gap-2 px-2 py-0.5 text-[11px] text-gray-500">
+      <div className="flex items-center gap-2 px-2 py-0.5 text-[11px] text-muted">
         <span>{formatBytes(new TextEncoder().encode(body ?? '').length)}</span>
         {(pretty.json || raw) && (
-          <button className="hover:text-gray-900" onClick={() => setRaw(!raw)}>
+          <button className="hover:text-fg" onClick={() => setRaw(!raw)}>
             {raw ? 'Pretty' : 'Raw'}
           </button>
         )}
-        <button className="hover:text-gray-900" onClick={() => navigator.clipboard?.writeText(body ?? '')}>
+        <button className="hover:text-fg" onClick={() => navigator.clipboard?.writeText(body ?? '')}>
           Copy
         </button>
         {note}
       </div>
       <pre className="px-2 pb-2 font-mono text-xs break-all whitespace-pre-wrap">{shown}</pre>
       {!all && pretty.text.length > SHOW_MAX && (
-        <button className="mx-2 mb-2 text-blue-700 hover:underline" onClick={() => setAll(true)}>
+        <button className="mx-2 mb-2 text-accent hover:underline" onClick={() => setAll(true)}>
           Show all ({formatBytes(pretty.text.length)})
         </button>
       )}
@@ -246,7 +251,7 @@ export function Body({
 /** Small "T2" badge for multi-tab sessions. */
 export function TabBadge({ tabId, tabs }: { tabId?: number; tabs: number[] }) {
   if (tabs.length < 2 || tabId == null) return null;
-  return <span className="shrink-0 rounded bg-gray-200 px-1 text-[10px] text-gray-600">T{tabs.indexOf(tabId) + 1}</span>;
+  return <span className="shrink-0 rounded bg-line px-1 text-[10px] text-gray-600">T{tabs.indexOf(tabId) + 1}</span>;
 }
 
 export function includes(hay: string | undefined, needle: string) {

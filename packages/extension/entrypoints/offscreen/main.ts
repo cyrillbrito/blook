@@ -166,7 +166,7 @@ async function saveChunk(sessionId: string, epoch: number, index: number, starte
     blob,
     ...(voiced ? { voiced } : {}),
   });
-  await sendToBackground({ type: 'audio/chunk-saved', sessionId, index, t }).catch(() => {});
+  await sendToBackground({ type: 'audio/chunk-saved', sessionId, index }).catch(() => {});
 }
 
 /** Decodes the chunk at 16 kHz mono and finds voiced ranges. Undefined if decoding fails. */

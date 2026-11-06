@@ -1,7 +1,7 @@
 // Playback on the session clock. One Clock is the master; the rrweb Replayer of the shown tab
 // and the mic audio follow it. Times are session ms (the bundle's `t`).
 import { Replayer } from '@rrweb/replay';
-import type { eventWithTime } from '@rrweb/types';
+import { EventType, type eventWithTime } from '@rrweb/types';
 import type { AudioChunkOut, Bundle } from './bundle';
 
 type Listener = () => void;
@@ -121,7 +121,7 @@ export class TabReplay {
   ) {
     this.base = events[0]!.timestamp;
     this.last = events.at(-1)!.timestamp;
-    const meta = events.find((e) => e.type === 4) as { data: { width: number; height: number } } | undefined;
+    const meta = events.find((e) => e.type === EventType.Meta);
     this.width = meta?.data.width ?? 1024;
     this.height = meta?.data.height ?? 768;
     this.replayer = new Replayer(events, {
@@ -225,7 +225,6 @@ export class AudioSync {
     const chunk = this.bundle.audio.find((c) => t >= c.t && t < c.endT);
     if (!this.clock.playing || !chunk || this.clock.speed > 4) {
       if (!this.el.paused) this.el.pause();
-      this.current = chunk;
       return;
     }
     const want = (t - chunk.t) / 1000;

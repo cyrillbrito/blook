@@ -93,7 +93,7 @@ export async function installBrowser(opts: { force?: boolean; log?: (msg: string
 }
 
 /** Headless Chromium: Playwright's headless shell, else the installed Google Chrome. */
-export async function launchBrowser(what = 'No browser found.'): Promise<Browser> {
+export async function launchBrowser(what: string): Promise<Browser> {
   try {
     return await chromium.launch({ headless: true });
   } catch (e) {

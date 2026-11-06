@@ -2,23 +2,15 @@
 // It has to be MAIN: rrweb patches CSSStyleSheet.insertRule, adoptedStyleSheets, canvas
 // contexts and so on, and those patches only see the page's calls in the page's own world.
 // In an isolated world, CSS-in-JS rules (emotion in Grafana) would be missing from the replay.
-//
-// No extension APIs here. It talks to the isolated bridge (recorder.content.ts) with
-// CustomEvents on `document` whose detail is a JSON string (strings cross worlds safely):
-//   main → bridge: blook:ready, blook:events {events}, blook:flushed {id}
-//   bridge → main: blook:start {mask, canvas}, blook:flush {id}, blook:stop {id}
+// No extension APIs here: it talks to the isolated bridge (recorder.content.ts) through lib/recorder-bridge.ts.
 import { record } from '@rrweb/record';
 import type { eventWithTime } from '@rrweb/types';
+import { emit, on, type RecorderEvents } from '@/lib/recorder-bridge';
 
 const FLUSH_MS = 500;
 /** Elements with this class are left out of the recording when masking is on. */
 const BLOCK_CLASS = 'blook-block';
 const MASK_TEXT_SELECTOR = '[data-blook-mask], .blook-mask';
-
-interface StartOptions {
-  mask: boolean;
-  canvas: boolean;
-}
 
 declare global {
   interface Window {
@@ -36,7 +28,7 @@ export default defineContentScript({
     if (window.__blookMain) return;
     window.__blookMain = true;
     let started = false;
-    on('blook:start', (opts: StartOptions) => {
+    on('blook:start', (opts) => {
       if (started) return;
       started = true;
       void start(opts);
@@ -45,20 +37,7 @@ export default defineContentScript({
   },
 });
 
-function emit(type: string, data: unknown) {
-  document.dispatchEvent(new CustomEvent(type, { detail: JSON.stringify(data) }));
-}
-
-function on(type: string, fn: (data: any) => void) {
-  const listener = (e: Event) => {
-    const detail = (e as CustomEvent).detail;
-    if (typeof detail === 'string') fn(JSON.parse(detail));
-  };
-  document.addEventListener(type, listener);
-  return () => document.removeEventListener(type, listener);
-}
-
-async function start(opts: StartOptions) {
+async function start(opts: RecorderEvents['blook:start']) {
   let buffer: eventWithTime[] = [];
   const flush = () => {
     if (!buffer.length) return;
@@ -92,15 +71,11 @@ async function start(opts: StartOptions) {
   addEventListener('pagehide', flush);
   addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
 
-  on('blook:flush', ({ id }) => {
-    flush();
-    emit('blook:flushed', { id });
-  });
   const offStop = on('blook:stop', ({ id }) => {
     stopRecord?.();
     clearInterval(timer);
     flush();
-    emit('blook:flushed', { id });
+    emit('blook:stopped', { id });
     offStop();
   });
 }
@@ -125,8 +100,8 @@ function bodyReady(): Promise<void> {
 
 /**
  * rrweb only takes its first full snapshot when readyState is 'interactive' or 'complete'.
- * Otherwise it waits for `load`, which on heavy pages (Grafana) came ~10 s after Record,
- * so the start of the session had no DOM. While the page is still parsing, report
+ * Otherwise it waits for `load`, which on heavy pages (Grafana) comes ~10 s after Record,
+ * leaving the start of the session with no DOM. While the page is still parsing, report
  * 'interactive' for the duration of the synchronous record() call: rrweb snapshots the partial
  * DOM right away, and its MutationObserver records the rest of the parse as mutations.
  * The own-property override is removed before any page script can run again.

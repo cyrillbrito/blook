@@ -9,11 +9,11 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'record';
 type Size = 'sm' | 'md' | 'lg';
 
 const VARIANT: Record<Variant, string> = {
-  primary: 'bg-fg text-white hover:bg-gray-700',
+  primary: 'bg-accent text-white hover:bg-accent-strong',
   secondary: 'border border-line-strong bg-surface text-fg hover:bg-surface-sunken',
   ghost: 'text-muted hover:bg-surface-sunken hover:text-fg',
   danger: 'bg-danger text-white hover:bg-red-700',
-  record: 'bg-recording-strong text-white shadow-sm hover:bg-[#b8361a]',
+  record: 'bg-recording-strong text-white shadow-sm hover:bg-[#b52e15]',
 };
 
 const SIZE: Record<Size, string> = {
@@ -59,7 +59,6 @@ const TONE: Record<Tone, string> = {
   recording: 'bg-recording-soft text-recording-strong',
 };
 
-/** Small status pill. */
 export function Badge({ tone = 'neutral', title, children }: { tone?: Tone; title?: string; children: ReactNode }) {
   return (
     <span title={title} className={cx('inline-flex items-center gap-1 rounded-full px-1.5 text-2xs font-medium', TONE[tone])}>
@@ -68,7 +67,6 @@ export function Badge({ tone = 'neutral', title, children }: { tone?: Tone; titl
   );
 }
 
-/** On/off switch with a label. */
 export function Switch(props: { label: ReactNode; checked: boolean; disabled?: boolean; onChange: (v: boolean) => void; title?: string }) {
   return (
     <label
@@ -86,7 +84,7 @@ export function Switch(props: { label: ReactNode; checked: boolean; disabled?: b
       <span
         className={cx(
           'relative h-4 w-7 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-accent/50',
-          props.checked ? 'bg-fg' : 'bg-line-strong',
+          props.checked ? 'bg-accent' : 'bg-line-strong',
         )}
       >
         <span
@@ -101,16 +99,15 @@ export function Switch(props: { label: ReactNode; checked: boolean; disabled?: b
   );
 }
 
-/** Bordered white box. */
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return <div className={cx('rounded-card border border-line bg-surface', className)}>{children}</div>;
 }
 
-/** Small uppercase heading for a group, with optional actions on the right. */
+/** Small heading for a group, with optional actions on the right. */
 export function SectionTitle({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <h2 className="text-2xs font-semibold tracking-wide text-muted uppercase">{children}</h2>
+      <h2 className="text-xs font-semibold text-fg">{children}</h2>
       {actions}
     </div>
   );
@@ -128,7 +125,6 @@ export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputEleme
   );
 }
 
-/** Label above a control. */
 export function Field({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <label className="block space-y-0.5">
@@ -148,7 +144,6 @@ export function LiveDot({ className }: { className?: string }) {
   );
 }
 
-/** Error or notice line. */
 export function Alert({ tone = 'danger', children }: { tone?: 'danger' | 'warn'; children: ReactNode }) {
   return (
     <p

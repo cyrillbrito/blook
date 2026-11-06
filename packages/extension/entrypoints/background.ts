@@ -1,6 +1,5 @@
 import { deleteSession, listSessions } from '@/lib/db';
 import type { BackgroundMessage, BackgroundRequests } from '@/lib/messages';
-import { settingsItem } from '@/lib/settings';
 import {
   addRrwebEvents,
   getStatus,
@@ -18,7 +17,6 @@ import { transcribeChunkSoon, transcriptionStatus } from '@/lib/transcribe/openr
 type Handler = (msg: any, sender: Browser.runtime.MessageSender) => unknown | Promise<unknown>;
 
 export default defineBackground(() => {
-  // Clicking the toolbar icon opens the side panel.
   browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => console.error('[blook] setPanelBehavior', err));
 
   registerListeners();
@@ -43,12 +41,6 @@ export default defineBackground(() => {
       return { ok: true };
     },
     'session/export': (m) => exportSession(m.sessionId),
-    'settings/get': () => settingsItem.getValue(),
-    'settings/set': async (m) => {
-      const next = { ...(await settingsItem.getValue()), ...m.settings };
-      await settingsItem.setValue(next);
-      return next;
-    },
     'rrweb/hello': (_m, s) => rrwebHello(s.tab?.id),
     'rrweb/events': (m, s) => ({ ok: addRrwebEvents(s.tab?.id, s.frameId, m.events) }),
     'audio/chunk-saved': (m) => {

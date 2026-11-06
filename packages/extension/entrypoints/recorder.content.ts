@@ -5,6 +5,7 @@
 // /content-scripts/recorder-main.js, and also injected with executeScript as a fallback.
 import type { eventWithTime } from '@rrweb/types';
 import { sendToBackground, type ContentMessage } from '@/lib/messages';
+import { emit, on, type RecorderEvents } from '@/lib/recorder-bridge';
 
 declare global {
   interface Window {
@@ -24,20 +25,9 @@ export default defineContentScript({
   },
 });
 
-function emit(type: string, data: unknown) {
-  document.dispatchEvent(new CustomEvent(type, { detail: JSON.stringify(data) }));
-}
-
-function on(type: string, fn: (data: any) => void) {
-  document.addEventListener(type, (e) => {
-    const detail = (e as CustomEvent).detail;
-    if (typeof detail === 'string') fn(JSON.parse(detail));
-  });
-}
-
 function start() {
   // Listen first: the MAIN script may run before or after this one.
-  let options: { mask: boolean; canvas: boolean } | undefined;
+  let options: RecorderEvents['blook:start'] | undefined;
   on('blook:ready', () => options && emit('blook:start', options));
 
   let buffer: eventWithTime[] = [];
@@ -59,10 +49,10 @@ function start() {
   });
 
   const waiting = new Map<number, () => void>();
-  on('blook:flushed', ({ id }) => waiting.get(id)?.());
+  on('blook:stopped', ({ id }) => waiting.get(id)?.());
   let nextId = 1;
-  /** Asks the MAIN recorder to hand over its buffer, then waits until it reached the background. */
-  const drain = (type: 'blook:flush' | 'blook:stop') =>
+  /** Stops the MAIN recorder, then waits until its last events reached the background. */
+  const stop = () =>
     new Promise<void>((resolve) => {
       const id = nextId++;
       const timer = setTimeout(done, 1000); // recorder never started in this frame
@@ -72,15 +62,13 @@ function start() {
         resolve();
       }
       waiting.set(id, done);
-      emit(type, { id });
+      emit('blook:stop', { id });
     }).then(() => send());
 
   browser.runtime.onMessage.addListener((msg: ContentMessage, _sender, sendResponse) => {
-    if (msg.type === 'rrweb/flush' || msg.type === 'rrweb/stop') {
-      drain(msg.type === 'rrweb/stop' ? 'blook:stop' : 'blook:flush').then(() => sendResponse({ ok: true }));
-      return true;
-    }
-    return undefined;
+    if (msg.type !== 'rrweb/stop') return undefined;
+    stop().then(() => sendResponse({ ok: true }));
+    return true;
   });
 
   const hello = async () => {

@@ -1,8 +1,6 @@
 import { useEffect, useLayoutEffect, useState, type RefObject } from 'react';
 import type { Clock } from './playback';
 
-export { cx } from '@blook/ui';
-
 /** The clock's time, re-rendering at most every `step` ms of session time. */
 export function useNow(clock: Clock, step = 100): number {
   const [now, setNow] = useState(() => clock.now());

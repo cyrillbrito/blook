@@ -3,8 +3,9 @@
 // Each chunk is transcribed as soon as it's saved (background), the rest after Stop,
 // and Export only fills in what's missing. Results live per chunk in the transcripts store.
 import { browser } from 'wxt/browser';
-import { chunkTranscript, mergeChunks, MIN_CHUNK_BYTES, type TranscriptSource } from '@blook/core/transcript';
-import { openRouterTranscribe, OPENROUTER_ENDPOINT } from '@blook/core/openrouter';
+import { chunkResult, chunkTranscript, mergeChunks, type TranscriptSource } from '@blook/core/transcript';
+import type { BundleOptions } from '@blook/core/bundle';
+import { openRouterEach, openRouterTranscribe, OPENROUTER_ENDPOINT } from '@blook/core/openrouter';
 import { getBySession, openBlookDB } from '../db';
 import type { PanelMessage } from '../messages';
 import { settingsItem } from '../settings';
@@ -17,11 +18,9 @@ async function endpoint(): Promise<string> {
   const v = (await browser.storage.local.get(ENDPOINT_OVERRIDE_KEY))[ENDPOINT_OVERRIDE_KEY];
   return typeof v === 'string' && v ? v : OPENROUTER_ENDPOINT;
 }
-const PARALLEL = 3;
 
 async function transcribeChunk(chunk: AudioChunkRow, apiKey: string) {
-  const ext = chunk.mimeType.includes('ogg') ? 'ogg' : 'webm';
-  const name = `${String(chunk.index).padStart(3, '0')}.${ext}`;
+  const name = `${String(chunk.index).padStart(3, '0')}.webm`;
   const res = await openRouterTranscribe(chunk.blob, name, { apiKey, endpoint: await endpoint() });
   const source: TranscriptSource = {
     method: 'openrouter',
@@ -30,8 +29,6 @@ async function transcribeChunk(chunk: AudioChunkRow, apiKey: string) {
     at: new Date().toISOString(),
     blookVersion: browser.runtime.getManifest().version,
   };
-  // Times are seconds from the chunk start: chunkTranscript pulls them out of silence with the
-  // chunk's voiced ranges and shifts them to session time.
   return { ...chunkTranscript(chunk, res), source };
 }
 
@@ -69,21 +66,12 @@ function runChunk(chunk: AudioChunkRow, apiKey: string): Promise<void> {
   const key = `${chunk.sessionId}:${chunk.index}`;
   let run = inflight.get(key);
   if (run) return run;
-  run = (async () => {
-    const base = { index: chunk.index, t: chunk.t, segments: [], words: [] };
-    let result: TranscriptChunkResult = base;
-    if (chunk.blob.size > MIN_CHUNK_BYTES) {
-      try {
-        result = { ...base, ...(await transcribeChunk(chunk, apiKey)) };
-      } catch (err) {
-        result = { ...base, error: String((err as Error)?.message ?? err) };
-      }
-    }
-    await saveResult(chunk.sessionId, result);
-  })().finally(() => {
-    inflight.delete(key);
-    notify(chunk.sessionId);
-  });
+  run = chunkResult(chunk, chunk.blob.size, () => transcribeChunk(chunk, apiKey))
+    .then((result) => saveResult(chunk.sessionId, result))
+    .finally(() => {
+      inflight.delete(key);
+      notify(chunk.sessionId);
+    });
   inflight.set(key, run);
   notify(chunk.sessionId);
   return run;
@@ -102,44 +90,19 @@ export async function transcribeChunkSoon(sessionId: SessionId, index: number): 
   await runChunk(chunk, openRouterApiKey);
 }
 
-/**
- * Transcribes every chunk that has no good result yet, then returns
- * the stored transcript. Undefined when there's no audio, or no key and nothing stored.
- * Throws only when no chunk could be transcribed at all.
- */
-export async function ensureTranscript(sessionId: SessionId): Promise<TranscriptRow | undefined> {
+/** Transcribes every chunk that has no good result yet. Without an API key it does nothing. */
+export async function ensureTranscript(sessionId: SessionId): Promise<void> {
   const db = await openBlookDB();
   const { openRouterApiKey } = await settingsItem.getValue();
-  const stored = await db.get('transcripts', sessionId);
-  if (!openRouterApiKey) return stored;
-
-  const chunks = (await getBySession('audioChunks', sessionId)).sort((a, b) => a.index - b.index);
-  if (!chunks.length) return stored;
+  if (!openRouterApiKey) return;
+  const [chunks, stored] = await Promise.all([getBySession('audioChunks', sessionId), db.get('transcripts', sessionId)]);
   const results = new Map((stored?.chunks ?? []).map((c) => [c.index, c]));
   const missing = chunks.filter((c) => !isDone(results.get(c.index)));
-
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(PARALLEL, missing.length) }, async () => {
-      while (next < missing.length) await runChunk(missing[next++]!, openRouterApiKey);
-    }),
-  );
-
-  const row = await db.get('transcripts', sessionId);
-  const okCount = row?.chunks.filter((c) => !c.error).length ?? 0;
-  if (!row || okCount === 0) throw new Error(row?.errors?.[0]?.error ?? 'transcription failed');
-  return row;
+  await openRouterEach(missing, (c) => runChunk(c, openRouterApiKey));
 }
 
-/**
- * buildBundle options from what's stored, without starting any transcription. For pages that
- * show a session from IndexedDB (Replay). Export uses ensureTranscript first instead.
- */
-export async function storedTranscriptOptions(sessionId: SessionId): Promise<{
-  transcript?: TranscriptRow;
-  transcriptStatus: 'ok' | 'partial' | 'pending' | 'none' | 'skipped' | 'failed';
-  transcriptNote?: string;
-}> {
+/** The bundle's transcript options, from what's stored. Done and partial: transcriptJson derives status and note. */
+export async function transcriptOptions(sessionId: SessionId): Promise<BundleOptions> {
   const db = await openBlookDB();
   const transcript = await db.get('transcripts', sessionId);
   const s = await transcriptionStatus(sessionId);
@@ -148,7 +111,8 @@ export async function storedTranscriptOptions(sessionId: SessionId): Promise<{
     case 'none':
       return { transcript, transcriptStatus: 'none', transcriptNote: 'no audio recorded' };
     case 'done':
-      return { transcript, transcriptStatus: transcript?.errors?.length ? 'partial' : 'ok' };
+    case 'partial':
+      return { transcript };
     case 'no-key':
       return s.done
         ? { transcript, transcriptStatus: 'partial', transcriptNote: `${progress}; no OpenRouter API key set for the rest` }
@@ -156,8 +120,6 @@ export async function storedTranscriptOptions(sessionId: SessionId): Promise<{
     case 'pending':
     case 'transcribing':
       return { transcript, transcriptStatus: 'pending', transcriptNote: `transcribing: ${progress}` };
-    case 'partial':
-      return { transcript, transcriptStatus: 'partial', transcriptNote: `${progress}; failed: ${s.error}` };
     case 'failed':
       return { transcript, transcriptStatus: 'failed', transcriptNote: `failed: ${s.error}` };
   }

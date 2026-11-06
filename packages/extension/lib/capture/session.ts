@@ -9,7 +9,7 @@ import { CdpCapture, enableDomains, type SendCommand } from './cdp';
 import { closeOffscreen, ensureOffscreen, sendToOffscreen } from './offscreen';
 import { BatchWriter } from './writer';
 import { ensureTranscript } from '../transcribe/openrouter';
-import type { eventWithTime } from '@rrweb/types';
+import { EventType, type eventWithTime } from '@rrweb/types';
 
 /** Isolated-world bridge (extension messaging) and MAIN-world rrweb recorder. */
 const RECORDER_JS = '/content-scripts/recorder.js';
@@ -27,6 +27,8 @@ interface Active {
   cdp: CdpCapture;
   keepalive: ReturnType<typeof setInterval>;
   micRunning: boolean;
+  /** The mic error shown in the status, cleared once the mic records. */
+  micNotice?: string;
   permissionTabId?: number;
   /** The Record reload of the first tab started loading (so its `complete` is the new page). */
   reloadSeen?: boolean;
@@ -65,18 +67,35 @@ function persist() {
   });
 }
 
+/** Saves the active session's meta to IndexedDB, and the resume state for a worker restart. */
+function save(a: Active) {
+  void putSession(a.meta);
+  persist();
+}
+
+/** The tab Record was pressed on. */
+const primaryTab = (meta: SessionMeta) => meta.tabs[0]!.tabId;
+
+async function endSession(meta: SessionMeta, error?: string) {
+  meta.endedAt = Date.now();
+  meta.durationMs = meta.endedAt - meta.startedAt;
+  meta.status = 'stopped';
+  await putSession(meta);
+  setStatus({ state: 'idle', session: meta, error });
+}
+
 function sessionIdFor(epoch: number): string {
   const d = new Date(epoch);
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
 }
 
-function makeActive(meta: SessionMeta, attached: number[]): Active {
+function makeActive(meta: SessionMeta): Active {
   const writer = new BatchWriter();
   writer.start();
   return {
     meta,
-    attached: new Set(attached),
+    attached: new Set(),
     writer,
     cdp: new CdpCapture(meta.id, meta.startedAt, writer, send),
     // Any extension API call resets the service worker idle timer (Chrome 110+).
@@ -141,7 +160,7 @@ export async function startSession(tabId: number): Promise<RecordingStatus> {
     settings: safeSettings,
     mic: { state: settings.mic ? 'starting' : 'off' },
   };
-  active = makeActive(meta, []);
+  active = makeActive(meta);
   setStatus({ state: 'starting', session: meta });
 
   try {
@@ -184,7 +203,7 @@ async function startMic() {
     } as const;
     let reply: OffscreenReply = await sendToOffscreen(msg).catch((err): OffscreenReply => ({ ok: false, error: String(err) }));
     // A freshly created offscreen document may not have its listener up yet.
-    if (!reply.ok && /receiving end|did not answer/i.test(reply.error ?? '')) {
+    if (!reply.ok && /receiving end/i.test(reply.error ?? '')) {
       await new Promise((r) => setTimeout(r, 300));
       reply = await sendToOffscreen(msg).catch((err): OffscreenReply => ({ ok: false, error: String(err) }));
     }
@@ -192,10 +211,8 @@ async function startMic() {
     if (reply.ok) {
       active.micRunning = true;
       setMic({ state: 'recording' });
-      persist();
-      if (status.error?.startsWith('Microphone') || status.error?.startsWith('Allow the microphone')) {
-        setStatus({ ...status, error: undefined });
-      }
+      if (active.micNotice && status.error === active.micNotice) setStatus({ ...status, error: undefined });
+      active.micNotice = undefined;
       return;
     }
     await onMicError(reply.error ?? 'mic failed', reply.needsPermission);
@@ -209,24 +226,23 @@ function setMic(mic: MicInfo) {
   if (!active) return;
   active.meta.mic = { ...active.meta.mic, ...mic };
   if (mic.state === 'recording') delete active.meta.mic.error;
-  void putSession(active.meta);
-  persist();
+  save(active);
   setStatus({ ...status, session: active.meta });
 }
 
 export async function onMicError(error: string, needsPermission?: boolean) {
-  if (!active) return;
+  const a = active;
+  if (!a) return;
   console.warn('[blook] mic', error);
-  active.micRunning = false;
+  a.micRunning = false;
   setMic({ state: needsPermission ? 'needs-permission' : 'failed', error });
-  if (needsPermission) {
-    if (active.permissionTabId === undefined) {
-      const tab = await browser.tabs.create({ url: browser.runtime.getURL('/mic-permission.html') });
-      if (active) active.permissionTabId = tab.id;
-    }
-    setStatus({ ...status, error: 'Allow the microphone in the tab that opened. Recording continues without audio until then.' });
-  } else {
-    setStatus({ ...status, error: `Microphone: ${error}` });
+  a.micNotice = needsPermission
+    ? 'Allow the microphone in the tab that opened. Recording continues without audio until then.'
+    : `Microphone: ${error}`;
+  setStatus({ ...status, error: a.micNotice });
+  if (needsPermission && a.permissionTabId === undefined) {
+    const tab = await browser.tabs.create({ url: browser.runtime.getURL('/mic-permission.html') });
+    a.permissionTabId = tab.id;
   }
 }
 
@@ -234,8 +250,7 @@ export async function onMicPermissionGranted() {
   if (!active) return;
   const permTab = active.permissionTabId;
   active.permissionTabId = undefined;
-  const recorded = active.meta.tabs[0]!.tabId;
-  await browser.tabs.update(recorded, { active: true }).catch(() => {});
+  await browser.tabs.update(primaryTab(active.meta), { active: true }).catch(() => {});
   if (permTab !== undefined) await browser.tabs.remove(permTab).catch(() => {});
   if (active.meta.settings.mic) await startMic();
 }
@@ -248,15 +263,12 @@ export function rrwebHello(tabId: number | undefined): { record: boolean; mask: 
 export function addRrwebEvents(tabId: number | undefined, frameId: number | undefined, events: eventWithTime[]) {
   if (!active || tabId === undefined || !active.attached.has(tabId)) return false;
   const { id, startedAt } = active.meta;
-  const primary = active.meta.tabs[0]!.tabId;
-  if (active.meta.firstSnapshotT === undefined && tabId === primary && (frameId ?? 0) === 0) {
-    const snap = events.find((e) => e.type === 2); // EventType.FullSnapshot
+  if (active.meta.firstSnapshotT === undefined && tabId === primaryTab(active.meta) && (frameId ?? 0) === 0) {
+    const snap = events.find((e) => e.type === EventType.FullSnapshot);
     if (snap) {
       active.meta.firstSnapshotT = snap.timestamp - startedAt;
-      void putSession(active.meta);
-      persist();
-      // Live once the page also fired load (the snapshot alone can be an empty shell).
-      if (active.meta.pageReadyT !== undefined) setStatus({ ...status, phase: 'live', session: active.meta });
+      save(active);
+      setStatus({ ...status, phase: phaseOf(active.meta), session: active.meta });
     }
   }
   const rows: RrwebEventRow[] = events.map((event) => ({
@@ -271,6 +283,12 @@ export function addRrwebEvents(tabId: number | undefined, frameId: number | unde
 }
 
 const PAGE_READY_TIMEOUT_MS = 30_000;
+/** After a worker restart the Record reload is likely long done and its load event already gone. */
+const RESTORED_PAGE_READY_TIMEOUT_MS = 5000;
+
+/** Live once the page has both a DOM snapshot and its load event (the snapshot alone can be an empty shell). */
+const phaseOf = (meta: SessionMeta): RecordingStatus['phase'] =>
+  meta.firstSnapshotT !== undefined && meta.pageReadyT !== undefined ? 'live' : 'loading-page';
 
 /**
  * The recorded page finished loading (load event of the Record reload, or the fallback timer).
@@ -282,10 +300,9 @@ function markPageReady(why: 'load' | 'timeout') {
   clearTimeout(a.readyTimer);
   a.meta.pageReadyT = Date.now() - a.meta.startedAt;
   if (why === 'timeout') console.warn('[blook] page load not seen; marking ready');
-  void putSession(a.meta);
-  persist();
+  save(a);
   if (status.state === 'recording') {
-    setStatus({ ...status, phase: a.meta.firstSnapshotT !== undefined ? 'live' : 'loading-page', session: a.meta });
+    setStatus({ ...status, phase: phaseOf(a.meta), session: a.meta });
   }
 }
 
@@ -332,13 +349,8 @@ async function doStop(error?: string): Promise<RecordingStatus> {
   await teardown();
   await a.writer.flush();
 
-  const endedAt = Date.now();
-  a.meta.endedAt = endedAt;
-  a.meta.durationMs = endedAt - a.meta.startedAt;
-  a.meta.status = 'stopped';
-  await putSession(a.meta);
   const micError = a.meta.mic.state === 'failed' ? `Microphone: ${a.meta.mic.error}` : undefined;
-  setStatus({ state: 'idle', session: a.meta, error: error ?? micError });
+  await endSession(a.meta, error ?? micError);
   // Transcribe now if a key is set, so Export is quick. Export retries if this fails.
   void ensureTranscript(a.meta.id).catch((err) => console.warn('[blook] transcription', err));
   return status;
@@ -371,19 +383,17 @@ export function registerListeners() {
     if (!active || tabId === undefined || !active.attached.has(tabId)) return;
     active.attached.delete(tabId);
     persist();
-    const primary = active.meta.tabs[0]!.tabId;
     if (reason === 'canceled_by_user') {
       void stopSession('Recording stopped: the debugger banner was dismissed.');
-    } else if (tabId === primary || active.attached.size === 0) {
+    } else if (tabId === primaryTab(active.meta) || active.attached.size === 0) {
       void stopSession(reason === 'target_closed' ? undefined : `Recording stopped: debugger detached (${reason}).`);
     }
   });
 
   browser.tabs.onRemoved.addListener((tabId) => {
-    if (active && tabId === active.meta.tabs[0]!.tabId) void stopSession();
+    if (active && tabId === primaryTab(active.meta)) void stopSession();
   });
 
-  // Follow tabs opened from a recorded tab.
   browser.tabs.onCreated.addListener(async (tab) => {
     if (!active || tab.id === undefined || tab.openerTabId === undefined) return;
     if (!active.attached.has(tab.openerTabId) || status.state !== 'recording') return;
@@ -396,8 +406,7 @@ export function registerListeners() {
     }
     const url = tab.pendingUrl || tab.url || '';
     a.meta.tabs.push({ tabId: tab.id, openerTabId: tab.openerTabId, t: Date.now() - a.meta.startedAt, url });
-    await putSession(a.meta);
-    persist();
+    save(a);
     setStatus({ ...status, session: a.meta });
   });
 
@@ -409,11 +418,10 @@ export function registerListeners() {
       const navs = active.meta.navigations;
       if (navs.at(-1)?.url !== info.url || navs.at(-1)?.tabId !== tabId) {
         navs.push({ tabId, t: Date.now() - active.meta.startedAt, url: info.url });
-        void putSession(active.meta);
-        persist();
+        save(active);
       }
     }
-    if (tabId === active.meta.tabs[0]!.tabId && active.meta.pageReadyT === undefined) {
+    if (tabId === primaryTab(active.meta) && active.meta.pageReadyT === undefined) {
       if (info.status === 'loading') active.reloadSeen = true;
       else if (info.status === 'complete' && active.reloadSeen) markPageReady('load');
     }
@@ -427,7 +435,7 @@ export async function restoreSession() {
     | { meta: SessionMeta; attached: number[]; micRunning: boolean }
     | undefined;
   if (!saved || active) return;
-  active = makeActive(saved.meta, []);
+  active = makeActive(saved.meta);
   active.micRunning = saved.micRunning;
   for (const tabId of saved.attached) {
     try {
@@ -438,23 +446,18 @@ export async function restoreSession() {
     }
   }
   if (active.attached.size === 0) {
-    const a = active;
+    const { meta } = active;
     await teardown();
-    a.meta.status = 'stopped';
-    a.meta.endedAt = Date.now();
-    a.meta.durationMs = a.meta.endedAt - a.meta.startedAt;
-    await putSession(a.meta);
-    setStatus({ state: 'idle', session: a.meta, error: 'Recording ended while the extension restarted.' });
+    await endSession(meta, 'Recording ended while the extension restarted.');
     return;
   }
   await registerRecorder().catch(() => {});
-  if (active.meta.pageReadyT === undefined) active.readyTimer = setTimeout(() => markPageReady('timeout'), 5000);
+  if (active.meta.pageReadyT === undefined) active.readyTimer = setTimeout(() => markPageReady('timeout'), RESTORED_PAGE_READY_TIMEOUT_MS);
   persist();
   setStatus({
     state: 'recording',
-    phase: active.meta.firstSnapshotT === undefined || active.meta.pageReadyT === undefined ? 'loading-page' : 'live',
+    phase: phaseOf(active.meta),
     session: active.meta,
   });
-  // Make sure the db is open early.
   await openBlookDB();
 }

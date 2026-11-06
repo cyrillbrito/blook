@@ -1,7 +1,8 @@
 // Transcript logic shared by the extension and `blook transcribe`: chunk results to session ms,
 // merging, transcript.json, the timeline's speech entries, and the live pause check.
 import { describe, expect, test } from 'bun:test';
-import { chunkTranscript, mergeChunks, replaceSpeech, transcriptJson, type TranscriptSource } from '../src/transcript.ts';
+import { chunkTranscript, mergeChunks, transcriptJson, type TranscriptSource } from '../src/transcript.ts';
+import { withTranscript } from '../src/timeline.ts';
 import { alignWords, PauseDetector } from '../src/vad.ts';
 import type { TranscriptChunkResult } from '../src/types.ts';
 
@@ -125,18 +126,26 @@ describe('merging and transcript.json', () => {
     });
   });
 
-  test('speech entries are replaced and sorted like buildTimeline (speech last on a tie)', () => {
+  test('a new transcript replaces the speech entries (speech last on a tie) and the session fields', () => {
     const timeline = [
       { t: 0, type: 'navigation', summary: 'nav' },
       { t: 500, type: 'speech', summary: 'old' },
       { t: 1000, type: 'click', summary: 'click' },
     ];
-    const segments = transcriptJson(mergeChunks([chunk(0, 1000)]), 1).segments;
-    expect(replaceSpeech(timeline, segments).map((e) => [e.t, e.type, e.summary])).toEqual([
+    const session = { id: 's', counts: { requests: 3, timeline: 3, transcriptSegments: 1 }, files: { 'session.json': 'this' } };
+    const t = transcriptJson(mergeChunks([chunk(0, 1000)]), 1);
+    const out = withTranscript(session, timeline, t);
+    expect(out.timeline.map((e) => [e.t, e.type, e.summary])).toEqual([
       [0, 'navigation', 'nav'],
       [1000, 'click', 'click'],
       [1000, 'speech', '🗣 "segment 0"'],
     ]);
+    expect(out.session).toMatchObject({
+      id: 's',
+      transcript: { status: 'ok', source: t.source },
+      counts: { requests: 3, timeline: 3, transcriptSegments: 1 },
+      files: { 'session.json': 'this', 'transcript.json': expect.stringContaining('status "ok"') },
+    });
   });
 });
 

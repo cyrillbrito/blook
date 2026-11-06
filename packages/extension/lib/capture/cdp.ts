@@ -11,7 +11,7 @@ export async function enableDomains(send: SendCommand, tabId: number) {
   await send(tabId, 'Network.enable', {
     maxTotalBufferSize: 200_000_000,
     maxResourceBufferSize: 20_000_000,
-    maxPostDataSize: 1_000_000,
+    maxPostDataSize: BODY_MAX_BYTES,
   });
   await send(tabId, 'Runtime.enable');
   await send(tabId, 'Log.enable');
@@ -213,6 +213,7 @@ export class CdpCapture {
     const row = this.requests.get(p.requestId);
     if (!row) return;
     row.endT = this.mono(p.timestamp);
+    // The `canceled` prefix is what core's isCanceled checks.
     row.errorText = p.canceled ? `canceled${p.errorText ? ` (${p.errorText})` : ''}` : p.errorText || p.blockedReason;
     this.requests.delete(p.requestId);
     this.writer.upsertRequest(row);
@@ -283,6 +284,7 @@ export class CdpCapture {
       t: this.wall(e.timestamp),
       source: 'log',
       level,
+      // `[network] …` marks Chrome's failed-request lines: core's isNetworkFailureLog relies on it.
       text: e.source ? `[${e.source}] ${e.text}` : e.text,
       url: e.url,
       line: e.lineNumber !== undefined ? e.lineNumber + 1 : undefined,
@@ -293,11 +295,17 @@ export class CdpCapture {
   private consoleRow(tabId: number, row: Omit<ConsoleRow, 'sessionId' | 'tabId'>) {
     // Log.enable and Runtime.enable replay entries from before attach: skip those.
     if (row.t < 0) return;
-    // Blook's own scripts (rrweb in the page's world) are not the app's console.
-    if (row.url?.startsWith('chrome-extension://') || /\(chrome-extension:\/\//.test(row.stack?.split('\n')[0] ?? '')) return;
+    if (isExtensionConsole(row)) return;
     const clean = Object.fromEntries(Object.entries(row).filter(([, v]) => v !== undefined)) as typeof row;
     this.writer.addConsole({ sessionId: this.sessionId, tabId, ...clean });
   }
+}
+
+/** Console entries from Blook's own scripts (rrweb in the page's world: its canvas readback warning, …). */
+function isExtensionConsole(c: { url?: string; stack?: string }): boolean {
+  if (c.url?.startsWith('chrome-extension://')) return true;
+  const top = c.stack?.match(/\((\S+?):\d+:\d+\)/)?.[1];
+  return !!top?.startsWith('chrome-extension://');
 }
 
 function responseFields(r: any): Partial<NetworkRequestRow> {

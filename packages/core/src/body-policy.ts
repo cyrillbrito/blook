@@ -1,13 +1,5 @@
 // Which HTTP bodies a recording keeps. The only place that decides; the extension's lib/capture/cdp.ts asks it.
-//
-// Rules (docs/architecture.md has the why, docs/bundle-format.md the fields):
-// - Request bodies (POST data) are always kept.
-// - Response bodies of API calls (XHR, Fetch, EventSource, and Other/Ping/Preflight/unknown
-//   unless the MIME type is an image, font, audio or video) are kept, whatever the content type.
-// - Response bodies of what the browser loads by itself (Document, Script, Stylesheet, Font,
-//   Image, Media, Manifest, TextTrack, Prefetch, …) are dropped, and not even fetched.
-//   Exception: a Document with status >= 400 (a failed page load) is kept.
-// - Every kept body is cut at BODY_MAX_BYTES and marked truncated, with its original size.
+// The rules are in docs/bundle-format.md (network.json), the why in docs/architecture.md (Key decisions).
 
 export const BODY_MAX_BYTES = 1_000_000;
 
@@ -50,8 +42,12 @@ export function capText(text: string, maxBytes: number): { text: string; size: n
 
 /** Cuts a base64 body to maxBytes decoded bytes, keeping it valid base64. */
 export function capBase64(b64: string, maxBytes: number): { b64: string; size: number; truncated: boolean } {
-  const pad = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
-  const size = (b64.length / 4) * 3 - pad;
+  const size = base64Size(b64);
   if (size <= maxBytes) return { b64, size, truncated: false };
   return { b64: b64.slice(0, Math.floor(maxBytes / 3) * 4), size, truncated: true };
+}
+
+/** Decoded size of a base64 string, in bytes. */
+export function base64Size(b64: string): number {
+  return (b64.length / 4) * 3 - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
 }

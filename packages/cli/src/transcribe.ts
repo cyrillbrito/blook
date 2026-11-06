@@ -1,26 +1,26 @@
 // `blook transcribe` engine: transcribe a bundle's audio chunks and rewrite transcript.json plus
 // what derives from it (timeline.json speech entries, session.json transcript, counts, files).
 // The mapping to session ms and the output shapes are the extension's (@blook/core/transcript).
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative } from 'node:path';
-import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate';
+import { dirname, join } from 'node:path';
+import { strToU8, zipSync, type Zippable } from 'fflate';
 import {
   chunkTranscript,
+  chunkResult,
   mergeChunks,
   MIN_CHUNK_BYTES,
-  replaceSpeech,
-  transcriptFileNote,
   transcriptJson,
-  transcriptSummary,
   type SttResult,
   type TranscriptOut,
   type TranscriptSource,
 } from '@blook/core/transcript';
-import { openRouterTranscribe, OPENROUTER_ENDPOINT } from '@blook/core/openrouter';
+import { openRouterEach, openRouterTranscribe, OPENROUTER_ENDPOINT } from '@blook/core/openrouter';
+import type { AudioChunkOut } from '@blook/core/bundle';
+import { withTranscript, type TimelineEntry } from '@blook/core/timeline';
 import { voicedRanges, type Range } from '@blook/core/vad';
 import { TRANSCRIPTION_MODEL, type TranscriptChunkResult } from '@blook/core/types';
-import { bundleFolder, PASS_A_BUNDLE } from './bundle.ts';
+import { readBundleFiles, type BundleFiles } from './bundle.ts';
 import { CliError, EXIT } from './errors.ts';
 import { note, warn } from './output.ts';
 import {
@@ -43,47 +43,6 @@ export interface TranscribeOptions {
   model?: string;
   force?: boolean;
   out?: string;
-}
-
-/** The bundle's files by path inside the bundle folder, and where they came from. */
-interface BundleFiles {
-  kind: 'zip' | 'folder';
-  /** The zip file, or the bundle folder. */
-  path: string;
-  /** Folder prefix inside the zip (`blook-<id>/`). */
-  prefix: string;
-  files: Map<string, Uint8Array>;
-}
-
-function readBundleFiles(path: string): BundleFiles {
-  if (!existsSync(path)) throw new CliError(`Bundle not found: ${path}`, EXIT.notFound, PASS_A_BUNDLE);
-  if (statSync(path).isDirectory()) {
-    const dir = bundleFolder(path);
-    const files = new Map<string, Uint8Array>();
-    const walk = (d: string) => {
-      for (const e of readdirSync(d, { withFileTypes: true })) {
-        const p = join(d, e.name);
-        if (e.isDirectory()) walk(p);
-        else files.set(relative(dir, p).split('\\').join('/'), readFileSync(p));
-      }
-    };
-    walk(dir);
-    if (!files.has('session.json')) throw new CliError(`Not a Blook bundle: no session.json in ${dir}.`, EXIT.notFound, PASS_A_BUNDLE);
-    return { kind: 'folder', path: dir, prefix: '', files };
-  }
-  let raw: Record<string, Uint8Array>;
-  try {
-    raw = unzipSync(readFileSync(path));
-  } catch {
-    throw new CliError(`Not a Blook bundle: ${path} is not a zip file.`, EXIT.notFound, PASS_A_BUNDLE);
-  }
-  const sessionEntry = Object.keys(raw).find((n) => n === 'session.json' || /^[^/]+\/session\.json$/.test(n));
-  if (!sessionEntry) throw new CliError(`Not a Blook bundle: no session.json in ${path}.`, EXIT.notFound, PASS_A_BUNDLE);
-  const prefix = sessionEntry.slice(0, -'session.json'.length);
-  const files = new Map<string, Uint8Array>();
-  for (const [name, data] of Object.entries(raw))
-    if (name.startsWith(prefix) && !name.endsWith('/')) files.set(name.slice(prefix.length), data);
-  return { kind: 'zip', path, prefix, files };
 }
 
 /** Writes via a temp file and a rename, so a crash never leaves a half-written file. */
@@ -110,16 +69,6 @@ function writeBundleFiles(b: BundleFiles, changed: string[], out?: string): stri
   return target;
 }
 
-interface AudioChunk {
-  index: number;
-  t: number;
-  endT: number;
-  durationMs: number;
-  voiced?: Range[];
-  mimeType: string;
-  file: string;
-}
-
 export interface TranscribeSummary {
   path: string;
   skipped: boolean;
@@ -138,20 +87,8 @@ export interface TranscribeSummary {
 export async function transcribeBundle(bundlePath: string, opts: TranscribeOptions): Promise<TranscribeSummary> {
   const started = Date.now();
   const b = readBundleFiles(bundlePath);
-  const read = <T>(name: string): T | undefined => {
-    const data = b.files.get(name);
-    if (!data) return undefined;
-    try {
-      return JSON.parse(strFromU8(data)) as T;
-    } catch {
-      throw new CliError(`Not a Blook bundle: ${name} in ${b.path} is not valid JSON.`, EXIT.notFound, PASS_A_BUNDLE);
-    }
-  };
-  const session = read<any>('session.json');
-  if (session?.format !== 'blook-bundle') {
-    throw new CliError(`Not a Blook bundle: ${b.path} has a session.json without "format": "blook-bundle".`, EXIT.notFound, PASS_A_BUNDLE);
-  }
-  const chunks = (read<AudioChunk[]>('audio/chunks.json') ?? []).filter((c) => b.files.has(c.file));
+  const { session } = b;
+  const chunks = (b.json<AudioChunkOut[]>('audio/chunks.json') ?? []).filter((c) => b.files.has(c.file));
   if (!chunks.length) {
     throw new CliError(
       `No audio in ${b.path}: nothing to transcribe.`,
@@ -159,7 +96,7 @@ export async function transcribeBundle(bundlePath: string, opts: TranscribeOptio
       `The mic recorded nothing (session.json .mic: ${JSON.stringify(session.mic ?? null)}).`,
     );
   }
-  const existing = read<TranscriptOut>('transcript.json');
+  const existing = b.json<TranscriptOut>('transcript.json');
   const summary = (t: TranscriptOut, skipped: boolean, path: string): TranscribeSummary => ({
     path,
     skipped,
@@ -185,7 +122,6 @@ export async function transcribeBundle(bundlePath: string, opts: TranscribeOptio
   const results = method === 'openrouter' ? await viaOpenRouter(b, chunks, opts) : await viaWhisper(b, chunks, opts);
   const merged = mergeChunks(results);
   const ok = results.filter((r) => !r.error).length;
-  const t = transcriptJson(merged, chunks.length, ok ? {} : { status: 'failed', note: `failed: ${merged.errors?.[0]?.error}` });
   if (!ok) {
     // Keep whatever transcript the bundle had.
     throw new CliError(
@@ -196,17 +132,14 @@ export async function transcribeBundle(bundlePath: string, opts: TranscribeOptio
         : 'Run with BLOOK_DEBUG=1 for details, or try --method openrouter.',
     );
   }
+  const t = transcriptJson(merged, chunks.length);
   if (t.errors?.length) warn(`${t.errors.length} of ${chunks.length} chunks failed: ${t.errors[0]!.error}`);
 
-  // transcript.json, then what derives from it.
-  const timeline = replaceSpeech(read<any[]>('timeline.json') ?? [], t.segments);
-  session.transcript = transcriptSummary(t);
-  session.counts = { ...session.counts, timeline: timeline.length, transcriptSegments: t.segmentCount };
-  session.files = { ...session.files, 'transcript.json': transcriptFileNote(t.status) };
+  const derived = withTranscript(session, b.json<TimelineEntry[]>('timeline.json') ?? [], t);
   const put = (name: string, v: unknown) => b.files.set(name, strToU8(JSON.stringify(v, null, 2)));
   put('transcript.json', t);
-  put('timeline.json', timeline);
-  put('session.json', session);
+  put('timeline.json', derived.timeline);
+  put('session.json', derived.session);
   const written = writeBundleFiles(b, ['transcript.json', 'timeline.json', 'session.json'], opts.out);
   return summary(t, false, written);
 }
@@ -232,15 +165,15 @@ const cliSource = (method: TranscriptSource['method'], model: string): Transcrip
 });
 
 /** chunks.json has voiced ranges in session ms; the mapping wants them from the chunk start. */
-const relVoiced = (c: AudioChunk) => c.voiced?.map(([a, b]): Range => [a - c.t, b - c.t]);
+const relVoiced = (c: AudioChunkOut) => c.voiced?.map(([a, b]): Range => [a - c.t, b - c.t]);
 
-function toResult(c: AudioChunk, res: SttResult, source: TranscriptSource, voiced = relVoiced(c)): TranscriptChunkResult {
+function toResult(c: AudioChunkOut, res: SttResult, source: TranscriptSource, voiced = relVoiced(c)): TranscriptChunkResult {
   return { index: c.index, t: c.t, ...chunkTranscript({ t: c.t, durationMs: c.durationMs, voiced }, res), source };
 }
 
-const label = (c: AudioChunk, n: number) => `chunk ${c.index + 1}/${n} (${c.file}, ${(c.durationMs / 1000).toFixed(1)} s)`;
+const label = (c: AudioChunkOut, n: number) => `chunk ${c.index + 1}/${n} (${c.file}, ${(c.durationMs / 1000).toFixed(1)} s)`;
 
-async function viaOpenRouter(b: BundleFiles, chunks: AudioChunk[], opts: TranscribeOptions): Promise<TranscriptChunkResult[]> {
+async function viaOpenRouter(b: BundleFiles, chunks: AudioChunkOut[], opts: TranscribeOptions): Promise<TranscriptChunkResult[]> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey)
     throw new CliError(
@@ -252,35 +185,20 @@ async function viaOpenRouter(b: BundleFiles, chunks: AudioChunk[], opts: Transcr
   const endpoint = process.env.BLOOK_OPENROUTER_URL || OPENROUTER_ENDPOINT;
   note(`Transcribing ${chunks.length} chunk(s) with OpenRouter ${model}`);
   const results: TranscriptChunkResult[] = [];
-  let next = 0;
-  // Three requests at a time, like the extension.
-  await Promise.all(
-    Array.from({ length: Math.min(3, chunks.length) }, async () => {
-      while (next < chunks.length) {
-        const c = chunks[next++]!;
-        const data = b.files.get(c.file)!;
-        const base = { index: c.index, t: c.t, segments: [], words: [] };
-        if (data.length <= MIN_CHUNK_BYTES) {
-          results.push(base);
-          continue;
-        }
-        try {
-          const blob = new Blob([new Uint8Array(data)], { type: c.mimeType });
-          const res = await openRouterTranscribe(blob, c.file.split('/').pop()!, { apiKey, endpoint, model });
-          const r = toResult(c, res, cliSource('openrouter', model));
-          note(`  ${label(c, chunks.length)}: ${r.words.length} words`);
-          results.push(r);
-        } catch (e) {
-          note(`  ${label(c, chunks.length)}: ${e instanceof Error ? e.message : e}`);
-          results.push({ ...base, error: e instanceof Error ? e.message : String(e) });
-        }
-      }
-    }),
-  );
+  await openRouterEach(chunks, async (c) => {
+    const data = b.files.get(c.file)!;
+    const r = await chunkResult(c, data.length, async () => {
+      const blob = new Blob([new Uint8Array(data)], { type: c.mimeType });
+      const res = await openRouterTranscribe(blob, c.file.split('/').pop()!, { apiKey, endpoint, model });
+      return toResult(c, res, cliSource('openrouter', model));
+    });
+    if (data.length > MIN_CHUNK_BYTES) note(`  ${label(c, chunks.length)}: ${r.error ?? `${r.words.length} words`}`);
+    results.push(r);
+  });
   return results;
 }
 
-async function viaWhisper(b: BundleFiles, chunks: AudioChunk[], opts: TranscribeOptions): Promise<TranscriptChunkResult[]> {
+async function viaWhisper(b: BundleFiles, chunks: AudioChunkOut[], opts: TranscribeOptions): Promise<TranscriptChunkResult[]> {
   const cli = findWhisperCli();
   if (!cli)
     throw new CliError(

@@ -12,6 +12,7 @@ import type {
   WebSocketFrameRow,
   WebSocketRow,
 } from './types.ts';
+import { base64Size } from './body-policy.ts';
 import { buildTimeline, isNetworkFailureLog } from './timeline.ts';
 import {
   transcriptFileNote,
@@ -43,13 +44,6 @@ function encodeBody(body: string, base64: boolean, mime: string | undefined, tru
 /** Text frames have no MIME type: parse those that look like a JSON object or array. */
 export function encodePayload(payload: string, binary: boolean, truncated: boolean) {
   return encodeBody(payload, binary, !binary && /^\s*[[{]/.test(payload) ? 'json' : undefined, truncated);
-}
-
-/** Console entries from Blook's own scripts (rrweb's canvas readback warning, …). */
-export function isExtensionConsole(c: { url?: string; stack?: string }): boolean {
-  if (c.url?.startsWith('chrome-extension://')) return true;
-  const top = c.stack?.match(/\((\S+?):\d+:\d+\)/)?.[1];
-  return !!top?.startsWith('chrome-extension://');
 }
 
 export interface RequestOut {
@@ -126,23 +120,21 @@ export interface AudioChunkOut {
   file: string;
 }
 
-/** session.json. */
 export type SessionOut = ReturnType<typeof sessionJson>;
 
 function json(value: unknown): Uint8Array {
   return strToU8(JSON.stringify(value, null, 2));
 }
 
+/** A request the browser canceled (navigation, abort) has an errorText starting with `canceled`: it didn't fail. */
+export const isCanceled = (errorText: string | undefined) => !!errorText?.startsWith('canceled');
+
 /** Drops undefined fields so the JSON only has keys with values. */
 function clean<T extends object>(o: T): T {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
 }
 
-function base64Size(b64: string): number {
-  return (b64.length / 4) * 3 - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
-}
-
-export function contentType(headers: Headers | undefined): string | undefined {
+function contentType(headers: Headers | undefined): string | undefined {
   for (const [k, v] of Object.entries(headers ?? {})) if (k.toLowerCase() === 'content-type') return v;
   return undefined;
 }
@@ -198,6 +190,22 @@ export interface BundleOptions {
   transcriptNote?: string;
 }
 
+/**
+ * A bundle's files by their path in the bundle folder, from paths that may carry a folder prefix
+ * (`blook-<id>/` in the ZIP). The folder of the shallowest session.json is the root. Undefined
+ * without a session.json.
+ */
+export function bundleRoot<T>(paths: Map<string, T>): { prefix: string; files: Map<string, T> } | undefined {
+  const sessionPath = [...paths.keys()]
+    .filter((p) => p === 'session.json' || p.endsWith('/session.json'))
+    .sort((a, b) => a.length - b.length)[0];
+  if (sessionPath === undefined) return undefined;
+  const prefix = sessionPath.slice(0, -'session.json'.length);
+  const files = new Map<string, T>();
+  for (const [p, v] of paths) if (p.startsWith(prefix)) files.set(p.slice(prefix.length), v);
+  return { prefix, files };
+}
+
 /** The bundle ZIP of one session. Sorts the row arrays in place. */
 export async function zipBundle(rows: SessionRows, opts: BundleOptions = {}): Promise<{ folder: string; zip: Uint8Array }> {
   const { meta, rrweb, requests: requestRows, sockets: socketRows, frames: frameRows, console: consoleRows, audio } = rows;
@@ -214,7 +222,7 @@ export async function zipBundle(rows: SessionRows, opts: BundleOptions = {}): Pr
   };
 
   // rrweb.json: per tab, top-frame events (cross-origin iframes are folded in by rrweb),
-  // timestamps rewritten to ms since session start, in arrival order.
+  // timestamps rewritten to ms since session start.
   const rrwebByTab = new Map<number, any[]>();
   for (const row of rrweb) {
     if (row.frameId !== 0) continue;
@@ -232,11 +240,9 @@ export async function zipBundle(rows: SessionRows, opts: BundleOptions = {}): Pr
     put('rrweb.json', strToU8(JSON.stringify({ tabs })));
   }
 
-  // websockets.json
   const sockets = socketsOut(socketRows, frameRows);
   const socketIds = new Set(sockets.map((s) => s.id));
 
-  // network.json, bodies inline.
   const requests: RequestOut[] = [];
   for (const r of requestRows) {
     const out: RequestOut = clean({
@@ -251,7 +257,7 @@ export async function zipBundle(rows: SessionRows, opts: BundleOptions = {}): Pr
       status: r.status,
       statusText: r.statusText,
       mimeType: r.mimeType,
-      failed: (!!r.errorText && !r.errorText.startsWith('canceled')) || (r.status ?? 0) >= 400,
+      failed: (!!r.errorText && !isCanceled(r.errorText)) || (r.status ?? 0) >= 400,
       errorText: r.errorText,
       socketId: socketIds.has(r.requestId) ? r.requestId : undefined,
       requestHeaders: r.requestHeaders,
@@ -275,9 +281,7 @@ export async function zipBundle(rows: SessionRows, opts: BundleOptions = {}): Pr
     requests.push(out);
   }
 
-  const consoleOut: ConsoleOut[] = consoleRows
-    .filter((c) => !isExtensionConsole(c))
-    .map(({ sessionId: _s, id: _i, ...rest }, index) => ({ index, ...rest }));
+  const consoleOut: ConsoleOut[] = consoleRows.map(({ sessionId: _s, id: _i, ...rest }, index) => ({ index, ...rest }));
 
   // transcript.json: segments with their words, all in session ms.
   const transcriptOut = transcriptJson(opts.transcript, audio.length, {

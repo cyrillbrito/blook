@@ -1,22 +1,10 @@
 // Builds timeline.json: one array, sorted by t, merging everything an agent needs to scan first.
 // Each entry is small and has a `ref` into the file that holds the full record.
 // The format is documented in docs/bundle-format.md; keep both in sync.
+import { EventType, IncrementalSource, MouseInteractions, NodeType } from '@rrweb/types';
 import type { SessionMeta } from './types.ts';
 import type { ConsoleOut, RequestOut, SocketOut } from './bundle.ts';
-import { speechEntries, type SegmentOut } from './transcript.ts';
-
-// rrweb enums, inlined to avoid pulling rrweb into the service worker.
-const FULL_SNAPSHOT = 2;
-const INCREMENTAL = 3;
-const META = 4;
-const SOURCE_MUTATION = 0;
-const SOURCE_MOUSE_INTERACTION = 2;
-const SOURCE_SCROLL = 3;
-const SOURCE_INPUT = 5;
-const MOUSE_CLICK = 2;
-const MOUSE_DBLCLICK = 4;
-const NODE_ELEMENT = 2;
-const NODE_TEXT = 3;
+import { transcriptFileNote, transcriptSummary, type SegmentOut, type TranscriptOut } from './transcript.ts';
 
 /** Typing into one field within this gap is one `input` entry. */
 const INPUT_MERGE_MS = 5000;
@@ -101,8 +89,8 @@ class NodeMap {
       if (out.length >= max) return;
       const n = this.nodes.get(nid);
       if (!n) return;
-      if (n.type === NODE_TEXT) out += ` ${n.textContent ?? ''}`;
-      else if (n.type === NODE_ELEMENT && !['script', 'style'].includes(n.tagName)) {
+      if (n.type === NodeType.Text) out += ` ${n.textContent ?? ''}`;
+      else if (n.type === NodeType.Element && !['script', 'style'].includes(n.tagName)) {
         for (const c of this.children.get(nid) ?? []) walk(c);
       }
     };
@@ -114,8 +102,8 @@ class NodeMap {
     let n = this.nodes.get(id);
     let nid = id;
     if (!n) return `node #${id}`;
-    if (n.type === 0) return 'document'; // rrweb NodeType.Document (page scroll)
-    if (n.type === NODE_TEXT && this.parent.has(id)) {
+    if (n.type === NodeType.Document) return 'document'; // page scroll
+    if (n.type === NodeType.Text && this.parent.has(id)) {
       nid = this.parent.get(id)!;
       n = this.nodes.get(nid);
     }
@@ -124,7 +112,7 @@ class NodeMap {
     for (let cur = nid, depth = 0; !isControl && depth < 4 && cur !== undefined; depth++) {
       const c = this.nodes.get(cur);
       if (
-        c?.type === NODE_ELEMENT &&
+        c?.type === NodeType.Element &&
         (['button', 'a', 'label', 'select', 'summary'].includes(c.tagName) || c.attributes?.role === 'button')
       ) {
         nid = cur;
@@ -154,9 +142,9 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
 
   events.forEach((e, i) => {
     const t: number = e.timestamp;
-    if (e.type === META) {
+    if (e.type === EventType.Meta) {
       href = e.data?.href;
-    } else if (e.type === FULL_SNAPSHOT) {
+    } else if (e.type === EventType.FullSnapshot) {
       map.reset();
       map.add(e.data.node);
       lastInput.clear();
@@ -169,9 +157,9 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
         url: href,
         ref: { file: 'rrweb.json', tabId, event: i },
       });
-    } else if (e.type === INCREMENTAL) {
+    } else if (e.type === EventType.IncrementalSnapshot) {
       const d = e.data;
-      if (d.source === SOURCE_MUTATION) {
+      if (d.source === IncrementalSource.Mutation) {
         for (const add of d.adds ?? []) map.add(add.node, add.parentId);
         for (const txt of d.texts ?? []) {
           const n = map.nodes.get(txt.id);
@@ -181,9 +169,12 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
           const n = map.nodes.get(attr.id);
           if (n?.attributes) Object.assign(n.attributes, attr.attributes);
         }
-      } else if (d.source === SOURCE_MOUSE_INTERACTION && (d.type === MOUSE_CLICK || d.type === MOUSE_DBLCLICK)) {
+      } else if (
+        d.source === IncrementalSource.MouseInteraction &&
+        (d.type === MouseInteractions.Click || d.type === MouseInteractions.DblClick)
+      ) {
         const target = map.describe(d.id);
-        const dbl = d.type === MOUSE_DBLCLICK;
+        const dbl = d.type === MouseInteractions.DblClick;
         out.push({
           t,
           type: 'click',
@@ -196,7 +187,7 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
           ...(dbl ? { double: true } : {}),
           ref: { file: 'rrweb.json', tabId, event: i },
         });
-      } else if (d.source === SOURCE_INPUT) {
+      } else if (d.source === IncrementalSource.Input) {
         // Drop inputs nobody typed: nodes rrweb never serialized (id -1), and programmatic value
         // and checked changes (React renders, deselected radio siblings).
         const node = map.nodes.get(d.id);
@@ -226,7 +217,7 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
           out.push(entry);
           lastInput.set(d.id, entry);
         }
-      } else if (d.source === SOURCE_SCROLL) {
+      } else if (d.source === IncrementalSource.Scroll) {
         const prev = lastScroll.get(d.id);
         if (prev && t - (prev.endT as number) < SCROLL_MERGE_MS) {
           Object.assign(prev, { endT: t, x: d.x, y: d.y, summary: `Scroll ${prev.target} to ${d.x},${d.y}` });
@@ -253,7 +244,8 @@ function rrwebEntries(tabId: number, events: any[]): TimelineEntry[] {
   return out;
 }
 
-function shortUrl(url: string): string {
+/** Path and query, for request summaries. */
+function pathAndQuery(url: string): string {
   try {
     const u = new URL(url);
     return cut(u.pathname + u.search, 100);
@@ -315,7 +307,7 @@ export function buildTimeline(input: {
       t: r.t,
       type: failed ? 'request-failed' : 'request',
       tabId: r.tabId,
-      summary: `${r.method} ${shortUrl(r.url)} → ${result}${r.durationMs !== undefined ? ` (${r.durationMs} ms)` : ''}`,
+      summary: `${r.method} ${pathAndQuery(r.url)} → ${result}${r.durationMs !== undefined ? ` (${r.durationMs} ms)` : ''}`,
       method: r.method,
       url: r.url,
       ...(r.status !== undefined ? { status: r.status } : {}),
@@ -348,7 +340,6 @@ export function buildTimeline(input: {
         ref: { file: 'websockets.json', socketId: s.id },
       });
     }
-    // Group frames: one entry per direction per FRAME_GROUP_MS window.
     let group: TimelineEntry | undefined;
     for (const f of s.frames) {
       if (group && group.direction === f.direction && f.t - group.t < FRAME_GROUP_MS) {
@@ -381,7 +372,6 @@ export function buildTimeline(input: {
   }
 
   for (const c of input.console) {
-    // Chrome logs "Failed to load resource" for every failed request: already a request-failed entry.
     if (isNetworkFailureLog(c)) continue;
     const isError = c.level === 'error';
     const file = c.url ? c.url.split(/[?#]/)[0]!.split('/').pop() || c.url : '';
@@ -398,11 +388,57 @@ export function buildTimeline(input: {
     });
   }
 
-  for (const e of speechEntries(input.segments)) out.push({ ...e });
+  out.push(...speechEntries(input.segments));
+  return sortByT(out);
+}
 
-  // Stable sort by t; the per-type push order above breaks ties.
-  return out
-    .map((e, i) => [e, i] as const)
-    .sort((a, b) => a[0].t - b[0].t || a[1] - b[1])
-    .map(([e]) => e);
+/** Sort by t. Array sort is stable: on a tie, push order wins (so speech, pushed last, comes last). */
+function sortByT<E extends { t: number }>(entries: E[]): E[] {
+  return entries.sort((a, b) => a.t - b.t);
+}
+
+export interface SpeechEntry extends TimelineEntry {
+  type: 'speech';
+  text: string;
+  endT: number;
+  ref: { file: 'transcript.json'; segment: number };
+}
+
+/** timeline.json `speech` entries, one per segment. */
+export function speechEntries(segments: SegmentOut[]): SpeechEntry[] {
+  return segments.map((seg) => ({
+    t: seg.t,
+    type: 'speech',
+    summary: `🗣 "${cut(seg.text, 300)}"`,
+    text: seg.text,
+    endT: seg.endT,
+    ref: { file: 'transcript.json', segment: seg.index },
+  }));
+}
+
+/** Swaps the speech entries of a timeline for new ones, in buildTimeline's order. */
+function replaceSpeech<E extends { t: number; type: string }>(timeline: E[], segments: SegmentOut[]): (E | SpeechEntry)[] {
+  return sortByT<E | SpeechEntry>([...timeline.filter((e) => e.type !== 'speech'), ...speechEntries(segments)]);
+}
+
+/**
+ * Rewrites what derives from transcript.json in an existing bundle (`blook transcribe`): the
+ * timeline's speech entries and session.json's .transcript, .counts and .files note. zipBundle
+ * builds the same fields from scratch.
+ */
+export function withTranscript<S extends { counts?: object; files?: object }, E extends { t: number; type: string }>(
+  session: S,
+  timeline: E[],
+  t: TranscriptOut,
+): { session: S; timeline: (E | SpeechEntry)[] } {
+  const next = replaceSpeech(timeline, t.segments);
+  return {
+    session: {
+      ...session,
+      transcript: transcriptSummary(t),
+      counts: { ...session.counts, timeline: next.length, transcriptSegments: t.segmentCount },
+      files: { ...session.files, 'transcript.json': transcriptFileNote(t.status) },
+    },
+    timeline: next,
+  };
 }

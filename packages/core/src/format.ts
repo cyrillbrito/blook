@@ -36,6 +36,15 @@ export function shortUrl(url: string): string {
   }
 }
 
+/** The host, or the whole string when it isn't a URL with one. */
+export function urlHost(url: string): string {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
+}
+
 /** Last path segment plus query, like DevTools' Name column. */
 export function urlName(url: string): string {
   try {

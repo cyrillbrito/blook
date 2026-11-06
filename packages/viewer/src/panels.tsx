@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Bundle, ConsoleOut, FrameOut, RequestOut, SocketOut, TimelineEntry } from './bundle';
+import type { Bundle, ConsoleOut, FrameOut, RequestOut, SocketOut, TimelineEntry, TimelineRef, TimelineType } from './bundle';
 import { lastAtOrBefore } from './playback';
 import { Body, Chip, Detail, KeyValues, RowList, Search, Section, SubTabs, TabBadge, Time, Toolbar, includes, type PanelProps } from './ui';
 import { formatBytes, formatMs, formatTime, urlName } from '@blook/core/format';
-import { cx, useNow } from './util';
+import { BODY_MAX_BYTES } from '@blook/core/body-policy';
+import { isCanceled } from '@blook/core/bundle';
+import { cx } from '@blook/ui';
+import { useNow } from './util';
 
 export type PanelId = 'timeline' | 'transcript' | 'network' | 'websockets' | 'console';
 
@@ -13,6 +16,9 @@ function bodyProps(body: unknown, encoding?: string): { text?: string; base64?: 
   if (encoding === 'base64') return { base64: String(body) };
   return { text: encoding === 'json' ? JSON.stringify(body) : String(body) };
 }
+
+/** A body or payload the capture cut at BODY_MAX_BYTES. */
+const cutNote = (size: number | undefined) => `Cut at ${BODY_MAX_BYTES / 1_000_000} MB during capture (was ${formatBytes(size)}).`;
 
 /** What a panel should select when opened from another panel. */
 export interface Focus {
@@ -43,8 +49,8 @@ function useSelection(panel: PanelId, focus: Focus | undefined) {
 
 // ---------------------------------------------------------------- Timeline
 
-const TL_GROUPS: { id: string; label: string; types: string[] }[] = [
-  { id: 'nav', label: 'Navigation', types: ['navigation', 'tab-open', 'snapshot'] },
+const TL_GROUPS: { id: string; label: string; types: TimelineType[] }[] = [
+  { id: 'nav', label: 'Navigation', types: ['navigation', 'page-ready', 'tab-open', 'snapshot'] },
   { id: 'user', label: 'User', types: ['click', 'input', 'scroll'] },
   { id: 'net', label: 'Network', types: ['request', 'request-failed'] },
   { id: 'ws', label: 'WebSocket', types: ['ws-open', 'ws-close', 'ws-frame'] },
@@ -52,19 +58,20 @@ const TL_GROUPS: { id: string; label: string; types: string[] }[] = [
   { id: 'speech', label: 'Speech', types: ['speech'] },
 ];
 
-const TYPE_STYLE: Record<string, string> = {
+const TYPE_STYLE: Record<TimelineType, string> = {
   navigation: 'bg-violet-100 text-violet-800',
+  'page-ready': 'bg-violet-100 text-violet-800',
   'tab-open': 'bg-violet-100 text-violet-800',
-  snapshot: 'bg-gray-100 text-gray-600',
+  snapshot: 'bg-surface-sunken text-gray-600',
   click: 'bg-sky-100 text-sky-800',
   input: 'bg-sky-100 text-sky-800',
-  scroll: 'bg-gray-100 text-gray-600',
-  request: 'bg-gray-100 text-gray-700',
+  scroll: 'bg-surface-sunken text-gray-600',
+  request: 'bg-surface-sunken text-gray-700',
   'request-failed': 'bg-red-100 text-red-800',
   'ws-open': 'bg-teal-100 text-teal-800',
   'ws-close': 'bg-teal-100 text-teal-800',
   'ws-frame': 'bg-teal-50 text-teal-700',
-  console: 'bg-gray-100 text-gray-700',
+  console: 'bg-surface-sunken text-gray-700',
   error: 'bg-red-100 text-red-800',
   speech: 'bg-blue-100 text-blue-800',
 };
@@ -115,7 +122,7 @@ export function TimelinePanel({ bundle, tabs, clock, follow, seek, open, focus }
   );
 
   const selected = sel != null ? bundle.timeline[Number(sel)] : undefined;
-  const target = selected ? refTarget(bundle, selected) : undefined;
+  const target = selected?.ref && refTarget(selected.ref);
 
   return (
     <>
@@ -126,7 +133,7 @@ export function TimelinePanel({ bundle, tabs, clock, follow, seek, open, focus }
             {g.label} <span className="opacity-60">{g.types.reduce((n, t) => n + (counts[t] ?? 0), 0)}</span>
           </Chip>
         ))}
-        <span className="mx-1 h-4 w-px bg-gray-200" />
+        <span className="mx-1 h-4 w-px bg-line" />
         <Chip active={onlyProblems} onClick={() => setOnlyProblems(!onlyProblems)}>
           Problems only
         </Chip>
@@ -155,10 +162,10 @@ export function TimelinePanel({ bundle, tabs, clock, follow, seek, open, focus }
           {target && (
             <div className="px-2 pt-2">
               <button
-                className="rounded border border-gray-300 px-2 py-0.5 hover:bg-gray-100"
+                className="cursor-pointer rounded-control border border-line-strong px-2 py-0.5 hover:bg-surface-sunken"
                 onClick={() => open(target.panel, target.key)}
               >
-                Open in {target.label} →
+                Show in {target.label}
               </button>
             </div>
           )}
@@ -176,17 +183,19 @@ function toggleOne(set: Set<string>, v: string) {
   return next;
 }
 
-function refTarget(bundle: Bundle, e: TimelineEntry): { panel: PanelId; key: string; label: string } | undefined {
-  const ref = e.ref as Record<string, unknown> | undefined;
-  if (!ref) return;
-  if (ref.file === 'network.json') return { panel: 'network', key: String(ref.requestId), label: 'Network' };
-  if (ref.file === 'console.json') return { panel: 'console', key: String(ref.index), label: 'Console' };
-  if (ref.file === 'transcript.json') return { panel: 'transcript', key: String(ref.segment), label: 'Transcript' };
-  if (ref.file === 'websockets.json') {
-    const key = ref.frame != null ? `${ref.socketId}:${ref.frame}` : `${ref.socketId}:`;
-    return { panel: 'websockets', key, label: 'WebSockets' };
+function refTarget(ref: TimelineRef): { panel: PanelId; key: string; label: string } | undefined {
+  switch (ref.file) {
+    case 'network.json':
+      return { panel: 'network', key: ref.requestId, label: 'Network' };
+    case 'console.json':
+      return { panel: 'console', key: String(ref.index), label: 'Console' };
+    case 'transcript.json':
+      return { panel: 'transcript', key: String(ref.segment), label: 'Transcript' };
+    case 'websockets.json':
+      return { panel: 'websockets', key: `${ref.socketId}:${ref.frame ?? ''}`, label: 'WebSockets' };
+    default:
+      return undefined;
   }
-  return undefined;
 }
 
 // ---------------------------------------------------------------- Network
@@ -226,20 +235,20 @@ export function NetworkPanel({ bundle, tabs, clock, follow, seek, focus }: Props
         <Time t={r.t} />
         <span className="w-12 shrink-0">{r.method}</span>
         <span className={cx('w-10 shrink-0 tabular-nums', !r.failed && 'text-gray-600')} title={r.statusText ?? r.errorText}>
-          {r.status ?? (r.errorText ? (r.errorText.startsWith('canceled') ? '(canc)' : '(fail)') : r.endT == null ? '…' : '')}
+          {r.status ?? (r.errorText ? (isCanceled(r.errorText) ? '(canc)' : '(fail)') : r.endT == null ? '…' : '')}
         </span>
         <TabBadge tabId={r.tabId} tabs={tabs} />
         <span className="min-w-0 flex-1 truncate" title={r.url}>
           {urlName(r.url)}
         </span>
-        <span className="w-16 shrink-0 truncate text-gray-500">{r.resourceType}</span>
-        <span className="w-14 shrink-0 text-right text-gray-500 tabular-nums">{formatMs(r.durationMs)}</span>
+        <span className="w-16 shrink-0 truncate text-muted">{r.resourceType}</span>
+        <span className="w-14 shrink-0 text-right text-muted tabular-nums">{formatMs(r.durationMs)}</span>
       </div>
     ),
     [tabs],
   );
   const header = (
-    <div className="flex gap-2 px-2 py-0.5 text-[11px] text-gray-500">
+    <div className="flex gap-2 px-2 py-0.5 text-[11px] text-muted">
       <span className="w-14 shrink-0">Time</span>
       <span className="w-12 shrink-0">Method</span>
       <span className="w-10 shrink-0">Status</span>
@@ -260,7 +269,7 @@ export function NetworkPanel({ bundle, tabs, clock, follow, seek, focus }: Props
             {t.label}
           </Chip>
         ))}
-        <span className="mx-1 h-4 w-px bg-gray-200" />
+        <span className="mx-1 h-4 w-px bg-line" />
         <Chip active={failedOnly} onClick={() => setFailedOnly(!failedOnly)}>
           Failed <span className="opacity-60">{failedCount}</span>
         </Chip>
@@ -333,13 +342,7 @@ export function NetworkPanel({ bundle, tabs, clock, follow, seek, focus }: Props
             <Body
               key={`${r.id}-req`}
               {...bodyProps(r.requestBody, r.requestBodyEncoding)}
-              note={
-                r.requestBody === undefined
-                  ? 'No request body.'
-                  : r.requestBodyTruncated
-                    ? `Cut at 1 MB during capture (was ${formatBytes(r.requestBodySize)}).`
-                    : undefined
-              }
+              note={r.requestBody === undefined ? 'No request body.' : r.requestBodyTruncated ? cutNote(r.requestBodySize) : undefined}
             />
           )}
           {tab === 'response' && (
@@ -351,7 +354,7 @@ export function NetworkPanel({ bundle, tabs, clock, follow, seek, focus }: Props
                 r.responseBodyNotKept
                   ? `Body not kept: ${r.responseBodyNotKept}${r.responseBodySize !== undefined ? ` (${formatBytes(r.responseBodySize)})` : ''}.`
                   : r.responseBodyTruncated
-                    ? `Cut at 1 MB during capture (was ${formatBytes(r.responseBodySize)}).`
+                    ? cutNote(r.responseBodySize)
                     : r.responseBody === undefined
                       ? 'No body (none sent, or Chrome did not keep it).'
                       : undefined
@@ -406,11 +409,9 @@ export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Pr
         <span className={cx('w-3 shrink-0 font-bold', f.direction === 'sent' ? 'text-green-700' : 'text-red-600')} title={f.direction}>
           {f.direction === 'sent' ? '↑' : '↓'}
         </span>
-        {!socket && <span className="w-24 shrink-0 truncate text-gray-500">{urlName(f.socket.url)}</span>}
-        <span className="min-w-0 flex-1 truncate">
-          {f.text ?? <span className="text-gray-500">{`<binary ${formatBytes(f.size)}>`}</span>}
-        </span>
-        <span className="w-14 shrink-0 text-right text-gray-500">{formatBytes(f.size)}</span>
+        {!socket && <span className="w-24 shrink-0 truncate text-muted">{urlName(f.socket.url)}</span>}
+        <span className="min-w-0 flex-1 truncate">{f.text ?? <span className="text-muted">{`<binary ${formatBytes(f.size)}>`}</span>}</span>
+        <span className="w-14 shrink-0 text-right text-muted">{formatBytes(f.size)}</span>
       </div>
     ),
     [socket],
@@ -420,11 +421,11 @@ export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Pr
   const frame = selFrame ? sockets.find((s) => s.id === selSocket)?.frames[Number(selFrame)] : undefined;
   const showSocket = sel != null && !selFrame ? sockets.find((s) => s.id === selSocket) : undefined;
 
-  if (!sockets.length) return <div className="p-4 text-center text-gray-400">No WebSockets in this session.</div>;
+  if (!sockets.length) return <div className="p-4 text-center text-muted">No WebSockets in this session.</div>;
 
   return (
     <>
-      <div className="max-h-[30%] shrink-0 overflow-auto border-b border-gray-200">
+      <div className="max-h-[30%] shrink-0 overflow-auto border-b border-line">
         {sockets.map((s) => (
           <div
             key={s.id}
@@ -434,8 +435,8 @@ export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Pr
               seek(s.t, s.tabId);
             }}
             className={cx(
-              'flex cursor-default items-center gap-2 border-b border-gray-100 px-2 py-0.5 font-mono hover:bg-gray-50',
-              s.id === socketId && 'bg-blue-50',
+              'flex cursor-default items-center gap-2 border-b border-gray-100 px-2 py-0.5 font-mono hover:bg-surface-muted',
+              s.id === socketId && 'bg-accent-soft',
             )}
           >
             <Time t={s.t} />
@@ -444,10 +445,10 @@ export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Pr
             <span className="min-w-0 flex-1 truncate" title={s.url}>
               {s.url}
             </span>
-            <span className="shrink-0 text-gray-500">
+            <span className="shrink-0 text-muted">
               <span className="text-green-700">↑{s.sentCount}</span> <span className="text-red-600">↓{s.receivedCount}</span>
             </span>
-            <span className="w-14 shrink-0 text-right text-gray-500">{s.endT != null ? formatMs(s.durationMs) : 'open'}</span>
+            <span className="w-14 shrink-0 text-right text-muted">{s.endT != null ? formatMs(s.durationMs) : 'open'}</span>
           </div>
         ))}
       </div>
@@ -462,7 +463,7 @@ export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Pr
         <Chip active={dir === 'received'} onClick={() => setDir('received')}>
           ↓ Received
         </Chip>
-        <span className="ml-auto text-gray-500">{socket ? urlName(socket.url) : 'All sockets'}</span>
+        <span className="ml-auto text-muted">{socket ? urlName(socket.url) : 'All sockets'}</span>
       </Toolbar>
       <RowList
         items={items}
@@ -482,11 +483,7 @@ export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Pr
           title={`${frame.direction === 'sent' ? '↑ Sent' : '↓ Received'} · frame ${frame.index} · ${formatTime(frame.t)} · ${formatBytes(frame.size)}`}
           onClose={() => setSel(undefined)}
         >
-          <Body
-            key={sel}
-            {...bodyProps(frame.payload, frame.payloadEncoding)}
-            note={frame.truncated ? `Cut at 1 MB during capture (was ${formatBytes(frame.size)}).` : undefined}
-          />
+          <Body key={sel} {...bodyProps(frame.payload, frame.payloadEncoding)} note={frame.truncated ? cutNote(frame.size) : undefined} />
         </Detail>
       )}
       {showSocket && (
@@ -529,7 +526,7 @@ const LEVEL_ROW: Record<string, string> = {
   error: 'bg-red-50/60 text-red-700',
   warn: 'bg-amber-50/60 text-amber-800',
   info: 'text-blue-800',
-  debug: 'text-gray-500',
+  debug: 'text-muted',
   log: '',
 };
 
@@ -553,7 +550,7 @@ export function ConsolePanel({ bundle, tabs, clock, follow, seek, focus }: Props
             {c.text}
           </span>
           {c.url && (
-            <span className="max-w-40 shrink-0 truncate text-gray-400" title={`${c.url}:${c.line ?? ''}:${c.column ?? ''}`}>
+            <span className="max-w-40 shrink-0 truncate text-muted" title={`${c.url}:${c.line ?? ''}:${c.column ?? ''}`}>
               {urlName(c.url)}
               {c.line != null && `:${c.line}`}
             </span>
@@ -624,7 +621,7 @@ export function TranscriptPanel({ bundle, clock, follow, seek, focus }: Props) {
       )}
       {transcript.source && (
         <div
-          className="shrink-0 border-b border-gray-100 px-2 py-1 text-gray-400"
+          className="shrink-0 border-b border-gray-100 px-2 py-1 text-muted"
           title={`${transcript.source.at}, Blook ${transcript.source.blookVersion}`}
         >
           {transcript.source.method} {transcript.source.model}, by the {transcript.source.by}
@@ -636,16 +633,16 @@ export function TranscriptPanel({ bundle, clock, follow, seek, focus }: Props) {
             key={s.index}
             data-i={i}
             className={cx(
-              'flex gap-2 border-b border-l-2 border-gray-100 border-l-transparent px-2 py-1 hover:bg-gray-50',
-              i === active && inSegment && 'border-l-amber-500 bg-amber-50',
-              sel === String(i) && 'bg-blue-50',
+              'flex gap-2 border-b border-l-2 border-gray-100 border-l-transparent px-2 py-1 hover:bg-surface-muted',
+              i === active && inSegment && 'border-l-playhead bg-playhead-soft',
+              sel === String(i) && 'bg-accent-soft',
             )}
             onClick={() => {
               setSel(String(i));
               seek(s.t);
             }}
           >
-            <button className="w-14 shrink-0 text-left font-mono text-gray-400 tabular-nums hover:text-blue-700" title="Seek here">
+            <button className="w-14 shrink-0 text-left font-mono text-muted tabular-nums hover:text-accent" title="Seek here">
               {formatTime(s.t)}
             </button>
             <p className="min-w-0 flex-1 text-[13px] leading-relaxed">
@@ -658,7 +655,7 @@ export function TranscriptPanel({ bundle, clock, follow, seek, focus }: Props) {
                         setSel(String(i));
                         seek(w.t);
                       }}
-                      className={cx('cursor-pointer rounded-sm hover:bg-blue-100', now >= w.t && now < w.endT && 'bg-amber-300')}
+                      className={cx('cursor-pointer rounded-sm hover:bg-accent-soft', now >= w.t && now < w.endT && 'bg-playhead/40')}
                     >
                       {w.word}{' '}
                     </span>
@@ -668,7 +665,7 @@ export function TranscriptPanel({ bundle, clock, follow, seek, focus }: Props) {
           </div>
         ))}
         {!segments.length && (
-          <div className="space-y-2 p-4 text-center text-gray-400">
+          <div className="space-y-2 p-4 text-center text-muted">
             <div>No transcript segments.</div>
             {audio.length > 0 && (
               <div>

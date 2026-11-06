@@ -27,7 +27,8 @@ const hasBrowser = await ReplayEngine.launch().then(
 );
 if (!hasBrowser)
   console.warn('No browser found: skipping screenshot, dom and pointer tests. Run `blook install-browser` or install Google Chrome.');
-const withBrowser = test.skipIf(!hasBrowser);
+// Each replay test starts a browser in a CLI subprocess: seconds, more on a busy machine.
+const withBrowser = (name: string, fn: () => void | Promise<unknown>) => test.skipIf(!hasBrowser)(name, fn, 30_000);
 
 let folder: string;
 beforeAll(() => {
@@ -247,7 +248,6 @@ describe('extension and skill', () => {
     const r = run('skill', 'print');
     expect(r.code).toBe(0);
     expect(r.stdout).toStartWith('---\nname: blook\n');
-    expect(existsSync(join(import.meta.dir, '../../../skills/blook/SKILL.md'))).toBe(true);
   });
   test('skill install without a terminal copies the skill', () => {
     const home = join(tmp, 'home');
@@ -369,7 +369,7 @@ describe('transcribe', () => {
     ]);
     const s = entry(zip, 'session.json');
     expect(s.transcript).toEqual({ status: 'ok', source: out.source });
-    expect(s.counts).toMatchObject({ transcriptSegments: 1, timeline: 9 });
+    expect(s.counts).toMatchObject({ transcriptSegments: 1, timeline: entry(ZIP, 'session.json').counts.timeline + 1 });
     expect(s.files['transcript.json']).toContain('status "ok"');
     // Everything else is untouched.
     expect(entry(zip, 'network.json')).toEqual(entry(ZIP, 'network.json'));

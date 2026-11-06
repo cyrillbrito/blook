@@ -11,6 +11,6 @@ Tools that do part of what Blook does, and what to look at in each. The open-sou
 | [PostHog](https://github.com/PostHog/posthog-js), [Sentry](https://github.com/getsentry/sentry-javascript) replay | MIT | no | rrweb forks. Network masking defaults; Sentry's "replay buffer" of the last minutes |
 | [Jam](https://jam.dev) | closed | no | The product closest to Blook: instant replay, WebSocket inspector, an MCP server and [agent skills](https://github.com/jamdotdev/skills) that shaped `skills/blook` |
 | [Playwright trace viewer](https://playwright.dev/docs/trace-viewer) | Apache-2.0 | no | A trace ZIP an agent can read; its CLI's "list, then drill into one id" pattern |
-| [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) | Apache-2.0 | no | CDP from an MCP server; a model for a replay MCP |
+| [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) | Apache-2.0 | no | CDP from an MCP server |
 
 Transcription: [OpenRouter STT](https://openrouter.ai/docs/guides/overview/multimodal/stt) (`POST /api/v1/audio/transcriptions`, `verbose_json` with word timestamps; Whisper supports it, `gpt-4o-transcribe` rejects it). Local options: [Speaches](https://github.com/speaches-ai/speaches) and the [whisper.cpp server](https://github.com/ggml-org/whisper.cpp/tree/master/examples/server).

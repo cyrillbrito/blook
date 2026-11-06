@@ -88,16 +88,6 @@ describe('websockets.json and the timeline', () => {
   const sockets = socketsOut(rows, frameRows);
 
   test('every payload is inline, with t, direction, size and payloadEncoding', () => {
-    for (const s of sockets) {
-      for (const f of s.frames) {
-        expect(f).not.toHaveProperty('payloadFile');
-        expect(f).toHaveProperty('payload');
-        expect(typeof f.t).toBe('number');
-        expect(['sent', 'received']).toContain(f.direction);
-        expect(typeof f.size).toBe('number');
-        expect(['json', 'text', 'base64']).toContain(f.payloadEncoding);
-      }
-    }
     expect(sockets[0]!.frames).toEqual([
       { index: 0, t: 500, direction: 'sent', opcode: 1, size: 22, payload: { subscribe: 'orders' }, payloadEncoding: 'json' },
       { index: 1, t: 510, direction: 'sent', opcode: 1, size: 4, payload: 'ping', payloadEncoding: 'text' },

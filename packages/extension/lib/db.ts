@@ -56,7 +56,6 @@ export function openBlookDB(): Promise<BlookDBHandle> {
   return dbPromise;
 }
 
-/** Writes a batch of rows to one store in a single transaction. */
 export async function putMany<S extends (typeof SESSION_STORES)[number]>(store: S, rows: BlookDB[S]['value'][]): Promise<void> {
   const db = await openBlookDB();
   const tx = db.transaction(store, 'readwrite');
@@ -82,7 +81,6 @@ export async function putSession(meta: SessionMeta): Promise<void> {
   await db.put('sessions', meta);
 }
 
-/** Deletes a session and all its rows. */
 export async function deleteSession(sessionId: SessionId): Promise<void> {
   const db = await openBlookDB();
   const stores = ['sessions', 'transcripts', ...SESSION_STORES] as const;

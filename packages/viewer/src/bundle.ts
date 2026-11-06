@@ -2,11 +2,24 @@
 // Loaders build it from a ZIP, from dropped files or folders, or from a map of paths to bytes.
 import { strFromU8, unzipSync } from 'fflate';
 import type { eventWithTime } from '@rrweb/types';
+import { bundleRoot } from '@blook/core/bundle';
 import type { AudioChunkOut, ConsoleOut, RequestOut, SegmentOut, SessionOut, SocketOut, TranscriptOut } from '@blook/core/bundle';
-import type { TimelineEntry } from '@blook/core/timeline';
+import type { FrameOut } from '@blook/core/bundle';
+import type { TimelineEntry, TimelineRef, TimelineType } from '@blook/core/timeline';
 
-export type { AudioChunkOut, ConsoleOut, RequestOut, SegmentOut, SessionOut, SocketOut, TimelineEntry, TranscriptOut };
-export type FrameOut = SocketOut['frames'][number];
+export type {
+  AudioChunkOut,
+  ConsoleOut,
+  FrameOut,
+  RequestOut,
+  SegmentOut,
+  SessionOut,
+  SocketOut,
+  TimelineEntry,
+  TimelineRef,
+  TimelineType,
+  TranscriptOut,
+};
 
 export interface Bundle {
   /** Folder name, e.g. `blook-2026-11-03_19-09-02`. */
@@ -28,14 +41,9 @@ export interface Bundle {
 
 /** Builds a bundle from paths (with or without the `blook-<id>/` folder prefix) to bytes. */
 export function bundleFromFiles(input: Map<string, Uint8Array>, fallbackName = 'bundle'): Bundle {
-  // Find session.json and treat its folder as the bundle root.
-  const sessionPath = [...input.keys()]
-    .filter((p) => p === 'session.json' || p.endsWith('/session.json'))
-    .sort((a, b) => a.length - b.length)[0];
-  if (!sessionPath) throw new Error('No session.json found. Is this a Blook bundle?');
-  const prefix = sessionPath.slice(0, -'session.json'.length);
-  const files = new Map<string, Uint8Array>();
-  for (const [p, bytes] of input) if (p.startsWith(prefix)) files.set(p.slice(prefix.length), bytes);
+  const root = bundleRoot(input);
+  if (!root) throw new Error('No session.json found. Is this a Blook bundle?');
+  const { prefix, files } = root;
 
   /** A JSON file of the bundle; `fallback` only for files that may be absent. */
   const json = <T>(path: string, fallback?: T): T => {

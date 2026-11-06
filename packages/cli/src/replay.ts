@@ -1,11 +1,11 @@
 // Headless replay of a Blook bundle: Playwright Chromium + @rrweb/replay.
-// One ReplayEngine owns the browser; open() gives a TabReplay that can seek to
-// any t repeatedly (an MCP server can keep it alive between calls).
+// One ReplayEngine owns the browser; open() gives a TabReplay that can seek to any t.
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Browser, Page } from 'playwright-core';
+import { EventType, IncrementalSource } from '@rrweb/types';
 import { launchBrowser } from './browser.ts';
-import { type Bundle, type RrwebEvent, type MouseAt, mouseAt, pageStateAt, interactionsBetween, formatTime } from './bundle.ts';
+import { type Bundle, type RrwebEvent, type MouseAt, mouseAt, pageStateAt, interactionsBetween, formatClock } from './bundle.ts';
 import { CliError, EXIT } from './errors.ts';
 import { assets } from './assets.ts';
 
@@ -140,10 +140,10 @@ export class TabReplay {
       );
     }
     if (t < state.firstSnapshotAt) {
-      warnings.push(`t is before the first DOM snapshot (${formatTime(state.firstSnapshotAt)}); replaying that instead`);
+      warnings.push(`t is before the first DOM snapshot (${formatClock(state.firstSnapshotAt)}); replaying that instead`);
       rt = state.firstSnapshotAt;
     } else if (t > end) {
-      warnings.push(`t is after the last rrweb event (${formatTime(end)}); showing the final state`);
+      warnings.push(`t is after the last rrweb event (${formatClock(end)}); showing the final state`);
       rt = end;
     }
     const viewport = pageStateAt(events, rt).viewport ?? { width: 1280, height: 800 };
@@ -179,7 +179,7 @@ export class TabReplay {
       if (missing) warnings.push(`${missing} recorded canvas frame(s) could not be drawn`);
     }
 
-    return { tab: this.tab, t, replayedT: rt, time: formatTime(rt), url: pageStateAt(events, rt).url, viewport, warnings };
+    return { tab: this.tab, t, replayedT: rt, time: formatClock(rt), url: pageStateAt(events, rt).url, viewport, warnings };
   }
 
   async screenshot(
@@ -283,7 +283,8 @@ export class TabReplay {
  */
 function isCanvasFrame(e: RrwebEvent): boolean {
   const d = e.data;
-  if (e.type !== 3 || d?.source !== 9 || !Array.isArray(d.commands)) return false;
+  if (e.type !== EventType.IncrementalSnapshot || d?.source !== IncrementalSource.CanvasMutation || !Array.isArray(d.commands))
+    return false;
   const [a, b] = d.commands;
   return (
     d.commands.length === 2 &&

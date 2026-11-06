@@ -3,9 +3,11 @@
 // one failed request, a WebSocket with a JSON, a text and a binary frame, one console error,
 // and one audio chunk at 1000 that says "And so my fellow Americans" (fixtures/speech.webm, cut
 // from whisper.cpp's public-domain jfk.wav), not transcribed yet (status skipped).
+// The rows are what the extension stores; core's zipBundle turns them into the bundle, as on Export.
 // Run `bun test/make-fixture.ts` after changing it; the zip is committed.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { zipSync, strToU8 } from 'fflate';
+import { zipBundle } from '@blook/core/bundle';
+import type { SessionMeta } from '@blook/core/types';
 
 export const FIXTURE = {
   id: '2026-01-01_12-00-00',
@@ -79,193 +81,79 @@ const events = [
   move(4000, 600, 500, body.id),
 ];
 
-const session = {
-  format: 'blook-bundle',
-  version: 1,
-  id: FIXTURE.id,
-  url: 'http://localhost:4791/',
-  title: 'Fixture app',
-  status: 'stopped',
-  startedAt: 1767268800000,
-  startedAtIso: '2026-01-01T12:00:00.000Z',
-  endedAt: 1767268805000,
-  t: 0,
-  endT: FIXTURE.durationMs,
+const url = 'http://localhost:4791/';
+const tabId = FIXTURE.tabId;
+const sessionId = FIXTURE.id;
+const startedAt = 1767268800000;
+const meta: SessionMeta = {
+  id: sessionId,
+  startedAt,
+  endedAt: startedAt + FIXTURE.durationMs,
   durationMs: FIXTURE.durationMs,
-  firstSnapshotT: 20,
-  pageReadyT: 50,
-  tabs: [{ tabId: FIXTURE.tabId, t: 0, url: 'http://localhost:4791/' }],
-  navigations: [{ tabId: FIXTURE.tabId, t: 0, url: 'http://localhost:4791/' }],
+  status: 'stopped',
+  url,
+  title: 'Fixture app',
+  tabs: [{ tabId, t: 0, url }],
+  navigations: [{ tabId, t: 0, url }],
   settings: { mask: false, mic: true, canvas: false },
   mic: { state: 'stopped', chunks: 1 },
-  transcript: { status: 'skipped', note: 'skipped: no OpenRouter API key set' },
-  counts: {
-    rrwebEvents: events.length,
-    timeline: 8,
-    requests: 1,
-    failedRequests: 1,
-    webSockets: 1,
-    webSocketFrames: 3,
-    console: 1,
-    errors: 1,
-    audioChunks: 1,
-    transcriptSegments: 0,
-  },
-  files: {},
+  firstSnapshotT: 20,
+  pageReadyT: 50,
 };
-const tab = FIXTURE.tabId;
-const timeline = [
-  {
-    t: 0,
-    type: 'navigation',
-    tabId: tab,
-    summary: 'Navigate to http://localhost:4791/',
-    url: 'http://localhost:4791/',
-    ref: { file: 'session.json', navigation: 0 },
-  },
-  {
-    t: 20,
-    type: 'snapshot',
-    tabId: tab,
-    summary: 'DOM snapshot: http://localhost:4791/',
-    ref: { file: 'rrweb.json', tabId: tab, event: 1 },
-  },
-  {
-    t: 100,
-    type: 'ws-open',
-    tabId: tab,
-    summary: 'WebSocket open ws://localhost:4791/ws',
-    url: 'ws://localhost:4791/ws',
-    socketId: '1.2',
-    status: 101,
-    ref: { file: 'websockets.json', socketId: '1.2' },
-  },
-  {
-    t: 600,
-    type: 'ws-frame',
-    tabId: tab,
-    summary: 'WebSocket sent: {"subscribe":"orders"}',
-    socketId: '1.2',
-    direction: 'sent',
-    count: 1,
-    bytes: 25,
-    endT: 600,
-    preview: '{"subscribe":"orders"}',
-    ref: { file: 'websockets.json', socketId: '1.2', frame: 0, frameEnd: 0 },
-  },
-  {
-    t: 1500,
-    type: 'input',
-    tabId: tab,
-    summary: 'Input input #name: "Ada"',
-    target: 'input #name',
-    nodeId: input.id,
-    value: 'Ada',
-    endT: 1500,
-    ref: { file: 'rrweb.json', tabId: tab, event: 5 },
-  },
-  {
-    t: 2000,
-    type: 'click',
-    tabId: tab,
-    summary: 'Click button "Save" #save',
-    target: 'button "Save" #save',
-    nodeId: save.id,
-    x: FIXTURE.click.x,
-    y: FIXTURE.click.y,
-    ref: { file: 'rrweb.json', tabId: tab, event: 8 },
-  },
-  {
-    t: 2010,
-    type: 'request-failed',
-    tabId: tab,
-    summary: 'POST /api/save 500',
-    method: 'POST',
-    url: 'http://localhost:4791/api/save',
-    status: 500,
-    ref: { file: 'network.json', requestId: '1.1' },
-  },
-  {
-    t: 2050,
-    type: 'error',
-    tabId: tab,
-    summary: 'console.error: save failed',
-    level: 'error',
-    source: 'console',
-    ref: { file: 'console.json', index: 0 },
-  },
-];
-const network = [
-  {
-    id: '1.1',
-    tabId: tab,
-    t: 2010,
-    endT: 2040,
-    durationMs: 30,
-    method: 'POST',
-    url: 'http://localhost:4791/api/save',
-    resourceType: 'Fetch',
-    status: 500,
-    failed: true,
-    requestHeaders: {},
-    requestBody: { name: 'Ada' },
-    requestBodyEncoding: 'json',
-    responseBody: { error: 'boom' },
-    responseBodyEncoding: 'json',
-  },
-];
-const socket = {
-  id: '1.2',
-  requestId: '1.2',
-  tabId: tab,
-  url: 'ws://localhost:4791/ws',
-  t: 100,
-  endT: 4500,
-  durationMs: 4400,
-  status: 101,
-  frameCount: 3,
-  sentCount: 1,
-  receivedCount: 2,
-  frames: [
-    { index: 0, t: 600, direction: 'sent', opcode: 1, size: 25, payload: { subscribe: 'orders' }, payloadEncoding: 'json' },
-    { index: 1, t: 650, direction: 'received', opcode: 1, size: 2, payload: 'ok', payloadEncoding: 'text' },
-    { index: 2, t: 2020, direction: 'received', opcode: 2, size: 4, payload: '3q2+7w==', payloadEncoding: 'base64' },
-  ],
-};
-const consoleLog = [{ index: 0, tabId: tab, t: 2050, source: 'console', level: 'error', text: 'save failed' }];
-
-const dir = `blook-${FIXTURE.id}/`;
-const files: Record<string, unknown> = {
-  'session.json': session,
-  'timeline.json': timeline,
-  'rrweb.json': { tabs: [{ tabId: tab, url: 'http://localhost:4791/', events }] },
-  'network.json': network,
-  'websockets.json': [socket],
-  'console.json': consoleLog,
-  'transcript.json': { status: 'skipped', note: 'skipped: no OpenRouter API key set', segmentCount: 0, wordCount: 0, segments: [] },
-};
+const json = { 'content-type': 'application/json' };
 const speech = readFileSync(new URL('fixtures/speech.webm', import.meta.url));
 const { t: at, durationMs: len, voiced } = FIXTURE.audio;
-files['audio/chunks.json'] = [
-  {
-    index: 0,
-    t: at,
-    endT: at + len,
-    durationMs: len,
-    voiced,
-    mimeType: 'audio/webm;codecs=opus',
-    size: speech.length,
-    file: 'audio/000.webm',
-  },
-];
-session.files = Object.fromEntries([...Object.keys(files), 'audio/'].map((f) => [f, f]));
+
+export async function buildFixture(): Promise<Uint8Array> {
+  const { zip } = await zipBundle(
+    {
+      meta,
+      rrweb: events.map((event) => ({ sessionId, tabId, frameId: 0, t: event.timestamp, event: event as any })),
+      requests: [
+        {
+          sessionId,
+          requestId: '1.1',
+          tabId,
+          t: 2010,
+          endT: 2040,
+          method: 'POST',
+          url: `${url}api/save`,
+          resourceType: 'Fetch',
+          requestHeaders: json,
+          requestBody: '{"name":"Ada"}',
+          status: 500,
+          statusText: 'Internal Server Error',
+          responseHeaders: json,
+          mimeType: 'application/json',
+          responseBody: '{"error":"boom"}',
+        },
+      ],
+      sockets: [{ sessionId, socketId: '1.2', tabId, url: 'ws://localhost:4791/ws', t: 100, closedT: 4500, status: 101 }],
+      frames: [
+        { sessionId, socketId: '1.2', t: 600, direction: 'sent', opcode: 1, payload: '{"subscribe":"orders"}' },
+        { sessionId, socketId: '1.2', t: 650, direction: 'received', opcode: 1, payload: 'ok' },
+        { sessionId, socketId: '1.2', t: 2020, direction: 'received', opcode: 2, payload: '3q2+7w==' },
+      ],
+      console: [{ sessionId, tabId, t: 2050, source: 'console', level: 'error', text: 'save failed' }],
+      audio: [
+        {
+          sessionId,
+          index: 0,
+          t: at,
+          durationMs: len,
+          mimeType: 'audio/webm;codecs=opus',
+          blob: new Blob([new Uint8Array(speech)], { type: 'audio/webm;codecs=opus' }),
+          voiced: voiced.map(([a, b]): [number, number] => [a - at, b - at]),
+        },
+      ],
+    },
+    { transcriptStatus: 'skipped', transcriptNote: 'skipped: no OpenRouter API key set' },
+  );
+  return zip;
+}
 
 if (import.meta.main) {
-  const entries = Object.entries(files).map(([name, v]) => [
-    dir + name,
-    strToU8(JSON.stringify(v, null, name === 'rrweb.json' ? undefined : 2)),
-  ]);
-  const zip = zipSync(Object.fromEntries([...entries, [dir + 'audio/000.webm', [new Uint8Array(speech), { level: 0 }]]]));
+  const zip = await buildFixture();
   mkdirSync(new URL('fixtures/', import.meta.url), { recursive: true });
   writeFileSync(new URL('fixtures/blook-fixture.zip', import.meta.url), zip);
   console.log(`test/fixtures/blook-fixture.zip: ${zip.length} bytes`);

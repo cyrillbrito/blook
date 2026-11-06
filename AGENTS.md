@@ -24,74 +24,57 @@ Typical uses: report bugs to an agent, and let an agent write E2E tests from a n
 
 - Personal tool, Chrome only, local first. No accounts, no hosting, no telemetry.
 - Fewer options than Jam or Proofline Session Recorder. Build only what the uses above need.
-- Not a goal for now: stable test selectors, cookies or storage state, multi-user sharing.
+- Not goals: stable test selectors, cookies or storage state, multi-user sharing.
 
 ## Stack
 
 - [WXT](https://wxt.dev) (MV3), React and Tailwind
 - [rrweb](https://github.com/rrweb-io/rrweb) for DOM recording and replay
 - `chrome.debugger` (Chrome DevTools Protocol) for network, WebSocket and console
-- Transcription: OpenRouter speech-to-text (extension and CLI), or local whisper.cpp (CLI). The audio stays in the bundle, so a transcript can always be re-run.
+- Transcription: OpenRouter speech-to-text (extension and CLI), or local whisper.cpp (CLI)
 - Bun as package manager and for the CLI binary; Playwright in the CLI
 
 ## Commands
 
-A Bun workspaces monorepo: every package is in `packages/`, with one `bun install` and one `bun.lock` at the root.
+A Bun workspaces monorepo: every package is in `packages/`, with one `bun install` and one `bun.lock` at the root. The packages are described in [docs/architecture.md](docs/architecture.md).
 
 ```sh
 bun install
 bun run dev            # extension in dev mode, load packages/extension/.output/chrome-mv3-dev unpacked
-bun run build          # every package's build: the extension (.output/chrome-mv3), the CLI binary (dist/blook), the site (dist/)
+bun run build          # the extension (.output/chrome-mv3), the CLI binary (dist/blook), the site (dist/)
 bun run zip            # packages/extension/.output/blook-chrome.zip
 bun run typecheck      # bun check (TypeScript 7) on every package's tsconfig.json
-bun run test           # bun test in every package: format logic, capture, CLI against a synthetic bundle
+bun run test           # bun test in core, extension and cli
 bun run lint           # oxlint, one root config (.oxlintrc.json)
 bun run format         # oxfmt, one root config (.oxfmtrc.json); format:check in CI. Markdown is not formatted.
 ```
 
+One package: `bun run --filter @blook/cli test`, or run its script from its folder. The CLI from source: `cd packages/cli && bun src/cli.ts info <bundle.zip>` ([packages/cli/README.md](packages/cli/README.md)).
+
 `bun check` is Bun's built-in type checker, so no package needs TypeScript to check. The root `typescript` devDependency is only for editors: keep it on the version `bun -p process.versions.typescript` prints.
 
-One version for the product, in the root `package.json` (the extension manifest and `blook --version` read it; packages have none). The manual release workflow (`.github/workflows/release.yml`, input `bump`: patch, minor or major) bumps it, tags, and publishes the zip and CLI binaries. Release notes are a short changelog, never install steps: pass the optional `notes` input (one sentence, then 2 to 6 user-visible bullets), or it lists the commit subjects since the last tag.
+Packages share TypeScript source through `package.json` `exports` (`@blook/core/bundle`, `@blook/ui`), with no build step. Shared dependency versions are in the root `package.json` catalog (`"react": "catalog:"`), and packages link each other with `workspace:*`. A new package is a folder in `packages/` with a `package.json` (`"name": "@blook/<name>"`, `"private": true`, `exports` to its source) and a `tsconfig.json` that extends `../../tsconfig.base.json`. Add it to the root `typecheck` script.
 
-One package: `bun run --filter @blook/cli test`, or run its script from its folder. The CLI from source:
-
-```sh
-cd packages/cli
-bun src/cli.ts pointer <bundle.zip> 00:18.5   # also: info, screenshot, dom, transcribe, install-browser
-bun run build                                 # single binary: dist/blook
-```
-
-Details in [packages/cli/README.md](packages/cli/README.md).
-
-## Where things are
-
-Packages share TypeScript source through `package.json` `exports` (`@blook/core/bundle`, `@blook/ui`), with no build step. Shared dependency versions are in the root `package.json` catalog (`"react": "catalog:"`); packages link each other with `workspace:*`.
-
-- `packages/core` (`@blook/core`): the bundle format and logic shared by more than one package. Types of the recorded data (`types.ts`), the bundle builder and `BUNDLE_FORMAT_VERSION` (`bundle.ts`), `timeline.ts`, `transcript.ts` and `vad.ts`, the OpenRouter request, the body policy, display formatting. Pure: no browser-extension APIs.
-- `packages/extension` (`@blook/extension`): the WXT extension. `entrypoints/` (side panel, background, recorder, offscreen mic, Replay page), `lib/` (capture, IndexedDB, messages, settings, export and transcription glue). `lib/messages.ts` is the contract between extension contexts.
-- `packages/viewer` (`@blook/viewer`): the React viewer and its zip/folder loader. No `chrome.*`: hosts pass the initial loader and download handler as props. Hosts add `@import "@blook/viewer/styles.css"` to their Tailwind stylesheet.
-- `packages/ui` (`@blook/ui`): UI primitives, icons, the logo (`src/icon.svg`) and the Tailwind theme (`@blook/ui/theme.css`).
-- `packages/cli` (`@blook/cli`): the replay CLI; `src/assets.ts` holds the files the binary embeds.
-- `packages/site` (`@blook/site`): the Astro website on GitHub Pages (https://cyrillbrito.github.io/blook/): the landing page and `/viewer`, which hosts `@blook/viewer`. `bun run dev` in its folder; `.github/workflows/site.yml` deploys it on push to main.
-- `skills/blook/`: the agent skill (at the root, where the skills CLI finds it)
-- `install.sh`, `.github/workflows/release.yml`: the one-line installer and the release build
-- `store/`, `PRIVACY.md`: the Chrome Web Store listing, its images and the privacy policy (data, not a package; the site imports the images)
-
-A new package: a folder in `packages/` with a `package.json` (`"name": "@blook/<name>"`, `"private": true`, `exports` to its source) and a `tsconfig.json` that extends `../../tsconfig.base.json`; add it to the root `typecheck` script.
+The product has one version, in the root `package.json`. The extension manifest and `blook --version` read it, and packages have none. The manual release workflow (`.github/workflows/release.yml`, input `bump`: patch, minor or major) bumps it, tags, and publishes the zip and CLI binaries. Release notes are a short changelog, never install steps: pass the optional `notes` input (one sentence, then 2 to 6 user-visible bullets), or it lists the commit subjects since the last tag.
 
 ## Docs
 
-- [docs/](docs/README.md): the index. Architecture, the bundle format, the CLI design, and references.
-- Package READMEs: [cli](packages/cli/README.md), [viewer](packages/viewer/README.md), [ui](packages/ui/README.md).
-- Keep docs light: short, plain, current, no history. `docs/` stays high level; detail lives next to the code as short comments. Contracts stay exact: `docs/bundle-format.md`, `packages/core/src/types.ts`, `packages/extension/lib/messages.ts`.
-- Update the docs in the same change as the code. A stale doc is a bug.
-- The bundle format version is `BUNDLE_FORMAT_VERSION` in `packages/core/src/bundle.ts`.
+- [docs/architecture.md](docs/architecture.md): the packages, the parts of the recorder and viewer, and the key decisions
+- [docs/bundle-format.md](docs/bundle-format.md): the exact bundle layout and fields
+- [docs/cli-design.md](docs/cli-design.md): the rules the CLI follows for agents and people
+- [docs/references.md](docs/references.md): similar tools, cloned in `references/`
+- [packages/cli/README.md](packages/cli/README.md): running, building and the behavior of the replay CLI
+- [packages/viewer/README.md](packages/viewer/README.md) and [packages/ui/README.md](packages/ui/README.md): hosting the viewer, and the UI primitives
+- [skills/blook/SKILL.md](skills/blook/SKILL.md): the agent skill that reads bundles
+- [README.md](README.md): install and use, for users
+
+Docs describe the current state, short and plain. `docs/` stays high level, and detail lives next to the code as short comments. The contracts stay exact: `docs/bundle-format.md`, `packages/core/src/types.ts` (stored rows and settings), `packages/extension/lib/messages.ts` (messages between extension contexts). Update the docs in the same change as the code. A stale doc is a bug.
 
 ## Keep every part in sync
 
 The extension, the bundle, the viewer, the CLI, the site, the skill and the docs describe one product. Implement every change across all of them in one go: a change is done only when every package, the skill and the docs match it. No half-done features, no compatibility shims, no old names left behind:
 
-- **Bundle change** (capture, export, a field, a file; mostly `packages/core`): update [docs/bundle-format.md](docs/bundle-format.md), the viewer, the CLI (`packages/cli/src/bundle.ts` and its test fixture), and the skill's files table and recipes.
+- **Bundle change** (capture, export, a field, a file; mostly `packages/core`): update [docs/bundle-format.md](docs/bundle-format.md) (its version is `BUNDLE_FORMAT_VERSION` in `packages/core/src/bundle.ts`), the viewer, the CLI (`packages/cli/src/bundle.ts` and its test fixture), and the skill's files table and recipes.
 - **CLI change** (a command, option, output shape or exit code): update `--help`, [packages/cli/README.md](packages/cli/README.md), the tests, and the skill's CLI section.
 - **Viewer or UI change**: check every host still works (the extension's Replay page and side panel, and the site's `/viewer`).
 - **Skill change**: run its commands and jq recipes against a real bundle.

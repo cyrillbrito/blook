@@ -43,7 +43,7 @@ audio/chunks.json             mic chunk index (only when there is audio)
 audio/NNN.webm                raw mic audio, WebM/Opus, 20 to 40 s each, cut at pauses
 ```
 
-Every file except `audio/chunks.json` and `audio/*.webm` is always present, even when empty (`[]`). `rrweb.json` is present when the page was recorded. `session.json` `.files` lists exactly the files and folders in this bundle.
+Every file except `rrweb.json` and `audio/` is always present, even when empty (`[]`). `rrweb.json` is present when the page was recorded, and `audio/` when the mic recorded something. `session.json` `.files` lists exactly the files and folders in this bundle.
 
 JSON files are pretty-printed, except `rrweb.json`, which is one line.
 
@@ -68,7 +68,7 @@ The entry point. Read it first.
 | `exportedAt` | string | ISO time of the export. |
 | `clock` | string | The clock rule in one sentence. |
 | `firstSnapshotT` | number? | `t` of the first rrweb full snapshot of the first tab. Before this there is no DOM. It can come while the page is still loading, so the DOM may be an empty shell at first. Missing if the page was never captured. |
-| `pageReadyT` | number? | `t` when the Record reload of the first tab fired its load event (scripts loaded, app booting). From here the page normally shows real content. If no load event came within 30 s, it's the time Blook gave up waiting. |
+| `pageReadyT` | number? | `t` when the Record reload of the first tab fired its load event (scripts loaded, app booting). From here the page normally shows real content. If no load event came within 30 s (5 s when the recording resumed after the extension restarted), it's the time Blook gave up waiting. |
 | `tabs` | `{ tabId, t, url, openerTabId? }[]` | Tabs in the session. `[0]` is the recorded tab. The others were opened from a session tab; `t` is when they joined. |
 | `navigations` | `{ tabId, t, url }[]` | URL changes of session tabs, including SPA `pushState` changes, in `t` order. `[0]` is the start URL at `t = 0`. |
 | `settings` | `{ mask, mic, canvas }` (booleans) | Settings in effect. `mask`: inputs and marked text were masked. `mic`: the mic was on. `canvas`: canvas content was recorded at 2 fps. |
@@ -136,8 +136,8 @@ Optional fields are left out when they don't apply. They are never `null`.
 | `click` | `target`, `nodeId`, `x`, `y`, `double?` | `{ file: "rrweb.json", tabId, event: i }`. `x`/`y` are viewport CSS px. `nodeId` is the rrweb node id. `target` describes the element (tag, accessible name, `#id` or `.class`). |
 | `input` | `target`, `nodeId`, `value` or `checked`, `endT` | rrweb ref to the **last** input event of the burst. Typing into one field with gaps under 5 s is one entry. `value` is the final text (at most 200 chars; masked as `*` when `mask` was on). Checkboxes and radios have `checked` (boolean) instead of `value`, and the summary says `checked` or `unchecked`. Only user input is listed: programmatic value and checked changes (the app rendering form state, radios unchecked because a sibling was picked) and nodes rrweb never serialized (id -1) are dropped, using rrweb's `userTriggered` flag. The raw events, programmatic ones included, stay in the rrweb file. |
 | `scroll` | `target`, `nodeId`, `x`, `y`, `endT` | rrweb ref to the **first** scroll event. Scrolls of one element with gaps under 1 s are one entry; `x`/`y` are the final scroll offset. `target` is `document` for the page. |
-| `request` | `method`, `url`, `status?`, `resourceType?`, `endT?`, `durationMs?` | `{ file: "network.json", requestId }`. Every HTTP request that didn't fail. |
-| `request-failed` | as `request`, plus `errorText?` | Same. The request had a network error (not a cancel) or HTTP status ≥ 400. |
+| `request` | `method`, `url`, `status?`, `errorText?`, `resourceType?`, `endT?`, `durationMs?` | `{ file: "network.json", requestId }`. Every HTTP request that didn't fail; a canceled one has `errorText` starting with `canceled`. |
+| `request-failed` | as `request` | Same. The request had a network error (not a cancel) or HTTP status ≥ 400. |
 | `ws-open` | `url`, `socketId`, `status?` | `{ file: "websockets.json", socketId }` |
 | `ws-close` | `url`, `socketId` | Same. `t` is when the socket closed. |
 | `ws-frame` | `socketId`, `direction` (`"sent"` \| `"received"`), `count`, `bytes`, `endT`, `preview` | `{ file: "websockets.json", socketId, frame, frameEnd }`. A group of `count` frames of one socket and one direction within 1 s of the group's first frame. `frame`..`frameEnd` (inclusive) are frame indexes. `preview` is the first frame's payload as text (JSON re-serialized) cut to 120 chars, or `<binary N B>`. |
@@ -382,12 +382,4 @@ Only present when the mic recorded something. `audio/NNN.webm` are standalone We
 
 Fields: `index`, `t`, `endT`, `durationMs`, `voiced?`, `mimeType`, `size` (bytes) and `file`. `t` is when that chunk's recorder started. A word at `s` seconds into the file is at session time `t + s × 1000`. `voiced` (missing when the audio didn't decode) lists `[t, endT]` ranges in session ms where the chunk has speech-level energy, from a simple energy detector run when the chunk was saved. Outside them the mic was quiet.
 
-## jq recipes
-
-```sh
-jq -c '.[] | select(.type == "error" or .type == "request-failed")' timeline.json     # what went wrong
-jq -c '.[] | select(.t >= 10000 and .t <= 15000) | [.t, .type, .summary]' timeline.json  # a window
-jq '.[] | select(.id == "64397.23")' network.json                                       # one request
-jq -c '.[] | {url, frames: [.frames[] | {t, direction, payload}]}' websockets.json     # socket traffic
-jq -r '.segments[] | "\(.t)\t\(.text)"' transcript.json                                # narration
-```
+Recipes for reading these files with jq are in the skill's [recipes.md](../skills/blook/recipes.md).

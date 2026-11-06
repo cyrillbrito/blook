@@ -4,7 +4,6 @@
 // - /replay.html?open=<id>: the side panel's "Open bundle…" hands over the picked file (components/handoff.ts).
 // - /replay.html: the file picker, the fallback when the handoff is gone.
 import { buildBundle } from '@/lib/export/bundle';
-import { storedTranscriptOptions } from '@/lib/transcribe/openrouter';
 import { bundleFromUserFiles, bundleFromZip, ViewerApp, type Bundle, type ViewerAppProps } from '@blook/viewer';
 import { claimFile } from '@/components/handoff';
 import { tryBackground } from '@/components/util';
@@ -14,7 +13,7 @@ const sessionId = params.get('session') ?? '';
 const openId = params.get('open') ?? '';
 
 async function loadFromDb(id: string): Promise<Bundle> {
-  const { folder, zip } = await buildBundle(id, await storedTranscriptOptions(id));
+  const { folder, zip } = await buildBundle(id);
   return bundleFromZip(zip, folder);
 }
 
@@ -22,7 +21,7 @@ async function loadFromDb(id: string): Promise<Bundle> {
 async function download(id: string) {
   const res = await tryBackground({ type: 'session/export', sessionId: id }, 10 * 60_000);
   if (!res) throw new Error('The background worker did not answer.');
-  if (res.error) throw new Error(res.error);
+  if (!res.ok) throw new Error(res.error ?? 'Download failed.');
 }
 
 function props(): ViewerAppProps {

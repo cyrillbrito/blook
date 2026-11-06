@@ -3,7 +3,7 @@
 // drop or pick a bundle .zip or unzipped folder; once a bundle is open there are no load-other controls.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Card } from '@blook/ui';
-import { FolderOpenIcon, SpinnerIcon } from '@blook/ui/icons';
+import { BlookIcon, FolderOpenIcon, SpinnerIcon } from '@blook/ui/icons';
 import { bundleFromUserFiles, filesFromDrop, filesFromInput, type Bundle } from './bundle';
 import { Viewer } from './Viewer';
 
@@ -108,7 +108,10 @@ export function ViewerApp({ initial, onDownload, note }: ViewerAppProps) {
         </div>
       )}
       <Card className="w-full max-w-md space-y-4 p-6 shadow-sm">
-        <h1 className="text-base font-semibold">Blook viewer</h1>
+        <h1 className="flex items-center gap-2 text-base font-semibold">
+          <BlookIcon className="h-5 w-5" />
+          Blook viewer
+        </h1>
         {s.state === 'loading' ? (
           <p className="flex items-center gap-2 text-muted">
             <SpinnerIcon /> Loading {s.what}…

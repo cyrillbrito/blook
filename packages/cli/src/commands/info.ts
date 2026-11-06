@@ -1,6 +1,6 @@
 // `blook info`: what's in the bundle and when, without a browser.
 import type { Command } from 'commander';
-import { loadBundle, formatTime, pageStateAt, interactionsBetween } from '../bundle.ts';
+import { loadBundle, formatClock, pageStateAt, interactionsBetween } from '../bundle.ts';
 import { printJson } from '../output.ts';
 import { resolve } from 'node:path';
 
@@ -19,7 +19,7 @@ function info(bundlePath: string) {
       .filter((i) => CLICKS.has(i.type))
       .map((i) => {
         const target = targets.get(`${i.t}:${i.nodeId}`);
-        return { time: formatTime(i.t), ...i, ...(target ? { target } : {}) };
+        return { time: formatClock(i.t), ...i, ...(target ? { target } : {}) };
       });
     return {
       tab,
@@ -35,7 +35,7 @@ function info(bundlePath: string) {
   printJson({
     id: bundle.session.id,
     durationMs: bundle.durationMs,
-    duration: formatTime(bundle.durationMs),
+    duration: formatClock(bundle.durationMs),
     url: bundle.session.url,
     tabs,
   });

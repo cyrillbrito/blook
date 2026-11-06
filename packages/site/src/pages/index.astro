@@ -8,80 +8,122 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const repo = 'https://github.com/cyrillbrito/blook';
 const install = 'curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh';
 
+// The bundle folder, as `unzip -l` would list it.
 const files = [
+  ['session.json', 'Start here: the page, when you pressed Record, the settings and the counts'],
+  ['timeline.json', 'Every event below in one list, sorted by time'],
   ['rrweb.json', 'A DOM replay of the page, with mouse moves, clicks, scrolls and typing'],
   ['network.json', 'HTTP requests and responses, with API bodies inline'],
   ['websockets.json', 'WebSocket connections and their messages'],
   ['console.json', 'Console logs, errors and uncaught exceptions'],
-  ['transcript.json', 'Your narration, word by word, plus the audio in audio/'],
-  ['timeline.json', 'All of the above in one list, sorted by time'],
+  ['transcript.json', 'Your narration, word by word'],
+  ['audio/', 'Your microphone, in WebM chunks of 20 to 40 seconds'],
+];
+
+// An example stretch of timeline.json, styled like the viewer's Timeline tab.
+const clock: { t: string; type: string; text: string; tone: string }[] = [
+  { t: '0:11.8', type: 'speech', text: 'I tick "Write the release notes" and it should save.', tone: 'bg-blue-100 text-blue-800' },
+  { t: '0:12.9', type: 'click', text: 'Click input[type=checkbox] .toggle', tone: 'bg-sky-100 text-sky-800' },
+  { t: '0:13.0', type: 'request-failed', text: 'GET /todos/sync-missing → 404 (153 ms)', tone: 'bg-red-100 text-red-800' },
+  { t: '0:13.0', type: 'error', text: 'console.error: Sync failed: 404 from /todos/sync-missing', tone: 'bg-red-100 text-red-800' },
+  { t: '0:14.6', type: 'speech', text: 'It looks done, but after a reload it is gone again.', tone: 'bg-blue-100 text-blue-800' },
 ];
 
 const link = 'underline underline-offset-2 hover:text-accent-strong';
 const h2 = 'text-2xl font-semibold tracking-tight';
 const shot = 'rounded-card border border-line shadow-sm';
+const btn = 'inline-flex h-11 items-center rounded-control px-5 font-medium outline-none focus-visible:ring-2 focus-visible:ring-accent/50';
 ---
 
 <Base title="Blook: record your browser while you talk" description="A Chrome extension that records a narrated browser session into one local ZIP, for a developer or a coding agent to replay.">
   <main class="mx-auto max-w-5xl px-5">
     <section class="py-14 sm:py-20">
-      <h1 class="max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">Record your browser while you talk.</h1>
-      <p class="mt-5 max-w-2xl text-lg text-muted">
-        Blook is a Chrome extension. Press Record, use your web app and say what you see. On Stop you get one ZIP with the page, the network,
-        the console and your voice on one clock, ready for a developer or a coding agent.
-      </p>
-      <div class="mt-8 flex flex-wrap gap-3">
-        <a href="#install" class="inline-flex h-11 items-center rounded-control bg-fg px-5 font-medium text-white hover:bg-gray-700">Install</a>
-        <a
-          href={`${base}viewer/`}
-          class="inline-flex h-11 items-center rounded-control border border-line-strong px-5 font-medium hover:bg-surface-sunken"
-          >Open a recording</a
-        >
+      <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div>
+          <h1 class="text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-6xl">Record your browser while you talk.</h1>
+          <p class="mt-6 max-w-xl text-lg text-muted">
+            Blook is a Chrome extension. Press Record, use your web app and say what you see. On Stop you get one ZIP with the page, the
+            network, the console and your voice on one clock, ready for a developer or a coding agent.
+          </p>
+          <div class="mt-8 flex flex-wrap gap-3">
+            <a href="#install" class:list={[btn, 'bg-accent text-white hover:bg-accent-strong']}>Install</a>
+            <a href={`${base}viewer/`} class:list={[btn, 'border border-line-strong hover:bg-surface-sunken']}>Open a recording</a>
+          </div>
+        </div>
+        <figure>
+          <ol class="overflow-hidden rounded-card border border-line bg-surface font-mono text-[13px] leading-5 shadow-[0_1px_0_var(--color-line),0_12px_32px_-16px_rgb(37_69_201/0.35)]">
+            {
+              clock.map((row) =>
+                row.type === 'speech' ? (
+                  <li class="grid grid-cols-[3.25rem_1fr] items-baseline gap-x-3 border-t border-l-2 border-line border-l-accent first:border-t-0 bg-accent-soft/60 px-3 py-2.5 sm:grid-cols-[3.5rem_7.5rem_1fr]">
+                    <span class="text-muted tabular-nums">{row.t}</span>
+                    <span class="hidden sm:block">
+                      <span class:list={['rounded px-1.5 text-xs', row.tone]}>{row.type}</span>
+                    </span>
+                    <span class="font-sans text-base leading-6 text-fg">{row.text}</span>
+                  </li>
+                ) : (
+                  <li class="grid grid-cols-[3.25rem_1fr] items-baseline gap-x-3 border-t border-l-2 border-line border-l-transparent px-3 py-1.5 first:border-t-0 sm:grid-cols-[3.5rem_7.5rem_1fr]">
+                    <span class="text-muted tabular-nums">{row.t}</span>
+                    <span class="hidden sm:block">
+                      <span class:list={['rounded px-1.5 text-xs', row.tone]}>{row.type}</span>
+                    </span>
+                    <span class:list={['min-w-0 break-words', row.tone.includes('red') && 'text-red-700']}>{row.text}</span>
+                  </li>
+                ),
+              )
+            }
+          </ol>
+          <figcaption class="mt-3 text-sm text-muted">What you said and what the page did, in one <code>timeline.json</code>.</figcaption>
+        </figure>
       </div>
       <img
         src={timeline.src}
         width={timeline.width}
         height={timeline.height}
         alt="The Blook viewer: the page replay on the left, the timeline of clicks, requests and console errors on the right"
-        class:list={[shot, 'mt-12 w-full']}
+        class:list={[shot, 'mt-16 w-full']}
       />
     </section>
 
     <section class="border-t border-line py-14">
       <h2 class={h2}>What it's for</h2>
-      <div class="mt-6 grid gap-5 sm:grid-cols-2">
-        <div class="rounded-card border border-line bg-surface-muted p-6">
-          <h3 class="font-semibold">Report a bug to an agent</h3>
+      <div class="mt-6 grid gap-x-12 gap-y-8 sm:grid-cols-2">
+        <div class="max-w-prose">
+          <h3 class="text-lg font-semibold">Report a bug to an agent</h3>
           <p class="mt-2 text-muted">
             Reproduce the bug and describe it out loud. The agent reads the ZIP: what you said, what you clicked, which request failed and what
             the console printed at that moment.
           </p>
         </div>
-        <div class="rounded-card border border-line bg-surface-muted p-6">
-          <h3 class="font-semibold">Turn a flow into an E2E test</h3>
+        <div class="max-w-prose">
+          <h3 class="text-lg font-semibold">Turn a flow into an E2E test</h3>
           <p class="mt-2 text-muted">
             Walk through a flow and say what should happen. The agent gets the steps, the elements you used and the responses it can assert
             on, and writes the test.
           </p>
         </div>
       </div>
-      <p class="mt-5 text-muted">A person can open the same ZIP in the viewer, for example from a bug ticket.</p>
+      <p class="mt-8 text-muted">A person can open the same ZIP in the viewer, for example from a bug ticket.</p>
     </section>
 
     <section class="border-t border-line py-14">
       <div>
         <h2 class={h2}>What's in a recording</h2>
-        <p class="mt-3 text-muted">One folder of JSON files, zipped. Every event has a <code>t</code>: milliseconds since you pressed Record.</p>
-        <dl class="mt-6 grid gap-x-10 gap-y-4 sm:grid-cols-2">
-          {
-            files.map(([name, what]) => (
-              <div>
-                <dt class="font-mono text-sm font-semibold">{name}</dt>
-                <dd class="text-muted">{what}</dd>
-              </div>
-            ))
-          }
-        </dl>
+        <p class="mt-3 max-w-2xl text-muted">One folder of JSON files, zipped. Every event has a <code>t</code>, the milliseconds since you pressed Record.</p>
+        <div class="mt-6 overflow-x-auto rounded-card border border-line bg-surface-muted px-4 py-3 font-mono text-sm">
+          <p class="font-semibold">blook-2026-11-03_21-12-51/</p>
+          <dl class="mt-1">
+            {
+              files.map(([name, what]) => (
+                <div class="grid grid-cols-1 gap-x-6 py-1 pl-4 sm:grid-cols-[10rem_1fr]">
+                  <dt class="text-fg">{name}</dt>
+                  <dd class="font-sans text-muted">{what}</dd>
+                </div>
+              ))
+            }
+          </dl>
+        </div>
         <p class="mt-6 max-w-3xl text-muted">
           There is no video. The replay rebuilds the page at any moment, so a recording stays small and an agent asks for a screenshot only
           when it needs one. Details: <a class={link} href={`${repo}/blob/main/docs/bundle-format.md`}>the bundle format</a>.

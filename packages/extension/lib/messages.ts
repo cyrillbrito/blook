@@ -1,6 +1,6 @@
 // Message contracts between extension contexts. All go through browser.runtime messaging.
 import type { eventWithTime } from '@rrweb/types';
-import type { MicState, SessionId, SessionMeta, SessionTime, Settings } from '@blook/core/types';
+import type { MicState, SessionId, SessionMeta } from '@blook/core/types';
 
 /** What the side panel shows. Pushed by the background on every change. */
 export interface RecordingStatus {
@@ -9,8 +9,8 @@ export interface RecordingStatus {
   /** Set when attach, injection or the mic failed. */
   error?: string;
   /**
-   * While `state` is 'recording': 'loading-page' until the first rrweb full snapshot of the
-   * recorded tab arrives (no DOM captured yet), then 'live'.
+   * While `state` is 'recording': 'loading-page' until the recorded tab has both its first rrweb
+   * full snapshot and its load event (or the load timeout), then 'live'.
    */
   phase?: 'loading-page' | 'live';
   /** Mic state of the current session. */
@@ -19,7 +19,7 @@ export interface RecordingStatus {
 
 /**
  * Requests to the background, keyed by `type`: `req` is the message, `res` is the reply.
- * Senders: side panel (session/*, sessions/*, settings/*), content script (rrweb/*),
+ * Senders: side panel (session/*, sessions/*), content script (rrweb/*),
  * offscreen document (audio/*, mic/*).
  */
 export interface BackgroundRequests {
@@ -29,15 +29,13 @@ export interface BackgroundRequests {
   'session/status': { req: {}; res: RecordingStatus };
   'sessions/list': { req: {}; res: SessionMeta[] };
   'session/delete': { req: { sessionId: SessionId }; res: { ok: boolean } };
-  /** Builds the ZIP (and transcribes if needed), then downloads it. */
-  'session/export': { req: { sessionId: SessionId }; res: { ok: boolean; error?: string } };
-  'settings/get': { req: {}; res: Settings };
-  'settings/set': { req: { settings: Partial<Settings> }; res: Settings };
+  /** Builds the ZIP (and transcribes if needed), then downloads it. `warning`: downloaded, but the transcript is missing or partial. */
+  'session/export': { req: { sessionId: SessionId }; res: { ok: boolean; error?: string; warning?: string } };
 
   // Content script (rrweb) → background. tabId and frameId come from the sender.
   /** Asks whether to record and with which rrweb options. */
   'rrweb/hello': { req: {}; res: { record: boolean; mask: boolean; canvas: boolean } };
-  /** A batch of rrweb events, flushed every second or so. */
+  /** A batch of rrweb events, flushed about every 500 ms. */
   'rrweb/events': { req: { events: eventWithTime[] }; res: { ok: boolean } };
 
   // Offscreen document → background
@@ -45,7 +43,7 @@ export interface BackgroundRequests {
    * The offscreen page wrote an audio chunk to IndexedDB itself
    * (Blobs can't go through runtime messaging), and reports it here.
    */
-  'audio/chunk-saved': { req: { sessionId: SessionId; index: number; t: SessionTime }; res: { ok: boolean } };
+  'audio/chunk-saved': { req: { sessionId: SessionId; index: number }; res: { ok: boolean } };
   'mic/error': { req: { error: string; needsPermission?: boolean }; res: { ok: boolean } };
 
   // Mic permission page → background
@@ -72,7 +70,7 @@ export interface OffscreenReply {
 }
 
 /** Background → content script (browser.tabs.sendMessage). */
-export type ContentMessage = { type: 'rrweb/stop' } | { type: 'rrweb/flush' };
+export type ContentMessage = { type: 'rrweb/stop' };
 
 /** Background → side panel broadcast (browser.runtime.sendMessage, no reply). */
 export type PanelMessage =
@@ -80,7 +78,6 @@ export type PanelMessage =
   /** A session's stored data changed (e.g. transcription progress): refresh the list. */
   | { type: 'sessions/changed'; sessionId: SessionId };
 
-/** Typed request to the background. */
 export function sendToBackground<K extends BackgroundRequestType>(
   message: { type: K } & BackgroundRequests[K]['req'],
 ): Promise<BackgroundRequests[K]['res']> {

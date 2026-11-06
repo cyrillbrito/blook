@@ -5,6 +5,16 @@ import { TRANSCRIPTION_MODEL } from './types.ts';
 
 export const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/audio/transcriptions';
 
+/** Runs `fn` on every item, three OpenRouter requests at a time. */
+export async function openRouterEach<T>(items: T[], fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(3, items.length) }, async () => {
+      while (next < items.length) await fn(items[next++]!);
+    }),
+  );
+}
+
 /** Transcribes one audio file. Retries twice on network errors, 429 and 5xx with a growing pause. */
 export async function openRouterTranscribe(
   audio: Blob,

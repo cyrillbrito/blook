@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { EventType } from '@rrweb/types';
 import type { Bundle } from './bundle';
 import { AudioSync, Clock, TabReplay, lastAtOrBefore } from './playback';
 import { ConsolePanel, NetworkPanel, TimelinePanel, TranscriptPanel, WebSocketsPanel, type Focus, type PanelId } from './panels';
 import { formatDuration, formatTime, shortUrl } from '@blook/core/format';
-import { cx, useNow, usePlaying } from './util';
-import { Badge, Button, Switch } from '@blook/ui';
+import { useNow, usePlaying } from './util';
+import { Badge, Button, Switch, cx } from '@blook/ui';
 import { BlookIcon, DownloadIcon, PauseIcon, PlayIcon, SpinnerIcon, VolumeIcon } from '@blook/ui/icons';
 
 const SPEEDS = [0.5, 1, 2, 4, 8];
@@ -110,7 +111,7 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-col" style={{ width: split }}>
           {tabs.length > 1 && (
-            <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-gray-200 px-2 py-1">
+            <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-line px-2 py-1">
               {tabs.map((id, i) => {
                 const url = s.tabs.find((t) => t.tabId === id)?.url || s.navigations.find((n) => n.tabId === id)?.url;
                 return (
@@ -134,7 +135,7 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
           {tabId != null ? (
             <Stage key={tabId} bundle={bundle} tabId={tabId} clock={clock} />
           ) : (
-            <div className="flex flex-1 items-center justify-center bg-gray-100 text-gray-500">
+            <div className="flex flex-1 items-center justify-center bg-surface-sunken text-muted">
               This bundle has no DOM recording (rrweb).
             </div>
           )}
@@ -144,7 +145,7 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
         <Splitter onDrag={(x) => setSplit(Math.max(320, Math.min(innerWidth - 360, x)))} />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex shrink-0 items-end gap-0.5 border-b border-gray-200 bg-gray-50 px-1 pt-1">
+          <div className="flex shrink-0 items-center gap-0.5 border-b border-line bg-surface-muted px-1">
             {(
               [
                 ['timeline', 'Timeline'],
@@ -157,19 +158,20 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
               <button
                 key={id}
                 onClick={() => setPanel(id)}
+                aria-pressed={panel === id}
                 className={cx(
-                  'rounded-t border border-b-0 px-2 py-1',
-                  panel === id ? 'border-gray-200 bg-white font-medium' : 'border-transparent text-gray-600 hover:text-gray-900',
+                  '-mb-px cursor-pointer border-b-2 px-2 pt-2 pb-1.5 outline-none focus-visible:bg-accent-soft',
+                  panel === id ? 'border-accent font-medium text-fg' : 'border-transparent text-gray-600 hover:text-fg',
                 )}
               >
                 {label}{' '}
-                <span className={cx('text-gray-400', id === 'console' && errors > 0 && 'text-red-600')}>
+                <span className={cx('text-muted tabular-nums', id === 'console' && errors > 0 && 'text-danger')}>
                   {id === 'console' && errors > 0 && '✖ '}
                   {c[id]}
                 </span>
               </button>
             ))}
-            <span className="mb-1.5 ml-auto px-2 text-gray-600">
+            <span className="ml-auto px-2 text-gray-600">
               <Switch label="Follow" checked={follow} onChange={setFollow} title="Scroll lists to the playhead while playing" />
             </span>
           </div>
@@ -189,7 +191,7 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
 function Splitter({ onDrag }: { onDrag: (x: number) => void }) {
   return (
     <div
-      className="w-1 shrink-0 cursor-col-resize bg-gray-200 hover:bg-blue-400"
+      className="w-1 shrink-0 cursor-col-resize bg-line transition-colors hover:bg-accent active:bg-accent"
       onPointerDown={(e) => {
         const el = e.currentTarget;
         el.setPointerCapture(e.pointerId);
@@ -211,8 +213,8 @@ function AddressBar({ bundle, tabId, clock }: { bundle: Bundle; tabId?: number; 
   const navs = useMemo(() => bundle.session.navigations.filter((n) => n.tabId === tabId), [bundle, tabId]);
   const url = navs[lastAtOrBefore(navs, now)]?.url ?? bundle.session.tabs.find((t) => t.tabId === tabId)?.url ?? '';
   return (
-    <div className="shrink-0 border-b border-gray-200 px-2 py-1">
-      <div className="truncate rounded bg-gray-100 px-2 py-0.5 font-mono text-gray-700" title={url}>
+    <div className="shrink-0 border-b border-line px-2 py-1">
+      <div className="truncate rounded bg-surface-sunken px-2 py-0.5 font-mono text-gray-700" title={url}>
         {url || '—'}
       </div>
     </div>
@@ -226,7 +228,7 @@ function Stage({ bundle, tabId, clock }: { bundle: Bundle; tabId: number; clock:
   const [replay, setReplay] = useState<TabReplay>();
   const [error, setError] = useState<string>();
   const events = bundle.rrweb.get(tabId)!;
-  const firstFull = useMemo(() => events.find((e) => e.type === 2)?.timestamp, [events]);
+  const firstFull = useMemo(() => events.find((e) => e.type === EventType.FullSnapshot)?.timestamp, [events]);
   const now = useNow(clock, 250);
 
   useEffect(() => {
@@ -277,10 +279,10 @@ function Stage({ bundle, tabId, clock }: { bundle: Bundle; tabId: number; clock:
         : undefined);
 
   return (
-    <div ref={boxRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-gray-200">
+    <div ref={boxRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-line">
       <div
         ref={rootRef}
-        className={cx('overflow-hidden bg-white shadow [&_iframe]:border-0 [&_iframe]:bg-white', overlay && 'opacity-40')}
+        className={cx('overflow-hidden bg-surface shadow [&_iframe]:border-0 [&_iframe]:bg-surface', overlay && 'opacity-40')}
       />
       {overlay && <span className="absolute top-2 left-1/2 -translate-x-1/2 rounded bg-gray-800/85 px-3 py-1 text-white">{overlay}</span>}
     </div>
@@ -344,7 +346,7 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
   const speech = hover ? markers.find((m) => m.kind === 'speech' && hover.t >= m.t && hover.t <= m.endT!) : undefined;
 
   return (
-    <div className="shrink-0 border-t border-gray-200 bg-gray-50 px-2 py-1.5">
+    <div className="shrink-0 border-t border-line bg-surface-muted px-2 py-1.5">
       <div
         ref={barRef}
         className="relative h-6 cursor-pointer select-none"
@@ -370,7 +372,7 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
             />
           ))}
         <div className="absolute top-2 right-0 left-0 h-1.5 rounded bg-gray-300">
-          <div ref={fillRef} className="h-full rounded bg-gray-700" />
+          <div ref={fillRef} className="h-full rounded bg-fg/70" />
         </div>
         {markers
           .filter((m) => m.kind !== 'speech')
@@ -381,7 +383,7 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
               style={{ left: `${(m.t / end) * 100}%` }}
             />
           ))}
-        <div ref={headRef} className="pointer-events-none absolute top-0.5 h-5 w-0.5 -translate-x-1/2 bg-amber-500" />
+        <div ref={headRef} className="pointer-events-none absolute top-0.5 h-5 w-1 -translate-x-1/2 rounded-full bg-playhead" />
         {hover && (
           <div
             className="pointer-events-none absolute bottom-7 z-20 max-w-80 -translate-x-1/2 rounded bg-gray-900 px-2 py-1 text-[11px] text-white shadow"
@@ -404,7 +406,7 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
           {playing ? 'Pause' : 'Play'}
         </Button>
         <span className="font-mono tabular-nums">
-          <span ref={timeRef} /> <span className="text-gray-400">/ {formatTime(bundle.endT)}</span>
+          <span ref={timeRef} /> <span className="text-muted">/ {formatTime(bundle.endT)}</span>
         </span>
         <select
           value={speed}
@@ -431,7 +433,7 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
             {muted ? 'Muted' : 'Audio'}
           </Button>
         )}
-        <span className="ml-auto flex gap-2 text-[11px] text-gray-500">
+        <span className="ml-auto flex gap-2 text-[11px] text-muted">
           <Legend cls={MARKER_STYLE.error} label="error" />
           <Legend cls={MARKER_STYLE.failed} label="failed request" />
           <Legend cls={MARKER_STYLE.click} label="click" />

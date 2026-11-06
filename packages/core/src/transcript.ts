@@ -1,6 +1,6 @@
 // Transcript logic shared by the extension (its lib/transcribe/openrouter.ts, and bundle.ts here)
-// and the CLI (`blook transcribe`): speech-to-text results to session ms, transcript.json, and
-// the timeline's speech entries. Pure, so it runs in the service worker, under Bun and in tests.
+// and the CLI (`blook transcribe`): speech-to-text results to session ms, and transcript.json.
+// Pure, so it runs in the service worker, under Bun and in tests.
 import { alignWords, type Range } from './vad.ts';
 import type { TranscriptChunkResult, TranscriptRow, TranscriptSegment, TranscriptWord } from './types.ts';
 
@@ -29,6 +29,24 @@ export interface SttResult {
 
 /** Chunks this small hold no speech worth transcribing. */
 export const MIN_CHUNK_BYTES = 1000;
+
+/**
+ * One chunk's stored result: empty when the chunk is under MIN_CHUNK_BYTES, the error when
+ * `transcribe` throws, else what it returns.
+ */
+export async function chunkResult(
+  chunk: { index: number; t: number },
+  bytes: number,
+  transcribe: () => Promise<Pick<TranscriptChunkResult, 'words' | 'segments' | 'source'>>,
+): Promise<TranscriptChunkResult> {
+  const base = { index: chunk.index, t: chunk.t, segments: [], words: [] };
+  if (bytes <= MIN_CHUNK_BYTES) return base;
+  try {
+    return { ...base, ...(await transcribe()) };
+  } catch (err) {
+    return { ...base, error: err instanceof Error ? err.message : String(err) };
+  }
+}
 
 /** Text the model writes for silence or noise, not speech: `[BLANK_AUDIO]`, `(silence)`. */
 const NON_SPEECH = /^\s*[[(][^\])]*[\])]\s*$/;
@@ -157,37 +175,3 @@ export function transcriptSummary(t: TranscriptOut): { status: TranscriptStatus;
 /** session.json `.files['transcript.json']`. */
 export const transcriptFileNote = (status: TranscriptStatus) =>
   `Narration: status "${status}", segments with words, all times in session ms; source says how it was made.`;
-
-export interface SpeechEntry {
-  t: number;
-  type: 'speech';
-  summary: string;
-  text: string;
-  endT: number;
-  ref: { file: 'transcript.json'; segment: number };
-}
-
-/** timeline.json `speech` entries, one per segment. */
-export function speechEntries(segments: SegmentOut[]): SpeechEntry[] {
-  return segments.map((seg) => {
-    const one = seg.text.replace(/\s+/g, ' ').trim();
-    const text = one.length > 300 ? `${one.slice(0, 300)}…` : one;
-    return {
-      t: seg.t,
-      type: 'speech',
-      summary: `🗣 "${text}"`,
-      text: seg.text,
-      endT: seg.endT,
-      ref: { file: 'transcript.json', segment: seg.index },
-    };
-  });
-}
-
-/** Swaps the speech entries of a timeline for new ones, keeping buildTimeline's order (speech last on ties). */
-export function replaceSpeech<E extends { t: number; type: string }>(timeline: E[], segments: SegmentOut[]): (E | SpeechEntry)[] {
-  const rest: (E | SpeechEntry)[] = timeline.filter((e) => e.type !== 'speech');
-  return [...rest, ...speechEntries(segments)]
-    .map((e, i) => [e, i] as const)
-    .sort((a, b) => a[0].t - b[0].t || a[1] - b[1])
-    .map(([e]) => e);
-}
