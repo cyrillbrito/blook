@@ -1,220 +1,309 @@
 ---
 import Base from '../layouts/Base.astro';
 import timeline from '../../../../store/images/screenshot-1-timeline.png';
-import network from '../../../../store/images/screenshot-2-network.png';
 import sidepanel from '../../../../store/images/screenshot-4-sidepanel.png';
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const repo = 'https://github.com/cyrillbrito/blook';
 const install = 'curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh';
 
-// The bundle folder, as `unzip -l` would list it.
+// The bundle folder, as `unzip -l` would list it. `audio` files get the waveform icon, the rest the JSON one.
 const files = [
-  ['session.json', 'Start here: the page, when you pressed Record, the settings and the counts'],
-  ['timeline.json', 'Every event below in one list, sorted by time'],
-  ['rrweb.json', 'A DOM replay of the page, with mouse moves, clicks, scrolls and typing'],
-  ['network.json', 'HTTP requests and responses, with API bodies inline'],
-  ['websockets.json', 'WebSocket connections and their messages'],
-  ['console.json', 'Console logs, errors and uncaught exceptions'],
-  ['transcript.json', 'Your narration, word by word'],
-  ['audio/', 'Your microphone, in WebM chunks of 20 to 40 seconds'],
+  ['session.json', 'Start here: the page, the time, the counts'],
+  ['timeline.json', 'Every event in one list, by time'],
+  ['rrweb.json', 'The DOM replay'],
+  ['network.json', 'Requests and responses, with bodies'],
+  ['websockets.json', 'Connections and frames'],
+  ['console.json', 'Logs, errors and exceptions'],
+  ['transcript.json', 'Your words, each with its time'],
+  ['audio/', 'Your microphone, in WebM chunks'],
 ];
 
-// An example stretch of timeline.json, styled like the viewer's Timeline tab.
-const clock: { t: string; type: string; text: string; tone: string }[] = [
-  { t: '0:09.9', type: 'speech', text: 'Plain text works. Now one with an emoji.', tone: 'bg-blue-100 text-blue-800' },
-  { t: '0:16.0', type: 'click', text: 'Click button "Send"', tone: 'bg-sky-100 text-sky-800' },
-  { t: '0:16.0', type: 'request-failed', text: 'POST /api/channels/launch/messages → 500 (223 ms)', tone: 'bg-red-100 text-red-800' },
-  { t: '0:16.2', type: 'error', text: "console.error: Message not saved (500): Incorrect string value for column 'body'", tone: 'bg-red-100 text-red-800' },
-  { t: '0:17.6', type: 'ws-frame', text: 'WebSocket received: {"type":"channel.sync",…}', tone: 'bg-teal-100 text-teal-800' },
-  { t: '0:18.5', type: 'speech', text: "And now it's gone. No error, the message just disappears.", tone: 'bg-blue-100 text-blue-800' },
+// The jobs one recording serves, from packages/videos/MESSAGING.md. Icons are Lucide paths (ISC): bug, ticket, list-checks, server.
+const jobs: { title: string; icon: string[] }[] = [
+  {
+    title: 'Report a bug to an agent',
+    icon: [
+      'm8 2 1.88 1.88', 'M14.12 3.88 16 2', 'M9 7.13v-1a3.003 3.003 0 1 1 6 0v1',
+      'M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6', 'M12 20v-9',
+      'M6.53 9C4.6 8.8 3 7.1 3 5', 'M6 13H2', 'M3 21c0-2.1 1.7-3.9 3.8-4', 'M20.97 5c0 2.1-1.6 3.8-3.5 4', 'M22 13h-4', 'M17.2 17c2.1.1 3.8 1.9 3.8 4',
+    ],
+  },
+  {
+    title: 'File a bug anyone can replay',
+    icon: ['M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z', 'M13 5v2', 'M13 17v2', 'M13 11v2'],
+  },
+  {
+    title: 'Turn a flow into an E2E test',
+    icon: ['m3 17 2 2 4-4', 'm3 7 2 2 4-4', 'M13 6h8', 'M13 12h8', 'M13 18h8'],
+  },
+  {
+    title: 'Test the backend with real traffic',
+    icon: ['M4 2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z', 'M4 14h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2Z', 'M6 6h.01', 'M6 18h.01'],
+  },
 ];
+
+// What a recording holds. Icons are Lucide paths (ISC): mic, app-window, mouse-pointer-click, arrow-left-right, radio, terminal.
+const holds: { title: string; text: string; icon: string[] }[] = [
+  {
+    title: 'Your voice',
+    text: 'Every word you say, with its time, right next to the click it describes.',
+    icon: ['M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z', 'M19 10v2a7 7 0 0 1-14 0v-2', 'M12 19v3'],
+  },
+  {
+    title: 'The real page',
+    text: 'Not a video: the elements, styles and text, rebuilt at any moment.',
+    icon: ['M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z', 'M2 8h20', 'M6 4v4', 'M10 4v4'],
+  },
+  {
+    title: 'Clicks, typing and scrolls',
+    text: 'Every action with the element it hit, plus navigations and new tabs.',
+    icon: ['m9 9 5 12 1.8-5.2L21 14Z', 'M7.2 2.2 8 5.1', 'm5.1 8-2.9-.8', 'M14 4.1 12 6', 'm6 12-1.9 2'],
+  },
+  {
+    title: 'Network',
+    text: 'Every HTTP request and response, with the API bodies.',
+    icon: ['M8 3 4 7l4 4', 'M4 7h16', 'm16 21 4-4-4-4', 'M20 17H4'],
+  },
+  {
+    title: 'WebSockets',
+    text: 'Every connection, and every frame sent and received.',
+    icon: [
+      'M4.9 19.1C1 15.2 1 8.8 4.9 4.9', 'M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5', 'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z',
+      'M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5', 'M19.1 4.9C23 8.8 23 15.1 19.1 19',
+    ],
+  },
+  {
+    title: 'Console',
+    text: 'Logs, errors and uncaught exceptions, with where they came from.',
+    icon: ['m4 17 6-6-6-6', 'M12 19h8'],
+  },
+];
+
+// Lucide file-braces and audio-lines (ISC), for the ZIP's file tiles.
+const jsonIcon = [
+  'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z', 'M14 2v4a2 2 0 0 0 2 2h4',
+  'M10 12a1 1 0 0 0-1 1v1a1 1 0 0 1-1 1 1 1 0 0 1 1 1v1a1 1 0 0 0 1 1', 'M14 18a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1 1 1 0 0 1-1-1v-1a1 1 0 0 0-1-1',
+];
+const audioIcon = ['M2 10v3', 'M6 6v11', 'M10 3v18', 'M14 8v7', 'M18 5v13', 'M22 10v3'];
 
 const link = 'underline underline-offset-2 hover:text-accent-strong';
-const h2 = 'text-2xl font-semibold tracking-tight';
+const h2 = 'text-3xl font-semibold tracking-tight text-balance sm:text-4xl lg:text-5xl';
+const section = 'border-t border-line py-16 sm:py-24';
+// A two-column section: the heading and its sentence on the left, the content on the right.
+const split = 'grid grid-cols-[minmax(0,1fr)] gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]';
+const copyBtn =
+  'shrink-0 cursor-pointer border-l border-line-strong px-4 text-sm font-medium outline-none hover:bg-line focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-inset active:bg-line-strong';
 const shot = 'rounded-card border border-line shadow-sm';
-const btn = 'inline-flex h-11 items-center rounded-control px-5 font-medium outline-none focus-visible:ring-2 focus-visible:ring-accent/50';
 ---
 
 <Base title="Blook: record your browser while you talk" description="A Chrome extension that records a narrated browser session into one local ZIP, for a developer or a coding agent to replay.">
   <main class="mx-auto max-w-5xl px-5">
     <section class="py-14 sm:py-20">
-      <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div class="grid items-center gap-x-16 gap-y-12 md:grid-cols-[minmax(0,1fr)_auto]">
         <div>
           <h1 class="text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-6xl">Record your browser while you talk.</h1>
           <p class="mt-6 max-w-xl text-lg text-muted">
-            Blook is a Chrome extension. Press Record, use your web app and say what you see. On Stop you get one ZIP with the page, the
-            network, the console and your voice on one clock, ready for a developer or a coding agent.
+            A Chrome extension that saves the page, the network, the console and your voice in one ZIP, for a developer or a coding agent.
           </p>
-          <div class="mt-8 flex flex-wrap gap-3">
-            <a href="#install" class:list={[btn, 'bg-accent text-white hover:bg-accent-strong']}>Install</a>
-            <a href={`${base}viewer/`} class:list={[btn, 'border border-line-strong hover:bg-surface-sunken']}>Open a recording</a>
-          </div>
         </div>
-        <figure>
-          <ol class="overflow-hidden rounded-card border border-line bg-surface font-mono text-[13px] leading-5 shadow-[0_1px_0_var(--color-line),0_12px_32px_-16px_rgb(15_23_42/0.28)]">
-            {
-              clock.map((row) =>
-                row.type === 'speech' ? (
-                  <li class="grid grid-cols-[3.25rem_1fr] items-baseline gap-x-3 border-t border-l-2 border-line border-l-accent first:border-t-0 bg-accent-soft/60 px-3 py-2.5 sm:grid-cols-[3.5rem_7.5rem_1fr]">
-                    <span class="text-muted tabular-nums">{row.t}</span>
-                    <span class="hidden sm:block">
-                      <span class:list={['rounded px-1.5 text-xs', row.tone]}>{row.type}</span>
-                    </span>
-                    <span class="font-sans text-base leading-6 text-fg">{row.text}</span>
-                  </li>
-                ) : (
-                  <li class="grid grid-cols-[3.25rem_1fr] items-baseline gap-x-3 border-t border-l-2 border-line border-l-transparent px-3 py-1.5 first:border-t-0 sm:grid-cols-[3.5rem_7.5rem_1fr]">
-                    <span class="text-muted tabular-nums">{row.t}</span>
-                    <span class="hidden sm:block">
-                      <span class:list={['rounded px-1.5 text-xs', row.tone]}>{row.type}</span>
-                    </span>
-                    <span class:list={['min-w-0 break-words', row.tone.includes('red') && 'text-red-700']}>{row.text}</span>
-                  </li>
-                ),
-              )
-            }
-          </ol>
-          <figcaption class="mt-3 text-sm text-muted">What you said and what the page did, in one <code>timeline.json</code>.</figcaption>
-        </figure>
+        <!-- The side panel, cropped from the store screenshot at its real size: where a recording starts and stops. -->
+        <img
+          src={sidepanel.src}
+          width={sidepanel.width}
+          height={sidepanel.height}
+          alt="The Blook side panel while recording: Recording 0:16, a Stop recording button, the settings, and the recordings kept in the browser"
+          class:list={[shot, 'h-[400px] w-[320px] justify-self-center object-none object-[100%_0] shadow-card']}
+        />
       </div>
+      <div class="mt-10">
+        <div class="flex items-stretch overflow-hidden rounded-card border border-line-strong bg-surface-sunken">
+          <pre class="min-w-0 flex-1 overflow-x-auto px-4 py-3 font-mono text-sm"><code>{install}</code></pre>
+          <button type="button" data-copy={install} class={copyBtn}>Copy</button>
+        </div>
+        <p class="mt-4 text-muted">
+          On macOS or Linux, then <a class={link} href="#install">load it in Chrome once</a>. Got a recording? <a class={link} href={`${base}viewer/`}
+            >Open it in the viewer</a
+          >.
+        </p>
+      </div>
+    </section>
+
+    <section class={section}>
+      <h2 class={h2}>What a recording holds</h2>
+      <ul class="mt-12 grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          holds.map(({ title, text, icon }, i) => (
+            <li>
+              <span class="inline-flex size-12 items-center justify-center rounded-card bg-accent-soft text-accent">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="size-6" aria-hidden="true">
+                  {icon.map((d) => <path d={d} />)}
+                </svg>
+              </span>
+              <h3 class="mt-4 text-xl font-semibold">
+                {title}
+                {i === 0 && <span class="ml-2 rounded-control bg-accent px-2 py-0.5 align-middle text-sm font-medium text-white">transcribed</span>}
+              </h3>
+              <p class="mt-2 text-muted">{text}</p>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="mt-16 max-w-3xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+        All on one clock: the sentence, the click, the failed request and the error line up.
+      </p>
       <img
         src={timeline.src}
         width={timeline.width}
         height={timeline.height}
+        loading="lazy"
         alt="The Blook viewer: the page replay on the left, the timeline of clicks, requests and console errors on the right"
-        class:list={[shot, 'mt-16 w-full']}
+        class:list={[shot, 'mt-10 w-full']}
       />
     </section>
 
-    <section class="border-t border-line py-14">
-      <h2 class={h2}>What it's for</h2>
-      <div class="mt-6 grid gap-x-12 gap-y-8 sm:grid-cols-2">
-        <div class="max-w-prose">
-          <h3 class="text-lg font-semibold">Report a bug to an agent</h3>
-          <p class="mt-2 text-muted">
-            Reproduce the bug and describe it out loud. The agent reads the ZIP: what you said, what you clicked, which request failed and what
-            the console printed at that moment.
-          </p>
-        </div>
-        <div class="max-w-prose">
-          <h3 class="text-lg font-semibold">Turn a flow into an E2E test</h3>
-          <p class="mt-2 text-muted">
-            Walk through a flow and say what should happen. The agent gets the steps, the elements you used and the responses it can assert
-            on, and writes the test.
-          </p>
-        </div>
-      </div>
-      <p class="mt-8 text-muted">A person can open the same ZIP in the viewer, for example from a bug ticket.</p>
-    </section>
-
-    <section class="border-t border-line py-14">
-      <div>
-        <h2 class={h2}>What's in a recording</h2>
-        <p class="mt-3 max-w-2xl text-muted">One folder of JSON files, zipped. Every event has a <code>t</code>, the milliseconds since you pressed Record.</p>
-        <div class="mt-6 overflow-x-auto rounded-card border border-line bg-surface-muted px-4 py-3 font-mono text-sm">
-          <p class="font-semibold">blook-2026-11-03_21-12-51/</p>
-          <dl class="mt-1">
+    <section class={section}>
+      <div class="grid items-center gap-x-16 gap-y-12 lg:grid-cols-[auto_minmax(0,1fr)]">
+        <figure class="justify-self-center text-center">
+          <!-- A ZIP drawn from the tokens: a page with a folded corner and a zipper down the middle. -->
+          <svg viewBox="0 0 200 250" class="w-48 sm:w-56" aria-hidden="true">
+            <path d="M24 8h112l48 48v178a8 8 0 0 1-8 8H24a8 8 0 0 1-8-8V16a8 8 0 0 1 8-8Z" class="fill-surface stroke-line-strong" stroke-width="3" />
+            <path d="M136 8v40a8 8 0 0 0 8 8h40" class="fill-surface-sunken stroke-line-strong" stroke-width="3" stroke-linejoin="round" />
             {
-              files.map(([name, what]) => (
-                <div class="grid grid-cols-1 gap-x-6 py-1 pl-4 sm:grid-cols-[10rem_1fr]">
-                  <dt class="text-fg">{name}</dt>
-                  <dd class="font-sans text-muted">{what}</dd>
-                </div>
+              Array.from({ length: 9 }, (_, i) => (
+                <rect x={i % 2 ? 100 : 88} y={16 + i * 12} width="12" height="8" rx="2" class="fill-accent" />
               ))
             }
-          </dl>
+            <rect x="82" y="128" width="36" height="46" rx="6" class="fill-accent" />
+            <rect x="92" y="146" width="16" height="18" rx="3" class="fill-surface" />
+          </svg>
+          <figcaption class="mt-4 font-mono text-sm text-muted">blook-2026-11-03_21-12-51.zip</figcaption>
+        </figure>
+        <div>
+          <h2 class={h2}>One ZIP of plain JSON</h2>
+          <p class="mt-4 max-w-2xl text-lg text-muted">
+            No video inside: the replay rebuilds the page, so a recording stays small. Every event has a <code>t</code>, the milliseconds since
+            Record. Details: <a class={link} href={`${repo}/blob/main/docs/bundle-format.md`}>the bundle format</a>.
+          </p>
+          <ul class="mt-8 grid gap-3 sm:grid-cols-2">
+            {
+              files.map(([name, what]) => (
+                <li class="flex items-start gap-3 rounded-card border border-line bg-surface-muted p-3">
+                  <span class="mt-0.5 shrink-0 text-accent">
+                    {name === 'audio/' ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" class="size-5" aria-hidden="true">
+                        {audioIcon.map((d) => <path d={d} />)}
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="size-5" aria-hidden="true">
+                        {jsonIcon.map((d) => <path d={d} />)}
+                      </svg>
+                    )}
+                  </span>
+                  <span class="min-w-0">
+                    <span class="block font-mono text-sm font-medium">{name}</span>
+                    <span class="block text-sm text-muted">{what}</span>
+                  </span>
+                </li>
+              ))
+            }
+          </ul>
         </div>
-        <p class="mt-6 max-w-3xl text-muted">
-          There is no video. The replay rebuilds the page at any moment, so a recording stays small and an agent asks for a screenshot only
-          when it needs one. Details: <a class={link} href={`${repo}/blob/main/docs/bundle-format.md`}>the bundle format</a>.
-        </p>
       </div>
-      <img
-        src={network.src}
-        width={network.width}
-        height={network.height}
-        loading="lazy"
-        alt="The Network tab of the viewer: a request list with status codes, and the headers and body of the selected request"
-        class:list={[shot, 'mt-8 w-full']}
-      />
     </section>
 
-    <section class="grid items-start gap-10 border-t border-line py-14 md:grid-cols-2">
+    <section class={section}>
       <div>
-        <h2 class={h2}>Local first</h2>
-        <ul class="mt-6 list-disc space-y-2 pl-5 text-muted">
-          <li>Blook records only the tab you start it on, and tabs opened from it, between Record and Stop.</li>
-          <li>Recordings stay on your computer. They leave it only when you download the ZIP and share it.</li>
-          <li>No account, no analytics, no tracking.</li>
-          <li>Transcription is optional. With your own OpenRouter key, the audio goes to OpenRouter. Without one, the CLI can transcribe later on your machine with whisper.cpp.</li>
+        <h2 class={h2}>Nothing leaves your computer</h2>
+        <p class="mt-4 max-w-2xl text-lg text-muted">
+          Blook has no server, no account and no tracking. Recording and replay run in your browser, and a recording is a ZIP on your disk. It goes only where
+          you send it.
+        </p>
+        <ul class="mt-6 max-w-2xl list-disc space-y-2 pl-5 text-muted">
+          <li>It records only the tab you start it on, and tabs opened from it, between Record and Stop.</li>
+          <li>The <a class={link} href={`${base}viewer/`}>web viewer</a> opens a ZIP in your browser tab and uploads nothing.</li>
+          <li>
+            Transcription is the one opt-in exception: with your own OpenRouter key, the audio goes to OpenRouter. Without one, the CLI transcribes
+            later on your machine with whisper.cpp.
+          </li>
           <li>An option masks typed text and page text in the replay.</li>
         </ul>
-        <p class="mt-6 text-muted">
-          The <a class={link} href={`${base}viewer/`}>web viewer</a> works the same way: it opens the ZIP in your browser tab and uploads nothing.
-          More in the <a class={link} href={`${repo}/blob/main/PRIVACY.md`}>privacy policy</a>.
+        <p class="mt-6 text-muted">More in the <a class={link} href={`${repo}/blob/main/PRIVACY.md`}>privacy policy</a>.</p>
+      </div>
+    </section>
+
+    <section class:list={[section, split]}>
+      <div>
+        <h2 class={h2}>Made for coding agents</h2>
+        <p class="mt-4 text-lg text-muted">
+          Give the agent the ZIP and ask. The <code>blook</code> skill reads the JSON with <code>jq</code>, and the <code>blook</code> CLI replays
+          the page to show what it looked like and what the mouse was over at any moment. The agent reads only what it needs.
+        </p>
+        <p class="mt-4 text-muted">
+          Reference: <a class={link} href={`${repo}/tree/main/packages/cli#readme`}>the CLI</a> and <a
+            class={link}
+            href={`${repo}/tree/main/skills/blook`}>the skill</a
+          >.
         </p>
       </div>
-      <img
-        src={sidepanel.src}
-        width={sidepanel.width}
-        height={sidepanel.height}
-        loading="lazy"
-        alt="The Blook side panel next to a web app: Recording 0:09 with a Stop recording button, settings, and past recordings"
-        class={shot}
-      />
-    </section>
-
-    <section id="install" class="scroll-mt-4 border-t border-line py-14">
-      <h2 class={h2}>Install</h2>
-      <p class="mt-3 text-muted">On macOS or Linux, run:</p>
-      <div class="mt-3 flex items-stretch overflow-hidden rounded-card border border-line-strong bg-surface-sunken">
-        <pre class="min-w-0 flex-1 overflow-x-auto px-4 py-3 font-mono text-sm"><code>{install}</code></pre>
-        <button
-          type="button"
-          data-copy={install}
-          class="shrink-0 cursor-pointer border-l border-line-strong px-4 text-sm font-medium hover:bg-line">Copy</button
-        >
-      </div>
-      <p class="mt-4 text-muted">
-        It installs the <code>blook</code> command-line tool and the Chrome extension files in <code>~/Blook/extension</code>, and offers to add
-        the agent skill. Run <code>blook update</code> to update.
-      </p>
-      <p class="mt-6 font-medium">Then load the extension in Chrome once:</p>
-      <ol class="mt-2 list-decimal space-y-1 pl-5 text-muted">
-        <li>Open <code>chrome://extensions</code>.</li>
-        <li>Turn on <strong class="font-medium text-fg">Developer mode</strong> (top right).</li>
-        <li>Click <strong class="font-medium text-fg">Load unpacked</strong> and pick <code>~/Blook/extension</code>.</li>
-        <li>Pin Blook from the puzzle icon, and click it to open the side panel.</li>
-      </ol>
-      <p class="mt-6 text-muted">Or download the files from the <a class={link} href={`${repo}/releases/latest`}>latest release</a>.</p>
-    </section>
-
-    <section class="border-t border-line py-14">
-      <h2 class={h2}>For coding agents</h2>
-      <p class="mt-3 max-w-2xl text-muted">
-        The <code>blook</code> skill tells an agent how to read a recording: <code>jq</code> over the JSON files, and the <code>blook</code> CLI
-        to see the page at any moment. The installer sets up both. Give the agent the ZIP and ask.
-      </p>
-      <pre class="mt-5 overflow-x-auto rounded-card border border-line bg-surface-sunken px-4 py-3 font-mono text-sm"><code><span class="text-muted"># what the mouse was over at 18.5 s</span>
+      <pre class="min-w-0 self-start overflow-x-auto rounded-card border border-line bg-surface-muted px-4 py-3 font-mono text-sm"><code><span class="text-muted"># what the mouse was over at 18.5 s</span>
 blook pointer    blook-2026-11-03_21-12-51.zip 00:18.5
 <span class="text-muted"># the page at that moment, as a PNG</span>
 blook screenshot blook-2026-11-03_21-12-51.zip 00:18.5
 <span class="text-muted"># the DOM, or re-run the transcript locally</span>
 blook dom        blook-2026-11-03_21-12-51.zip 00:18.5
 blook transcribe blook-2026-11-03_21-12-51.zip</code></pre>
-      <p class="mt-4 text-muted">
-        Reference: <a class={link} href={`${repo}/tree/main/packages/cli#readme`}>the CLI</a> and <a
-          class={link}
-          href={`${repo}/tree/main/skills/blook`}>the skill</a
-        >.
-      </p>
+    </section>
+
+    <section class={section}>
+      <h2 class={h2}>One recording, many jobs</h2>
+      <ul class="mt-10 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
+        {
+          jobs.map(({ title, icon }) => (
+            <li class="flex items-center gap-4">
+              <span class="inline-flex size-12 shrink-0 items-center justify-center rounded-card bg-accent-soft text-accent">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="size-6" aria-hidden="true">
+                  {icon.map((d) => <path d={d} />)}
+                </svg>
+              </span>
+              <h3 class="font-semibold text-balance">{title}</h3>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section id="install" class:list={[section, 'scroll-mt-4']}>
+      <h2 class={h2}>Install</h2>
+      <p class="mt-4 text-lg text-muted">One command on macOS or Linux, then one step in Chrome.</p>
+      <div class="mt-8 flex items-stretch overflow-hidden rounded-card border border-line-strong bg-surface-sunken">
+        <pre class="min-w-0 flex-1 overflow-x-auto px-4 py-3 font-mono text-sm"><code>{install}</code></pre>
+        <button type="button" data-copy={install} class={copyBtn}>Copy</button>
+      </div>
+      <div class="mt-8 grid grid-cols-[minmax(0,1fr)] gap-x-12 gap-y-8 md:grid-cols-2">
+        <div>
+          <p class="text-muted">
+            It installs the <code>blook</code> command-line tool and the Chrome extension files in <code>~/Blook/extension</code>, and offers to
+            add the agent skill. Run <code>blook update</code> to update.
+          </p>
+          <p class="mt-4 text-muted">Or download the files from the <a class={link} href={`${repo}/releases/latest`}>latest release</a>.</p>
+        </div>
+        <div>
+          <p class="font-medium">Then load the extension in Chrome once:</p>
+          <ol class="mt-2 list-decimal space-y-1 pl-5 text-muted">
+            <li>Open <code>chrome://extensions</code>.</li>
+            <li>Turn on <strong class="font-medium text-fg">Developer mode</strong> (top right).</li>
+            <li>Click <strong class="font-medium text-fg">Load unpacked</strong> and pick <code>~/Blook/extension</code>.</li>
+            <li>Pin Blook from the puzzle icon, and click it to open the side panel.</li>
+          </ol>
+        </div>
+      </div>
     </section>
   </main>
 
   <footer class="border-t border-line">
     <div class="mx-auto flex max-w-5xl flex-wrap gap-x-6 gap-y-2 px-5 py-8 text-sm text-muted">
-      <span>Blook is open source. Chrome only.</span>
+      <span>Blook is free and open source. Chrome only.</span>
       <a class={link} href={repo}>GitHub</a>
       <a class={link} href={`${repo}/issues`}>Issues</a>
     </div>

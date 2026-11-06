@@ -14,7 +14,8 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 ---
 
 <!doctype html>
-<html lang="en">
+<!-- overflow-x-clip, not hidden: a wide line never scrolls the page sideways, and sticky still works. -->
+<html lang="en" class="overflow-x-clip">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -25,7 +26,7 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
     <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
     <link rel="icon" type="image/svg+xml" href={iconUrl} />
   </head>
-  <body class="bg-surface text-fg antialiased">
+  <body class="overflow-x-clip bg-surface text-fg antialiased">
     {
       !bare && (
         <header class="border-b border-line">

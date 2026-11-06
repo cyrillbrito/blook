@@ -2,3 +2,8 @@
 @import 'tailwindcss';
 @import '@blook/ui/theme.css';
 @import '@blook/viewer/styles.css';
+
+@theme {
+  /* The hero's timeline card: a hairline and a soft lift. */
+  --shadow-card: 0 1px 0 var(--color-line), 0 12px 32px -16px rgb(15 23 42 / 0.28);
+}
