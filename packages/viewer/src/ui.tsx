@@ -53,7 +53,7 @@ export function RowList<T extends { t: number }>({
             data-i={i}
             onClick={() => onSelect(item)}
             className={cx(
-              'cursor-default border-b border-gray-100 border-l-2 border-l-transparent hover:bg-surface-muted data-active:border-l-playhead data-active:bg-playhead-soft',
+              'cursor-default border-b border-slate-100 border-l-2 border-l-transparent hover:bg-surface-muted data-active:border-l-playhead data-active:bg-playhead-soft',
               selected && 'bg-accent-soft! hover:bg-accent-soft',
             )}
           >
@@ -148,7 +148,7 @@ export function SubTabs<K extends string>({ tabs, value, onChange }: { tabs: [K,
           onClick={() => onChange(k)}
           className={cx(
             'border-b-2 px-1.5 py-1 text-xs',
-            k === value ? 'border-accent font-medium text-accent-strong' : 'border-transparent text-gray-600 hover:text-fg',
+            k === value ? 'border-accent font-medium text-accent-strong' : 'border-transparent text-slate-600 hover:text-fg',
           )}
         >
           {label}
@@ -177,7 +177,7 @@ export function KeyValues({ entries }: { entries: [string, ReactNode][] }) {
 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="border-b border-gray-100 py-1">
+    <section className="border-b border-slate-100 py-1">
       <h4 className="px-2 py-0.5 text-2xs font-semibold text-fg">{title}</h4>
       {children}
     </section>
@@ -251,7 +251,7 @@ export function Body({
 /** Small "T2" badge for multi-tab sessions. */
 export function TabBadge({ tabId, tabs }: { tabId?: number; tabs: number[] }) {
   if (tabs.length < 2 || tabId == null) return null;
-  return <span className="shrink-0 rounded bg-line px-1 text-[10px] text-gray-600">T{tabs.indexOf(tabId) + 1}</span>;
+  return <span className="shrink-0 rounded bg-line px-1 text-[10px] text-slate-600">T{tabs.indexOf(tabId) + 1}</span>;
 }
 
 export function includes(hay: string | undefined, needle: string) {

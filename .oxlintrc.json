@@ -4,7 +4,7 @@
   "plugins": ["eslint", "typescript", "unicorn", "oxc", "react", "import", "promise"],
   "categories": { "correctness": "error" },
   "env": { "browser": true, "node": true, "es2024": true },
-  "ignorePatterns": ["references/**", "**/.output/**", "**/.wxt/**", "**/dist/**", "**/.astro/**"],
+  "ignorePatterns": ["references/**", ".agents/**", "**/.output/**", "**/.wxt/**", "**/dist/**", "**/.astro/**"],
   "rules": {
     // React Compiler rules. We don't use the compiler, and the flagged code is deliberate:
     // effects that sync state from the replay clock, refs read while rendering the scrubber tooltip.

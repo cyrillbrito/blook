@@ -3,14 +3,15 @@
 @source "./";
 
 @theme {
+  /* Neutrals are Tailwind slate, the logo's own scale (its window is slate-700). Use slate-*, never gray-*. */
   --color-surface: var(--color-white);
-  --color-surface-muted: var(--color-gray-50);
-  --color-surface-sunken: var(--color-gray-100);
-  --color-line: var(--color-gray-200);
-  --color-line-strong: var(--color-gray-300);
-  --color-fg: var(--color-gray-900);
-  --color-muted: var(--color-gray-500);
-  /* Brand pair from the app icon (icon.svg): dark slate and vermilion. */
+  --color-surface-muted: var(--color-slate-50);
+  --color-surface-sunken: var(--color-slate-100);
+  --color-line: var(--color-slate-200);
+  --color-line-strong: var(--color-slate-300);
+  --color-fg: var(--color-slate-900);
+  --color-muted: var(--color-slate-500); /* 4.8:1 with white */
+  /* Brand pair from the app icon (icon.svg): dark slate for actions, vermilion only for the eye and recording. */
   --color-accent: var(--color-slate-700); /* #334155, 10.4:1 with white */
   --color-accent-strong: var(--color-slate-800);
   --color-accent-soft: var(--color-slate-100);
@@ -19,8 +20,8 @@
   --color-warn: var(--color-amber-700); /* text on white: 5:1 (amber-600 is 3.2:1) */
   --color-ok: var(--color-green-600);
   --color-recording: #f2542d; /* dots and fills only: 3.5:1 with white */
-  --color-recording-strong: #d4381c; /* under white text: 4.8:1 */
-  --color-recording-soft: var(--color-red-50);
+  --color-recording-strong: #cc3f1d; /* under white text: 4.9:1 */
+  --color-recording-soft: #fff3f0;
   /* "Now" in the viewer: the scrubber head, the row and the word at the playhead. */
   --color-playhead: var(--color-amber-500);
   --color-playhead-soft: var(--color-amber-50);

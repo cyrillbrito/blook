@@ -161,7 +161,7 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
                 aria-pressed={panel === id}
                 className={cx(
                   '-mb-px cursor-pointer border-b-2 px-2 pt-2 pb-1.5 outline-none focus-visible:bg-accent-soft',
-                  panel === id ? 'border-accent font-medium text-fg' : 'border-transparent text-gray-600 hover:text-fg',
+                  panel === id ? 'border-accent font-medium text-fg' : 'border-transparent text-slate-600 hover:text-fg',
                 )}
               >
                 {label}{' '}
@@ -171,7 +171,7 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
                 </span>
               </button>
             ))}
-            <span className="ml-auto px-2 text-gray-600">
+            <span className="ml-auto px-2 text-slate-600">
               <Switch label="Follow" checked={follow} onChange={setFollow} title="Scroll lists to the playhead while playing" />
             </span>
           </div>
@@ -214,7 +214,7 @@ function AddressBar({ bundle, tabId, clock }: { bundle: Bundle; tabId?: number; 
   const url = navs[lastAtOrBefore(navs, now)]?.url ?? bundle.session.tabs.find((t) => t.tabId === tabId)?.url ?? '';
   return (
     <div className="shrink-0 border-b border-line px-2 py-1">
-      <div className="truncate rounded bg-surface-sunken px-2 py-0.5 font-mono text-gray-700" title={url}>
+      <div className="truncate rounded bg-surface-sunken px-2 py-0.5 font-mono text-slate-700" title={url}>
         {url || '—'}
       </div>
     </div>
@@ -284,7 +284,7 @@ function Stage({ bundle, tabId, clock }: { bundle: Bundle; tabId: number; clock:
         ref={rootRef}
         className={cx('overflow-hidden bg-surface shadow [&_iframe]:border-0 [&_iframe]:bg-surface', overlay && 'opacity-40')}
       />
-      {overlay && <span className="absolute top-2 left-1/2 -translate-x-1/2 rounded bg-gray-800/85 px-3 py-1 text-white">{overlay}</span>}
+      {overlay && <span className="absolute top-2 left-1/2 -translate-x-1/2 rounded bg-slate-800/85 px-3 py-1 text-white">{overlay}</span>}
     </div>
   );
 }
@@ -371,7 +371,7 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
               style={{ left: `${(m.t / end) * 100}%`, width: `${Math.max(0.3, ((m.endT! - m.t) / end) * 100)}%` }}
             />
           ))}
-        <div className="absolute top-2 right-0 left-0 h-1.5 rounded bg-gray-300">
+        <div className="absolute top-2 right-0 left-0 h-1.5 rounded bg-slate-300">
           <div ref={fillRef} className="h-full rounded bg-fg/70" />
         </div>
         {markers
@@ -386,13 +386,13 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
         <div ref={headRef} className="pointer-events-none absolute top-0.5 h-5 w-1 -translate-x-1/2 rounded-full bg-playhead" />
         {hover && (
           <div
-            className="pointer-events-none absolute bottom-7 z-20 max-w-80 -translate-x-1/2 rounded bg-gray-900 px-2 py-1 text-[11px] text-white shadow"
+            className="pointer-events-none absolute bottom-7 z-20 max-w-80 -translate-x-1/2 rounded bg-slate-900 px-2 py-1 text-[11px] text-white shadow"
             style={{ left: Math.max(60, Math.min(hover.x, (barRef.current?.clientWidth ?? 0) - 60)) }}
           >
             <div className="font-mono">{formatTime(hover.t)}</div>
             {speech && <div className="truncate text-blue-200">🗣 {speech.label}</div>}
             {near.map((m, i) => (
-              <div key={i} className={cx('truncate', m.kind === 'error' || m.kind === 'failed' ? 'text-red-300' : 'text-gray-300')}>
+              <div key={i} className={cx('truncate', m.kind === 'error' || m.kind === 'failed' ? 'text-red-300' : 'text-slate-300')}>
                 {(m.kind === 'error' || m.kind === 'failed') && '✖ '}
                 {m.label}
               </div>

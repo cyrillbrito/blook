@@ -3,5 +3,15 @@
   "printWidth": 140,
   "singleQuote": true,
   // Markdown stays hand-written: agents read the docs and the skill raw, and padded tables cost them tokens.
-  "ignorePatterns": ["references/**", "**/.output/**", "**/.wxt/**", "**/dist/**", "**/.astro/**", "bun.lock", "**/*.md"]
+  // .agents/ holds installed third-party skills.
+  "ignorePatterns": [
+    "references/**",
+    ".agents/**",
+    "**/.output/**",
+    "**/.wxt/**",
+    "**/dist/**",
+    "**/.astro/**",
+    "bun.lock",
+    "**/*.md"
+  ]
 }

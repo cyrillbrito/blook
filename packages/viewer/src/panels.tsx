@@ -62,16 +62,16 @@ const TYPE_STYLE: Record<TimelineType, string> = {
   navigation: 'bg-violet-100 text-violet-800',
   'page-ready': 'bg-violet-100 text-violet-800',
   'tab-open': 'bg-violet-100 text-violet-800',
-  snapshot: 'bg-surface-sunken text-gray-600',
+  snapshot: 'bg-surface-sunken text-slate-600',
   click: 'bg-sky-100 text-sky-800',
   input: 'bg-sky-100 text-sky-800',
-  scroll: 'bg-surface-sunken text-gray-600',
-  request: 'bg-surface-sunken text-gray-700',
+  scroll: 'bg-surface-sunken text-slate-600',
+  request: 'bg-surface-sunken text-slate-700',
   'request-failed': 'bg-red-100 text-red-800',
   'ws-open': 'bg-teal-100 text-teal-800',
   'ws-close': 'bg-teal-100 text-teal-800',
   'ws-frame': 'bg-teal-50 text-teal-700',
-  console: 'bg-surface-sunken text-gray-700',
+  console: 'bg-surface-sunken text-slate-700',
   error: 'bg-red-100 text-red-800',
   speech: 'bg-blue-100 text-blue-800',
 };
@@ -234,7 +234,7 @@ export function NetworkPanel({ bundle, tabs, clock, follow, seek, focus }: Props
       <div className={cx('flex items-center gap-2 px-2 py-px font-mono', r.failed && 'text-red-700')}>
         <Time t={r.t} />
         <span className="w-12 shrink-0">{r.method}</span>
-        <span className={cx('w-10 shrink-0 tabular-nums', !r.failed && 'text-gray-600')} title={r.statusText ?? r.errorText}>
+        <span className={cx('w-10 shrink-0 tabular-nums', !r.failed && 'text-slate-600')} title={r.statusText ?? r.errorText}>
           {r.status ?? (r.errorText ? (isCanceled(r.errorText) ? '(canc)' : '(fail)') : r.endT == null ? '…' : '')}
         </span>
         <TabBadge tabId={r.tabId} tabs={tabs} />
@@ -435,12 +435,12 @@ export function WebSocketsPanel({ bundle, tabs, clock, follow, seek, focus }: Pr
               seek(s.t, s.tabId);
             }}
             className={cx(
-              'flex cursor-default items-center gap-2 border-b border-gray-100 px-2 py-0.5 font-mono hover:bg-surface-muted',
+              'flex cursor-default items-center gap-2 border-b border-slate-100 px-2 py-0.5 font-mono hover:bg-surface-muted',
               s.id === socketId && 'bg-accent-soft',
             )}
           >
             <Time t={s.t} />
-            <span className="w-8 shrink-0 text-gray-600">{s.status ?? '…'}</span>
+            <span className="w-8 shrink-0 text-slate-600">{s.status ?? '…'}</span>
             <TabBadge tabId={s.tabId} tabs={tabs} />
             <span className="min-w-0 flex-1 truncate" title={s.url}>
               {s.url}
@@ -556,7 +556,7 @@ export function ConsolePanel({ bundle, tabs, clock, follow, seek, focus }: Props
             </span>
           )}
         </div>
-        {selected && c.stack && <pre className="mt-0.5 ml-16 text-[11px] whitespace-pre-wrap text-gray-600">{c.stack}</pre>}
+        {selected && c.stack && <pre className="mt-0.5 ml-16 text-[11px] whitespace-pre-wrap text-slate-600">{c.stack}</pre>}
       </div>
     ),
     [tabs],
@@ -621,7 +621,7 @@ export function TranscriptPanel({ bundle, clock, follow, seek, focus }: Props) {
       )}
       {transcript.source && (
         <div
-          className="shrink-0 border-b border-gray-100 px-2 py-1 text-muted"
+          className="shrink-0 border-b border-slate-100 px-2 py-1 text-muted"
           title={`${transcript.source.at}, Blook ${transcript.source.blookVersion}`}
         >
           {transcript.source.method} {transcript.source.model}, by the {transcript.source.by}
@@ -633,7 +633,7 @@ export function TranscriptPanel({ bundle, clock, follow, seek, focus }: Props) {
             key={s.index}
             data-i={i}
             className={cx(
-              'flex gap-2 border-b border-l-2 border-gray-100 border-l-transparent px-2 py-1 hover:bg-surface-muted',
+              'flex gap-2 border-b border-l-2 border-slate-100 border-l-transparent px-2 py-1 hover:bg-surface-muted',
               i === active && inSegment && 'border-l-playhead bg-playhead-soft',
               sel === String(i) && 'bg-accent-soft',
             )}

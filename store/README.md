@@ -6,6 +6,7 @@ Drafts for publishing Blook. Nothing here is submitted yet.
 - [privacy-practices.md](privacy-practices.md): single purpose, permission justifications, remote code, data usage
 - [../PRIVACY.md](../PRIVACY.md): the privacy policy, linked from the dashboard
 - `images/`: store icon, 4 screenshots (1280×800), small promo tile (440×280)
+- [promo-small.html](promo-small.html): the source of the promo tile (logo on light slate, a faint vermilion glow); render it at 440×280 and screenshot
 - [demo-app/](demo-app/): the fictional team chat recorded for the screenshots and the site's example timeline. `bun store/demo-app/server.ts` serves it on `http://localhost:4317` (restart it for a clean channel). A message with an emoji fails to save (500, `console.error`), and the WebSocket sync removes it.
 
 ## Checklist

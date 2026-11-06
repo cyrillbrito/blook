@@ -1,0 +1,54 @@
+<!doctype html>
+<!-- Source of images/promo-small-440x280.png. Render: agent-browser set viewport 440 280, open this file, screenshot. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 440px;
+        height: 280px;
+        overflow: hidden;
+      }
+      body {
+        /* Mist: light slate-50 to slate-200, a faint vermilion glow behind the logo. */
+        background:
+          radial-gradient(260px 200px at 95px 140px, rgb(242 84 45 / 0.13), transparent 70%), linear-gradient(135deg, #f8fafc, #e2e8f0);
+        color: #0f172a;
+        font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+        display: flex;
+        align-items: center;
+        gap: 26px;
+        padding: 0 40px;
+        box-sizing: border-box;
+      }
+      img {
+        width: 116px;
+        height: 116px;
+      }
+      b {
+        display: block;
+        font-size: 50px;
+        font-weight: 750;
+        letter-spacing: -1.2px;
+        line-height: 1;
+      }
+      span {
+        display: block;
+        margin-top: 10px;
+        font-size: 16px;
+        line-height: 1.35;
+        font-weight: 500;
+        color: #475569;
+      }
+    </style>
+  </head>
+  <body>
+    <img src="../packages/ui/src/icon.svg" alt="" />
+    <div>
+      <b>Blook</b>
+      <span>Narrated browser recordings<br />for coding agents</span>
+    </div>
+  </body>
+</html>

@@ -51,7 +51,7 @@ export function IconButton({
 type Tone = 'neutral' | 'accent' | 'danger' | 'warn' | 'ok' | 'recording';
 
 const TONE: Record<Tone, string> = {
-  neutral: 'bg-surface-sunken text-gray-600',
+  neutral: 'bg-surface-sunken text-slate-600',
   accent: 'bg-accent-soft text-accent-strong',
   danger: 'bg-danger-soft text-red-700',
   warn: 'bg-amber-50 text-amber-700',

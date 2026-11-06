@@ -2,7 +2,7 @@
 
 The bare minimum so the side panel, the viewer and the small pages look alike. No component or icon library.
 
-**Tokens** live in `@theme` in [src/theme.css](src/theme.css) and become normal Tailwind classes (`bg-surface`, `text-muted`, `border-line`, `rounded-card`, `text-2xs`). Use them instead of raw grays and reds. The `-strong` colors are for text and for fills under white text. A host imports them after Tailwind: `@import "tailwindcss"; @import "@blook/ui/theme.css";`. The theme also tells Tailwind to scan these primitives.
+**Tokens** live in `@theme` in [src/theme.css](src/theme.css) and become normal Tailwind classes (`bg-surface`, `text-muted`, `border-line`, `rounded-card`, `text-2xs`). Use them instead of raw colours. The palette comes from the logo: neutrals are Tailwind slate (the logo's window is slate-700), actions use dark slate (`accent`), and vermilion (`recording`) is kept for the eye and for recording. Write `slate-*`, never `gray-*`. The `-strong` colors are for text and for fills under white text. A host imports them after Tailwind: `@import "tailwindcss"; @import "@blook/ui/theme.css";`. The theme also tells Tailwind to scan these primitives.
 
 **Primitives** in [src/index.tsx](src/index.tsx) (`@blook/ui`), icons in [src/icons.tsx](src/icons.tsx) (`@blook/ui/icons`, inline SVG, colour follows the text), the logo in [src/icon.svg](src/icon.svg) (`packages/extension/scripts/render-icons.sh` turns it into the extension icons):
 
