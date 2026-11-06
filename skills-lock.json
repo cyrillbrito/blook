@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "documentation": {
+      "source": "cyrillbrito/skills",
+      "sourceType": "github",
+      "skillPath": "skills/documentation/SKILL.md",
+      "computedHash": "a45014152a3cd100a8f9330a9f3a63b512c66fed39e25488cd770c8706afe9cd"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "89496d5dd00f4810205f351759594fc2742bf8eea85a2f2b2d1de59f4bd91576"
+    },
+    "improve-codebase-architecture": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
+      "computedHash": "f768cb44209e0d30e3449b8f95ea3dc8293093f73cfe02127d530db43412cf76"
+    },
+    "unslop": {
+      "source": "cursor/plugins",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/unslop/SKILL.md",
+      "computedHash": "eca0ad9fa3a3867c83f3aaf3a058e247a569c8976a68ca423a569b93eb86de5d"
+    },
+    "untangle-codebase": {
+      "source": "caldoai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/untangle-codebase/SKILL.md",
+      "computedHash": "d5e9e1c4a1f30f34c0120dea773d0170004d6c19ef5e8f236c35773bd6c5bdbc"
+    }
+  }
+}
