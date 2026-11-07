@@ -1,7 +1,7 @@
 {
   "name": "@blook/extension",
   "private": true,
-  "description": "Record a narrated browser session into a local bundle for coding agents",
+  "description": "Record your browser while you talk: page replay, network, console and your voice in one local ZIP for developers and coding agents.",
   "type": "module",
   "scripts": {
     "dev": "wxt",

@@ -67,6 +67,7 @@ The product has one version, in the root `package.json`. The extension manifest 
 - [packages/viewer/README.md](packages/viewer/README.md) and [packages/ui/README.md](packages/ui/README.md): hosting the viewer, and the UI primitives
 - [skills/blook/SKILL.md](skills/blook/SKILL.md): the agent skill that reads bundles
 - [packages/videos/README.md](packages/videos/README.md): the marketing films, made with HyperFrames and its `hyperframes` skill
+- [packages/store/README.md](packages/store/README.md): the Chrome Web Store listing, privacy answers and images (a folder, not a package)
 - [README.md](README.md): install and use, for users
 
 Docs describe the current state, short and plain. `docs/` stays high level, and detail lives next to the code as short comments. The contracts stay exact: `docs/bundle-format.md`, `packages/core/src/types.ts` (stored rows and settings), `packages/extension/lib/messages.ts` (messages between extension contexts). Update the docs in the same change as the code. A stale doc is a bug.

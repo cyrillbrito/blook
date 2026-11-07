@@ -1,5 +1,5 @@
 // A small team chat with a planted bug, for the store screenshots and the site.
-// Run: bun store/demo-app/server.ts  (http://localhost:4317)
+// Run: bun packages/store/demo-app/server.ts  (http://localhost:4317)
 // The bug: a message with an emoji fails to save (500), but the UI shows it until the server's copy replaces it.
 import page from './index.html' with { type: 'text' };
 

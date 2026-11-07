@@ -12,9 +12,10 @@ The code is a Bun workspaces monorepo. Paths below are inside `packages/extensio
 | `extension` | The WXT extension: `entrypoints/` (side panel, background, recorder, offscreen mic, Replay page) and `lib/` (capture, IndexedDB, messages, settings, export, transcription) | |
 | `cli` | The `blook` replay CLI and its single binary, which embeds the files in `src/assets.ts` | |
 | `site` | The Astro website on GitHub Pages (https://cyrillbrito.github.io/blook/): the landing page and `/viewer`. `.github/workflows/site.yml` deploys it on push to main | |
+| `store` | Not a package (no `package.json`): the Chrome Web Store listing, privacy answers, images and their HTML sources, and the demo app recorded for the screenshots. See [packages/store/README.md](../packages/store/README.md) | site, videos (images) |
 | `videos` | Marketing films made with [HyperFrames](https://hyperframes.heygen.com) (HTML and GSAP rendered to MP4): one project per film in `films/`, the shared brief and brand assets. See [packages/videos/README.md](../packages/videos/README.md) | |
 
-Outside `packages/`: the agent skill in `skills/blook/` (at the root, where the skills CLI finds it), the installer `install.sh`, the release build `.github/workflows/release.yml`, and the Chrome Web Store drafts in `store/` with the privacy policy `PRIVACY.md`.
+Outside `packages/`: the agent skill in `skills/blook/` (at the root, where the skills CLI finds it), the installer `install.sh`, the release build `.github/workflows/release.yml`, and the privacy policy `PRIVACY.md`.
 
 ```mermaid
 flowchart TD

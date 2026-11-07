@@ -15,7 +15,8 @@ export default defineConfig({
     name: 'Blook',
     // One version for the product, in the root package.json.
     version: root.version,
-    description: 'Record a narrated browser session into a local bundle for coding agents',
+    description:
+      'Record your browser while you talk: page replay, network, console and your voice in one local ZIP for developers and coding agents.',
     permissions: ['sidePanel', 'debugger', 'storage', 'offscreen', 'scripting', 'unlimitedStorage', 'downloads'],
     host_permissions: ['<all_urls>'],
     // sidePanel.setPanelBehavior needs Chrome 116.

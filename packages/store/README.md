@@ -5,9 +5,10 @@ Drafts for publishing Blook. Nothing here is submitted yet.
 - [listing.md](listing.md): title, summary, description, category, images
 - [privacy-practices.md](privacy-practices.md): single purpose, permission justifications, remote code, data usage
 - [../PRIVACY.md](../PRIVACY.md): the privacy policy, linked from the dashboard
-- `images/`: store icon, 4 screenshots (1280×800), small promo tile (440×280)
+- `images/`: store icon, the 5 listing screenshots (`listing-*.png`, 1280×800), the real product screenshots (`screenshot-*.png`), small promo tile (440×280)
+- [screenshots.html](screenshots.html): the source of the listing screenshots
 - [promo-small.html](promo-small.html): the source of the promo tile (logo on light slate, a faint vermilion glow); render it at 440×280 and screenshot
-- [demo-app/](demo-app/): the fictional team chat recorded for the screenshots and the site's example timeline. `bun store/demo-app/server.ts` serves it on `http://localhost:4317` (restart it for a clean channel). A message with an emoji fails to save (500, `console.error`), and the WebSocket sync removes it.
+- [demo-app/](demo-app/): the fictional team chat recorded for the screenshots and the site's example timeline. `bun packages/store/demo-app/server.ts` serves it on `http://localhost:4317` (restart it for a clean channel). A message with an emoji fails to save (500, `console.error`), and the WebSocket sync removes it.
 
 ## Checklist
 

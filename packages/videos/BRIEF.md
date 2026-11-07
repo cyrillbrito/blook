@@ -17,7 +17,7 @@ Blook is a Chrome extension that records what happens in your browser while you 
 - Free and open source, Chrome only: https://github.com/cyrillbrito/blook. Website: https://cyrillbrito.github.io/blook/
 - Install: `curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh`
 
-Sources to quote from: `../../README.md`, `../../packages/site/src/pages/index.astro`, `../../store/listing.md`, `../../skills/blook/SKILL.md`, `../../docs/bundle-format.md`. Do not invent numbers (sizes, speed-ups, user counts). Do not name or mock competitors.
+Sources to quote from: `../../README.md`, `../../packages/site/src/pages/index.astro`, `../store/listing.md`, `../../skills/blook/SKILL.md`, `../../docs/bundle-format.md`. Do not invent numbers (sizes, speed-ups, user counts). Do not name or mock competitors.
 
 ## The canonical example (use it, it's real)
 

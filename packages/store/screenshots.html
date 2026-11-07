@@ -1,0 +1,674 @@
+<!doctype html>
+<!--
+  Source of images/listing-*.png, the Chrome Web Store screenshots (1280×800).
+  Same look as the store-intro film (packages/videos/films/store-intro): slate ground, Inter titles,
+  vermilion only for recording, amber for "now". Slides 1–4 rebuild the product UI with its real labels and
+  the TodoMVC example from packages/videos/BRIEF.md; slide 5 frames a real Replay page screenshot.
+  Render: agent-browser set viewport 1280 800, open this file with #s1 (only that slide shows), `agent-browser screenshot images/listing-1-record.png`, and so on for #s2 to #s5.
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        background: #f1f5f9;
+      }
+      body {
+        font-family: Inter, -apple-system, sans-serif;
+        color: #0f172a;
+        -webkit-font-smoothing: antialiased;
+      }
+      .mono {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+      }
+
+      body:has(.shot:target) .shot:not(:target) {
+        display: none;
+      }
+      .shot {
+        position: relative;
+        width: 1280px;
+        height: 800px;
+        overflow: hidden;
+        background: #f1f5f9;
+      }
+      .head {
+        position: absolute;
+        left: 72px;
+        top: 60px;
+        right: 72px;
+      }
+      .head h1 {
+        margin: 0;
+        font-weight: 800;
+        font-size: 54px;
+        line-height: 1.05;
+        letter-spacing: -0.035em;
+      }
+      .head p {
+        margin: 14px 0 0;
+        font-size: 22px;
+        line-height: 1.4;
+        color: #64748b;
+      }
+      .dot {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #f2542d;
+        margin-right: 18px;
+        vertical-align: 6px;
+      }
+
+      .win {
+        position: absolute;
+        background: #fff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow:
+          0 0 0 1px #e2e8f0,
+          0 20px 60px rgba(15, 23, 42, 0.1);
+      }
+      .bar {
+        height: 44px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 16px;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .lights {
+        display: flex;
+        gap: 7px;
+      }
+      .lights i {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #cbd5e1;
+      }
+      .url {
+        flex: 1;
+        height: 28px;
+        border-radius: 14px;
+        background: #f1f5f9;
+        font-size: 14px;
+        line-height: 28px;
+        padding: 0 16px;
+        color: #475569;
+      }
+      .logo {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 700;
+      }
+      .logo img {
+        width: 22px;
+        height: 22px;
+      }
+
+      /* TodoMVC */
+      .todos {
+        position: absolute;
+        text-align: center;
+      }
+      .todos h2 {
+        margin: 0 0 18px;
+        font-weight: 200;
+        font-size: 72px;
+        color: #b83f45;
+        letter-spacing: -0.01em;
+      }
+      .list {
+        width: 470px;
+        background: #fff;
+        text-align: left;
+        box-shadow:
+          0 2px 4px rgba(0, 0, 0, 0.1),
+          0 25px 50px rgba(0, 0, 0, 0.08);
+      }
+      .row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        height: 60px;
+        padding: 0 18px;
+        border-bottom: 1px solid #ededed;
+        font-size: 21px;
+        color: #484848;
+      }
+      .row:last-child {
+        border-bottom: 0;
+      }
+      .check {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 1.5px solid #c9c9c9;
+        flex: none;
+        position: relative;
+      }
+      .row.done {
+        color: #b5b5b5;
+        text-decoration: line-through;
+      }
+      .row.done .check {
+        border-color: #7fc4b3;
+      }
+      .row.done .check::after {
+        content: '';
+        position: absolute;
+        left: 9px;
+        top: 4px;
+        width: 7px;
+        height: 13px;
+        border: solid #5dc2af;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+      }
+      .foot {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 18px;
+        font-size: 14px;
+        color: #777;
+        border-top: 1px solid #ededed;
+      }
+
+      .cursor {
+        position: absolute;
+        width: 26px;
+        height: 34px;
+      }
+
+      /* side panel */
+      .panel {
+        position: absolute;
+        top: 44px;
+        right: 0;
+        bottom: 0;
+        width: 330px;
+        background: #f8fafc;
+        border-left: 1px solid #e2e8f0;
+        padding: 20px;
+      }
+      .card {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 0 0 1px #e2e8f0;
+        padding: 16px;
+      }
+      .live {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 17px;
+      }
+      .live b {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+      }
+      .live b::before {
+        content: '';
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #f2542d;
+      }
+      .live .t {
+        color: #64748b;
+        font-weight: 400;
+      }
+      .muted {
+        color: #64748b;
+      }
+      .btn {
+        margin-top: 14px;
+        height: 40px;
+        border-radius: 8px;
+        box-shadow: 0 0 0 1px #cbd5e1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #334155;
+      }
+      .btn::before {
+        content: '';
+        width: 10px;
+        height: 10px;
+        background: #0f172a;
+        border-radius: 2px;
+      }
+
+      .speech {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 28px 16px 16px;
+        border-radius: 999px;
+        background: #0f172a;
+        color: #fff;
+        font-size: 24px;
+        font-weight: 600;
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+        white-space: nowrap;
+      }
+      .mic {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #f2542d;
+        display: grid;
+        place-items: center;
+      }
+      .levels {
+        display: flex;
+        gap: 3px;
+        align-items: center;
+      }
+      .levels i {
+        width: 4px;
+        border-radius: 2px;
+        background: #f2542d;
+      }
+
+      /* timeline */
+      .lanes {
+        position: absolute;
+        left: 72px;
+        right: 72px;
+        top: 250px;
+        height: 480px;
+      }
+      .lane {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 104px;
+        border-top: 1px solid #e2e8f0;
+      }
+      .lane:first-of-type {
+        border-top: 0;
+      }
+      .lane > span {
+        position: absolute;
+        left: 28px;
+        top: 38px;
+        font-size: 20px;
+        font-weight: 500;
+        color: #64748b;
+      }
+      .ev {
+        position: absolute;
+        top: 18px;
+        padding-left: 14px;
+        border-left: 4px solid #cbd5e1;
+        font-size: 17px;
+        line-height: 1.6;
+        white-space: nowrap;
+      }
+      .pill {
+        display: inline-block;
+        padding: 0 9px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .speechp {
+        background: #dbeafe;
+        color: #1e40af;
+      }
+      .clickp {
+        background: #e0f2fe;
+        color: #075985;
+      }
+      .errp {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      .wsp {
+        background: #f1f5f9;
+        color: #475569;
+      }
+      .ev.err {
+        color: #dc2626;
+        border-left-color: #fca5a5;
+      }
+      .ev.sp {
+        border-left-color: #93c5fd;
+      }
+      .ev.ck {
+        border-left-color: #7dd3fc;
+      }
+
+      /* terminal */
+      .term {
+        position: absolute;
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.18);
+      }
+      .term .bar {
+        background: #1e293b;
+        border-bottom: 0;
+        color: #94a3b8;
+        font-size: 14px;
+      }
+      .term .bar .lights i {
+        background: #475569;
+      }
+      .term pre {
+        margin: 0;
+        padding: 24px 28px;
+        font-size: 16.5px;
+        line-height: 1.65;
+        white-space: pre-wrap;
+      }
+      .term .you {
+        color: #fff;
+        font-family: Inter, sans-serif;
+        font-weight: 600;
+        font-size: 19px;
+      }
+      .term .cmd {
+        color: #7dd3fc;
+      }
+      .term .dim {
+        color: #64748b;
+      }
+      .term .say {
+        font-family: Inter, sans-serif;
+        font-size: 18.5px;
+        line-height: 1.55;
+        color: #f8fafc;
+      }
+      .term .say code {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 16px;
+        color: #fca5a5;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 1. Record while you talk -->
+    <section class="shot" id="s1">
+      <div class="head">
+        <h1><span class="dot"></span>Record your browser while you talk</h1>
+        <p>Use your web app and say what you see. Blook keeps the page, the network, the console and your voice.</p>
+      </div>
+      <div class="win" style="left: 72px; top: 232px; width: 1136px; height: 620px">
+        <div class="bar">
+          <span class="lights"><i></i><i></i><i></i></span><span class="url">demo.playwright.dev/todomvc</span>
+        </div>
+        <div class="todos" style="left: 108px; top: 84px">
+          <h2>todos</h2>
+          <div class="list">
+            <div class="row"><span class="check"></span>Ask the agent to fix the sync error</div>
+            <div class="row done"><span class="check"></span>Write the release notes</div>
+            <div class="row"><span class="check"></span>Send the ZIP to the agent</div>
+            <div class="foot"><span>2 items left</span><span>All&nbsp;&nbsp; Active&nbsp;&nbsp; Completed</span></div>
+          </div>
+        </div>
+        <svg class="cursor" style="left: 142px; top: 279px" viewBox="0 0 26 34">
+          <path
+            d="M2 2 L2 27 L8.5 21 L13 31.5 L17.5 29.5 L13 19.5 L22 19.5 Z"
+            fill="#111"
+            stroke="#fff"
+            stroke-width="2"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <div class="panel">
+          <div class="logo" style="font-size: 19px; margin-bottom: 16px"><img src="../ui/src/icon.svg" alt="" />Blook</div>
+          <div class="card">
+            <div class="live">
+              <b>Recording <span class="t">0:12</span></b
+              ><span class="muted" style="font-size: 14px">Mic on</span>
+            </div>
+            <div style="margin-top: 10px; font-size: 15px">React • TodoMVC</div>
+            <div class="muted" style="font-size: 14px">demo.playwright.dev</div>
+            <div class="btn">Stop recording</div>
+          </div>
+        </div>
+      </div>
+      <div class="speech" style="left: 200px; top: 668px">
+        <span class="mic"
+          ><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round">
+            <rect x="9" y="2" width="6" height="12" rx="3" />
+            <path d="M5 10a7 7 0 0 0 14 0M12 17v4" /></svg
+        ></span>
+        <span class="levels"
+          ><i style="height: 10px"></i><i style="height: 18px"></i><i style="height: 26px"></i><i style="height: 14px"></i
+          ><i style="height: 20px"></i
+        ></span>
+        I tick “Write the release notes” and it should save.
+      </div>
+    </section>
+
+    <!-- 2. One clock -->
+    <section class="shot" id="s2">
+      <div class="head">
+        <h1>Everything on one timeline</h1>
+        <p>What you said, what you clicked, which request failed and what the console printed, in one place.</p>
+      </div>
+      <div class="win lanes">
+        <div style="position: absolute; left: 700px; top: 0; bottom: 0; width: 100px; background: #fffbeb"></div>
+        <div class="lane" style="top: 0; height: 56px; border-top: 0">
+          <span class="mono muted" style="position: absolute; left: 232px; top: 18px; font-size: 14px">0:10</span
+          ><span class="mono muted" style="position: absolute; left: 402px; top: 18px; font-size: 14px">0:11</span
+          ><span class="mono muted" style="position: absolute; left: 572px; top: 18px; font-size: 14px">0:12</span
+          ><span class="mono muted" style="position: absolute; left: 742px; top: 18px; font-size: 14px">0:13</span
+          ><span class="mono muted" style="position: absolute; left: 912px; top: 18px; font-size: 14px">0:14</span
+          ><span class="mono muted" style="position: absolute; left: 1082px; top: 18px; font-size: 14px">0:15</span>
+        </div>
+        <div class="lane" style="top: 56px">
+          <span>Voice</span>
+          <div
+            class="mono"
+            style="
+              position: absolute;
+              z-index: 2;
+              left: 556px;
+              width: 442px;
+              top: 22px;
+              padding: 10px 14px;
+              border-radius: 8px;
+              background: #dbeafe;
+              color: #1e40af;
+              font-size: 16px;
+              line-height: 1.4;
+            "
+          >
+            I tick “Write the release notes” and it should save.
+          </div>
+        </div>
+        <div class="lane" style="top: 160px">
+          <span>Page</span>
+          <div
+            class="ev ck mono"
+            style="left: auto; right: 393px; padding: 0 14px 0 0; border-left: 0; border-right: 4px solid #7dd3fc; text-align: right"
+          >
+            <span class="pill clickp">click</span><br />input.toggle
+          </div>
+        </div>
+        <div class="lane" style="top: 264px">
+          <span>Network</span>
+          <div class="ev err mono" style="left: 766px">
+            <span class="pill errp">request-failed</span><br />GET /todos/sync-missing → 404
+          </div>
+        </div>
+        <div class="lane" style="top: 368px; height: 112px">
+          <span>Console</span>
+          <div class="ev err mono" style="left: 766px"><span class="pill errp">error</span><br />Sync failed: 404</div>
+        </div>
+        <div style="position: absolute; left: 758px; top: 46px; bottom: 0; width: 4px; background: #f59e0b; border-radius: 2px"></div>
+        <div style="position: absolute; left: 750px; top: 38px; width: 20px; height: 20px; border-radius: 50%; background: #f59e0b"></div>
+      </div>
+      <div class="mono" style="position: absolute; left: 792px; top: 206px; font-size: 22px; font-weight: 600">0:13.0</div>
+      <div
+        style="
+          position: absolute;
+          left: 330px;
+          top: 616px;
+          width: 236px;
+          padding: 18px 20px;
+          border-radius: 16px;
+          background: #0f172a;
+          color: #fff;
+          box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+        "
+      >
+        <div style="font-weight: 700; font-size: 20px">The bug, caught</div>
+        <div style="margin-top: 6px; font-size: 15px; line-height: 1.45; color: #cbd5e1">
+          The click, then a <span style="color: #fca5a5">404</span> and a console <span style="color: #fca5a5">error</span>, all at 0:13.0
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Real page -->
+    <section class="shot" id="s3">
+      <div class="head">
+        <h1>Full replay. Not a video.</h1>
+        <p>The real page, rebuilt at any moment: play, pause and scrub, and every element is still there.</p>
+      </div>
+      <div class="win" style="left: 72px; top: 232px; width: 700px; height: 500px">
+        <div class="bar">
+          <span class="lights"><i></i><i></i><i></i></span
+          ><span class="logo" style="font-size: 15px"
+            ><img src="../ui/src/icon.svg" alt="" style="width: 18px; height: 18px" />Blook Replay</span
+          ><span class="mono muted" style="font-size: 13px">blook-2026-11-03_21-12-51.zip</span>
+        </div>
+        <div style="position: absolute; left: 60px; top: 110px">
+          <div class="list" style="width: 400px">
+            <div class="row"><span class="check"></span>Ask the agent to fix the sync error</div>
+            <div class="row done" style="outline: 3px solid #f59e0b; outline-offset: -2px; z-index: 1">
+              <span class="check"></span>Write the release notes
+            </div>
+            <div class="row"><span class="check"></span>Send the ZIP to the agent</div>
+          </div>
+          <div
+            class="mono"
+            style="
+              position: absolute;
+              left: 404px;
+              top: 76px;
+              padding: 4px 10px;
+              border-radius: 0 6px 6px 0;
+              background: #f59e0b;
+              color: #0f172a;
+              font-size: 14px;
+              font-weight: 600;
+              white-space: nowrap;
+            "
+          >
+            &lt;li class="completed"&gt;
+          </div>
+        </div>
+        <div style="position: absolute; left: 60px; right: 60px; bottom: 56px">
+          <div style="display: flex; align-items: center; gap: 16px">
+            <span style="width: 40px; height: 40px; border-radius: 50%; background: #334155; display: grid; place-items: center"
+              ><svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z" fill="#fff" /></svg
+            ></span>
+            <div style="flex: 1; height: 6px; border-radius: 3px; background: #e2e8f0; position: relative">
+              <div style="width: 75%; height: 100%; border-radius: 3px; background: #334155"></div>
+              <div
+                style="
+                  position: absolute;
+                  left: 75%;
+                  top: -9px;
+                  width: 6px;
+                  height: 24px;
+                  margin-left: -3px;
+                  border-radius: 3px;
+                  background: #f59e0b;
+                "
+              ></div>
+            </div>
+            <span class="mono" style="font-size: 16px">0:12.9 <span class="muted">/ 0:17.2</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="term" style="left: 812px; top: 300px; width: 396px; height: 360px">
+        <div class="bar">
+          <span class="lights"><i></i><i></i><i></i></span>blook dom … 00:12.9
+        </div>
+        <pre class="mono" style="font-size: 15px"><span class="dim">&lt;ul class="todo-list"&gt;</span>
+  <span class="dim">&lt;li&gt;</span>Ask the agent…<span class="dim">&lt;/li&gt;</span>
+  <span style="background: rgba(245,158,11,.25); color: #fcd34d">&lt;li class="completed"&gt;</span>
+    <span class="dim">&lt;input class="toggle"</span>
+      <span class="dim">type="checkbox"</span>
+      <span style="color: #fcd34d">checked</span><span class="dim">&gt;</span>
+    Write the release notes
+  <span style="color: #fcd34d">&lt;/li&gt;</span>
+  <span class="dim">&lt;li&gt;</span>Send the ZIP…<span class="dim">&lt;/li&gt;</span>
+<span class="dim">&lt;/ul&gt;</span></pre>
+      </div>
+    </section>
+
+    <!-- 4. One ZIP, any agent -->
+    <section class="shot" id="s4">
+      <div class="head">
+        <h1>One local ZIP. Any coding agent can read it.</h1>
+        <p>Attach it to a ticket or hand it to your agent. The blook skill and CLI replay the page at any moment.</p>
+      </div>
+      <div class="win" style="left: 72px; top: 252px; width: 330px; height: 470px; padding: 28px">
+        <svg width="64" height="80" viewBox="0 0 64 80">
+          <path d="M4 2h40l18 18v56a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#fff" stroke="#cbd5e1" stroke-width="2" />
+          <path d="M44 2v18h18" fill="none" stroke="#cbd5e1" stroke-width="2" />
+          <g fill="#334155">
+            <rect x="26" y="8" width="6" height="4" />
+            <rect x="32" y="14" width="6" height="4" />
+            <rect x="26" y="20" width="6" height="4" />
+            <rect x="32" y="26" width="6" height="4" />
+            <rect x="26" y="32" width="6" height="4" />
+            <rect x="27" y="42" width="10" height="13" rx="2" />
+          </g>
+        </svg>
+        <div class="mono" style="margin-top: 12px; font-size: 14px; font-weight: 600">blook-2026-11-03_21-12-51.zip</div>
+        <div class="mono muted" style="margin-top: 14px; font-size: 15.5px; line-height: 1.85">
+          session.json<br />timeline.json<br />rrweb.json<br />network.json<br />websockets.json<br />console.json<br />transcript.json<br />audio/
+        </div>
+      </div>
+      <div class="term" style="left: 432px; top: 252px; width: 776px; height: 470px">
+        <div class="bar">
+          <span class="lights"><i></i><i></i><i></i></span>coding agent
+        </div>
+        <pre class="mono"><span class="you">› The todo doesn't save. Recording: blook-2026-11-03_21-12-51.zip</span>
+
+<span class="dim">$</span> <span class="cmd">blook info blook-2026-11-03_21-12-51.zip</span>
+<span class="dim">$</span> <span class="cmd">blook pointer blook-2026-11-03_21-12-51.zip 00:12.9</span>
+<span class="dim">  "tag": "input", "classes": ["toggle"], …</span>
+
+<span class="say">At 0:12.9 you tick “Write the release notes”. The click sends <code>GET /todos/sync-missing</code>, which returns <code>404</code>, and the console logs <code>Sync failed: 404</code>. So the item looks done, but it is never saved.</span></pre>
+      </div>
+    </section>
+
+    <!-- 5. The real Replay page -->
+    <section class="shot" id="s5">
+      <div class="head">
+        <h1>Review it in the Replay page</h1>
+        <p>Replay, timeline, transcript, network, WebSockets and console in sync. Nothing is uploaded.</p>
+      </div>
+      <div class="win" style="left: 72px; top: 232px; width: 1136px; height: 710px">
+        <img src="images/screenshot-1-timeline.png" alt="" style="display: block; width: 1136px" />
+      </div>
+    </section>
+  </body>
+</html>

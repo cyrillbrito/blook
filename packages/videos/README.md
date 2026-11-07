@@ -7,7 +7,7 @@ Marketing films for Blook: the README, the website, the Chrome Web Store and soc
 - `MESSAGING.md`: the selling points, the audiences, what a film may claim, and the beats of the store intro.
 - `BRIEF.md`: the product facts, the real TodoMVC example, the brand and the rules every film follows. Read it before building or changing a film.
 - `films/<film>/`: one HyperFrames project per film. `index.html` mounts one scene per file in `compositions/`. `STORYLINES.md` holds the three angles considered, `SPEC.md` the one built, and `REVIEW.md` what was checked and what is weak.
-- `shared/`: symlinks to the real logo (`packages/ui/src/icon.svg`) and screenshots (`store/images/`, `docs/images/`). A film's `assets/` links to these, so a new logo or screenshot reaches every film on the next render.
+- `shared/`: symlinks to the real logo (`packages/ui/src/icon.svg`) and screenshots (`packages/store/images/`, `docs/images/`). A film's `assets/` links to these, so a new logo or screenshot reaches every film on the next render.
 - `out/`: renders, git-ignored. Copy a render to where it is used (for example `docs/images/`) and commit it there.
 
 | Film | Format | For |

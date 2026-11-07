@@ -8,13 +8,9 @@ Comes from `manifest.name`: **Blook**.
 
 ## Summary (manifest `description`, max 132 characters)
 
-Current, 72 characters:
+From `packages/extension/wxt.config.ts`, 131 characters. The store shows it from the next uploaded version; 0.3.0 went up with the old one, "Record a narrated browser session into a local bundle for coding agents".
 
-> Record a narrated browser session into a local bundle for coding agents
-
-Alternative, 118 characters:
-
-> Record your browser while you talk: DOM replay, network, console and voice in one local ZIP for developers and AI agents.
+> Record your browser while you talk: page replay, network, console and your voice in one local ZIP for developers and coding agents.
 
 ## Category
 
@@ -56,16 +52,19 @@ WHY IT ASKS FOR THESE PERMISSIONS
 Open source: https://github.com/cyrillbrito/blook
 ```
 
-## Graphic assets (in `store/images/`)
+## Graphic assets (in `images/`)
 
 | Asset | File | Required |
 | --- | --- | --- |
 | Store icon 128×128 | `store-icon-128.png` (96 px artwork, 16 px transparent padding; same as `packages/extension/public/icon/128.png`) | yes |
-| Screenshots 1280×800 | `screenshot-1-timeline.png`, `screenshot-2-network.png`, `screenshot-3-console.png`, `screenshot-4-sidepanel.png` | at least 1 |
+| Screenshots 1280×800, in this order | `listing-1-record.png`, `listing-2-timeline.png`, `listing-3-replay.png`, `listing-4-agent.png`, `listing-5-viewer.png` (source: [`screenshots.html`](screenshots.html)) | at least 1, at most 5 |
 | Small promo tile 440×280 | `promo-small-440x280.png` | no, but listings without it rank lower |
 | Marquee 1400×560 | none | no |
+| Promo video | a YouTube link to `packages/videos/out/store-intro.mp4` (`bun run render store-intro` in `packages/videos`) | no |
 
-The screenshots come from a real recording of the team chat demo in [`demo-app/`](demo-app/), served locally, so no private URLs, keys or third-party brands. The story: a message with an emoji shows up, its `POST` fails with a 500 and a `console.error`, and the WebSocket sync quietly removes it. The narration is macOS `say` played through Chrome's fake microphone, transcribed with `blook transcribe --method whisper`.
+The listing screenshots each pair one headline with one idea, in the look of the store-intro film: slides 1 to 4 rebuild the product UI in HTML with its real labels and the TodoMVC example from `packages/videos/BRIEF.md`, and slide 5 frames the real Replay page (`screenshot-1-timeline.png`). To change one, edit `screenshots.html` and render it as its header comment says.
+
+The `screenshot-*.png` files, used by slide 5, the site and the films, come from a real recording of the team chat demo in [`demo-app/`](demo-app/), served locally, so no private URLs, keys or third-party brands. The story: a message with an emoji shows up, its `POST` fails with a 500 and a `console.error`, and the WebSocket sync quietly removes it. The narration is macOS `say` played through Chrome's fake microphone, transcribed with `blook transcribe --method whisper`.
 
 ## Distribution
 
