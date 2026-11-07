@@ -1,0 +1,16 @@
+{
+  "name": "@blook/videos",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preview": "hyperframes preview",
+    "lint": "hyperframes check",
+    "snapshot": "hyperframes snapshot",
+    "render": "bun scripts/render.ts",
+    "typecheck": "bun check"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "hyperframes": "0.9.19"
+  }
+}

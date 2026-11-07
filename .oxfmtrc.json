@@ -3,10 +3,11 @@
   "printWidth": 140,
   "singleQuote": true,
   // Markdown stays hand-written: agents read the docs and the skill raw, and padded tables cost them tokens.
-  // .agents/ holds installed third-party skills.
+  // .agents/ holds installed third-party skills. Films are edited by HyperFrames Studio, which rewrites their scripts.
   "ignorePatterns": [
     "references/**",
     ".agents/**",
+    "packages/videos/films/**",
     "**/.output/**",
     "**/.wxt/**",
     "**/dist/**",

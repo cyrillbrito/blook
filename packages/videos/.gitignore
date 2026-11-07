@@ -1,0 +1,4 @@
+# Renders, and HyperFrames local state (snapshots, check artifacts, history).
+out/
+renders/
+.hyperframes/

@@ -1,0 +1,72 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      background: #f1f5f9;
+      font-family: Inter, sans-serif;
+      color: #0f172a;
+      overflow: hidden;
+    }
+    #en-logo {
+      position: absolute;
+      left: 602px;
+      top: 290px;
+      width: 220px;
+      height: 220px;
+    }
+    #en-word {
+      position: absolute;
+      left: 858px;
+      top: 316px;
+      font: 900 168px/168px Inter, sans-serif;
+      letter-spacing: -0.045em;
+      white-space: nowrap;
+    }
+    #en-tag {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 590px;
+      text-align: center;
+      font: 600 56px/68px Inter, sans-serif;
+      letter-spacing: -0.015em;
+      color: #334155;
+    }
+    #en-foot {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 690px;
+      text-align: center;
+      font: 400 36px/48px Inter, sans-serif;
+      color: #64748b;
+    }
+    #en-foot b {
+      font: 400 34px/48px "JetBrains Mono", monospace;
+      color: #334155;
+    }
+  </style>
+  <div id="root" data-composition-id="end" data-width="1920" data-height="1080">
+    <img id="en-logo" src="assets/icon.svg" alt="Blook" />
+    <div id="en-word">Blook</div>
+    <div id="en-tag">Full browser replay, with audio transcription</div>
+    <div id="en-foot">Free and open source · <b>github.com/cyrillbrito/blook</b></div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      // a quiet sign-off: the logo, the name, one line, where to get it
+      tl.fromTo("#en-logo", { opacity: 0, scale: 0.9, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 1.0, ease: "power3.out" }, 0.2);
+      tl.fromTo("#en-word", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.9, ease: "power3.out" }, 0.5);
+      tl.fromTo("#en-tag", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, 1.4);
+      tl.fromTo("#en-foot", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, 2.1);
+      tl.set({}, {}, 6.0);
+      // the whole scene plays 1.1x: authored at a calm pace, then sped up a touch (SPEED in every scene)
+      const SPEED = 1.1;
+      const film = gsap.timeline({ paused: true });
+      film.add(tl.paused(false).timeScale(SPEED), 0);
+      window.__timelines["end"] = film;
+    })();
+  </script>
+</template>

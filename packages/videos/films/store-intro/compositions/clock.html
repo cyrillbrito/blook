@@ -1,0 +1,254 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      background: #f1f5f9;
+      font-family: Inter, sans-serif;
+      color: #0f172a;
+      overflow: hidden;
+    }
+    /* every title: centred, one size, fades up as a whole */
+    .ttl {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 472px;
+      text-align: center;
+      font: 800 112px/136px Inter, sans-serif;
+      letter-spacing: -0.03em;
+      white-space: nowrap;
+    }
+    #ck-shot {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+    }
+    #ck-zoom {
+      position: absolute;
+      inset: 0;
+    }
+    /* the playhead's head: a small amber knob */
+    #ck-knob {
+      position: absolute;
+      left: -14px;
+      top: 194px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #f59e0b;
+    }
+    #ck-card {
+      position: absolute;
+      left: 60px;
+      top: 200px;
+      width: 1800px;
+      height: 770px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow:
+        0 0 0 1px #e2e8f0,
+        0 20px 60px rgba(15, 23, 42, 0.08);
+    }
+    .ck-lane {
+      position: absolute;
+      left: 61px;
+      width: 1798px;
+      height: 180px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .ck-label {
+      position: absolute;
+      left: 110px;
+      font: 500 40px/44px Inter, sans-serif;
+      color: #64748b;
+    }
+    #ck-band {
+      position: absolute;
+      left: 1132px;
+      top: 230px;
+      width: 88px;
+      height: 720px;
+      background: #fffbeb;
+      opacity: 0;
+    }
+    .ev {
+      position: absolute;
+      width: 0;
+      height: 180px;
+      font: 400 34px/44px "JetBrains Mono", monospace;
+      white-space: nowrap;
+    }
+    .ev .tick {
+      position: absolute;
+      left: -3px;
+      top: 25px;
+      width: 6px;
+      height: 130px;
+      border-radius: 3px;
+      background: #cbd5e1;
+    }
+    .ev .pill {
+      position: absolute;
+      left: 22px;
+      top: 30px;
+      height: 52px;
+      padding: 0 16px;
+      border-radius: 8px;
+      font: 500 32px/52px "JetBrains Mono", monospace;
+      background: #f1f5f9;
+      color: #768599;
+    }
+    .ev .row {
+      position: absolute;
+      left: 22px;
+      top: 100px;
+      color: #7c8aa0;
+    }
+    .ev.lead .pill,
+    .ev.lead .row {
+      left: auto;
+      right: 22px;
+    }
+    #ck-ph {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 0;
+      height: 0;
+    }
+    #ck-line {
+      position: absolute;
+      left: -3px;
+      top: 214px;
+      width: 6px;
+      height: 736px;
+      border-radius: 3px;
+      background: #f59e0b;
+      transform-origin: 50% 0;
+    }
+    #ck-time {
+      position: absolute;
+      left: 32px;
+      top: 112px;
+      font: 600 44px/52px "JetBrains Mono", monospace;
+      color: #0f172a;
+      opacity: 0;
+    }
+    /* the callout once the camera has moved in: what the lined-up events mean */
+    #ck-call {
+      position: absolute;
+      left: 60px;
+      top: 640px;
+      width: 430px;
+      padding: 30px 34px;
+      border-radius: 24px;
+      background: #0f172a;
+      color: #fff;
+      opacity: 0;
+    }
+    #ck-call b {
+      display: block;
+      font: 700 46px/54px Inter, sans-serif;
+      letter-spacing: -0.02em;
+    }
+    #ck-call span {
+      display: block;
+      margin-top: 12px;
+      font: 400 32px/42px Inter, sans-serif;
+      color: #cbd5e1;
+    }
+    #ck-call i {
+      color: #fca5a5;
+      font-style: normal;
+    }
+  </style>
+  <div id="root" data-composition-id="clock" data-width="1920" data-height="1080">
+    <div class="ttl" id="ck-title">Everything on one timeline</div>
+
+    <div id="ck-shot">
+      <div id="ck-zoom">
+      <div id="ck-card"></div>
+      <div class="ck-lane" style="top: 230px; border-top: 0"></div>
+      <div class="ck-lane" style="top: 410px"></div>
+      <div class="ck-lane" style="top: 590px"></div>
+      <div class="ck-lane" style="top: 770px"></div>
+      <div class="ck-label" style="top: 298px">Voice</div>
+      <div class="ck-label" style="top: 478px">Page</div>
+      <div class="ck-label" style="top: 658px">Network</div>
+      <div class="ck-label" style="top: 838px">Console</div>
+      <div id="ck-band"></div>
+      <!-- x(t) = 480 + (t - 11.5) * 480 -->
+      <div class="ev" data-t="11.8" data-kind="speech" style="left: 624px; top: 230px"><div class="tick"></div><div class="pill">speech</div><div class="row">I tick “Write the release notes”</div></div>
+      <div class="ev lead" data-t="12.9" data-kind="click" style="left: 1152px; top: 410px"><div class="tick"></div><div class="pill">click</div><div class="row">input.toggle</div></div>
+      <div class="ev" data-t="13.0" data-kind="failed" style="left: 1200px; top: 590px"><div class="tick"></div><div class="pill">request-failed</div><div class="row">GET /todos/sync-missing → 404</div></div>
+      <div class="ev" data-t="13.0" data-kind="error" style="left: 1200px; top: 770px"><div class="tick"></div><div class="pill">error</div><div class="row">Sync failed: 404</div></div>
+      <div id="ck-ph"><div id="ck-line"></div><div id="ck-knob"></div><div id="ck-time">0:11.5</div></div>
+      </div>
+      <div id="ck-call"><b>The bug, caught</b><span>The click, then a <i>404</i> and a console <i>error</i>, all at 0:13.0</span></div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const $ = (s) => document.querySelector(s);
+      const $$ = (s) => Array.from(document.querySelectorAll(s));
+      const tl = gsap.timeline({ paused: true });
+      const X = (t) => 480 + (t - 11.5) * 480;
+      const ck = { t: 11.5 };
+      const clamp01 = gsap.utils.clamp(0, 1);
+      const mix = (a, b, k) => gsap.utils.interpolate(a, b, k);
+      const LIT = {
+        speech: { tick: "#93c5fd", pillBg: "#dbeafe", pill: "#1e40af", row: "#0f172a" },
+        click: { tick: "#0ea5e9", pillBg: "#e0f2fe", pill: "#075985", row: "#0f172a" },
+        failed: { tick: "#f97316", pillBg: "#fee2e2", pill: "#991b1b", row: "#b91c1c" },
+        error: { tick: "#dc2626", pillBg: "#fee2e2", pill: "#991b1b", row: "#b91c1c" },
+      };
+      const DIM = { tick: "#cbd5e1", pillBg: "#f1f5f9", pill: "#768599", row: "#7c8aa0" };
+      const evs = $$(".ev").map((e) => ({ t: parseFloat(e.dataset.t), c: LIT[e.dataset.kind], tick: e.querySelector(".tick"), pill: e.querySelector(".pill"), row: e.querySelector(".row") }));
+      const ph = $("#ck-ph"), time = $("#ck-time");
+      function draw() {
+        const t = ck.t;
+        ph.style.transform = "translateX(" + X(t).toFixed(1) + "px)";
+        time.textContent = "0:" + t.toFixed(1);
+        for (const e of evs) {
+          const k = clamp01((t - e.t) / 0.05 + 1);
+          e.tick.style.background = mix(DIM.tick, e.c.tick, k);
+          e.pill.style.background = mix(DIM.pillBg, e.c.pillBg, k);
+          e.pill.style.color = mix(DIM.pill, e.c.pill, k);
+          e.row.style.color = mix(DIM.row, e.c.row, k);
+        }
+      }
+      tl.eventCallback("onUpdate", draw);
+      tl.set("#ck-line", { scaleY: 0 }, 0);
+
+      // title alone, then the shot
+      tl.fromTo("#ck-title", { opacity: 0, y: 28, filter: "blur(6px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.9, ease: "power3.out" }, 0.15);
+      tl.to("#ck-title", { opacity: 0, y: -18, filter: "blur(6px)", duration: 0.6, ease: "power2.in" }, 2.6);
+      tl.fromTo("#ck-shot", { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.9, ease: "power3.out" }, 3.15);
+      tl.to("#ck-line", { scaleY: 1, duration: 0.8, ease: "power2.out" }, 3.8);
+      tl.fromTo(["#ck-knob", "#ck-time"], { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 3.8);
+
+      // a slow sweep to 0:13.0, where the click, the 404 and the error line up
+      const S = 4.4, SD = 3.2;
+      tl.to(ck, { t: 13.0, duration: SD, ease: "power1.inOut" }, S);
+      tl.fromTo("#ck-band", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power2.out" }, S + SD);
+
+      // a gentle push-in centred on the events (x 646..1814), so they read on a phone; the lane labels slide off
+      tl.to("#ck-zoom", { scale: 1.2, x: -270, transformOrigin: "1230px 540px", duration: 1.6, ease: "power2.inOut" }, S + SD + 0.3);
+
+      // say what lines up: the error is found, at the click
+      tl.fromTo("#ck-call", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.7, ease: "power3.out" }, S + SD + 1.9);
+
+      // out
+      tl.to("#ck-shot", { opacity: 0, y: -18, duration: 0.6, ease: "power2.in" }, 11.9);
+      tl.set({}, {}, 12.6);
+
+      draw();
+      // the whole scene plays 1.1x: authored at a calm pace, then sped up a touch (SPEED in every scene)
+      const SPEED = 1.1;
+      const film = gsap.timeline({ paused: true });
+      film.add(tl.paused(false).timeScale(SPEED), 0);
+      window.__timelines["clock"] = film;
+    })();
+  </script>
+</template>

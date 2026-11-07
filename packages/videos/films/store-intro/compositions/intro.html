@@ -1,0 +1,240 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      background: #f1f5f9;
+      font-family: Inter, sans-serif;
+      color: #0f172a;
+      overflow: hidden;
+    }
+    /* every title: centred, one size, fades up as a whole */
+    .ttl {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 404px;
+      text-align: center;
+      font: 800 112px/136px Inter, sans-serif;
+      letter-spacing: -0.03em;
+      white-space: nowrap;
+    }
+    /* the recording light: the only red dot of the intro, blinking like a REC lamp */
+    #in-rec-dot {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      margin-right: 34px;
+      border-radius: 50%;
+      background: #f2542d;
+      vertical-align: 18px;
+    }
+    /* the Blook side panel, rebuilt at 2x from entrypoints/sidepanel (IdleCard, LiveCard) */
+    #in-shot {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+    }
+    #in-head {
+      position: absolute;
+      left: 580px;
+      top: 370px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font: 700 52px/64px Inter, sans-serif;
+    }
+    #in-head img {
+      width: 60px;
+      height: 60px;
+    }
+    .in-card {
+      position: absolute;
+      left: 580px;
+      top: 480px;
+      width: 760px;
+      background: #fff;
+      border: 2px solid #e2e8f0;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+    }
+    #in-idle {
+      height: 250px;
+    }
+    #in-rec {
+      position: absolute;
+      left: 36px;
+      top: 36px;
+      width: 688px;
+      height: 110px;
+      border-radius: 14px;
+      background: #cc3f1d;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      font: 600 44px/110px Inter, sans-serif;
+      box-shadow: 0 2px 4px rgba(15, 23, 42, 0.12);
+    }
+    #in-rec i {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 5px solid #fff;
+      box-sizing: border-box;
+      position: relative;
+    }
+    #in-rec i::after {
+      content: "";
+      position: absolute;
+      left: 7px;
+      top: 7px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+    }
+    #in-tab {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 172px;
+      text-align: center;
+      font: 400 34px/44px Inter, sans-serif;
+      color: #64748b;
+    }
+    #in-tab b {
+      font-weight: 400;
+      color: #0f172a;
+    }
+    #in-live {
+      height: 330px;
+      opacity: 0;
+    }
+    #in-live .st {
+      position: absolute;
+      left: 76px;
+      top: 36px;
+      font: 600 48px/56px Inter, sans-serif;
+    }
+    #in-live .st span {
+      font-weight: 400;
+      color: #64748b;
+      margin-left: 18px;
+      font-variant-numeric: tabular-nums;
+    }
+    #in-live .ld {
+      position: absolute;
+      left: 36px;
+      top: 52px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f2542d;
+    }
+    #in-live .mic {
+      position: absolute;
+      right: 36px;
+      top: 42px;
+      font: 400 36px/44px Inter, sans-serif;
+      color: #64748b;
+    }
+    #in-live .host {
+      position: absolute;
+      left: 36px;
+      top: 116px;
+      font: 400 36px/46px Inter, sans-serif;
+    }
+    #in-live .host div {
+      color: #64748b;
+    }
+    #in-live .stop {
+      position: absolute;
+      left: 36px;
+      top: 222px;
+      width: 688px;
+      height: 76px;
+      border: 2px solid #cbd5e1;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      font: 600 36px/76px Inter, sans-serif;
+    }
+    #in-live .stop i {
+      width: 22px;
+      height: 22px;
+      border-radius: 3px;
+      background: #0f172a;
+    }
+    #in-cursor {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 48px;
+      height: 70px;
+    }
+  </style>
+  <div id="root" data-composition-id="intro" data-width="1920" data-height="1080">
+    <div class="ttl" id="in-title"><i id="in-rec-dot"></i>Record your browser<br />while you talk</div>
+
+    <div id="in-shot">
+      <div id="in-head"><img src="assets/icon.svg" alt="" />Blook</div>
+      <div class="in-card" id="in-idle">
+        <div id="in-rec"><i></i>Start recording</div>
+        <div id="in-tab">Records this tab: <b>React • TodoMVC</b></div>
+      </div>
+      <div class="in-card" id="in-live">
+        <i class="ld" id="in-ld"></i><div class="st">Recording<span id="in-clock">0:00</span></div>
+        <div class="mic">Mic on</div>
+        <div class="host">React • TodoMVC<div>demo.playwright.dev</div></div>
+        <div class="stop"><i></i>Stop recording</div>
+      </div>
+    </div>
+
+    <svg id="in-cursor" viewBox="0 0 18 26">
+      <path d="M1 1 L1 21.5 L6.2 16.6 L9.6 24.6 L13 23.1 L9.7 15.3 L16.6 15.3 Z" fill="#0f172a" stroke="#fff" stroke-width="1.4" stroke-linejoin="round" />
+    </svg>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      const clock = document.querySelector("#in-clock");
+      const LIVE = 4.6; // the card turns live; its timer counts from here
+
+      tl.set("#in-cursor", { x: 1180, y: 1120 }, 0);
+
+      // the idea, alone and readable from frame 0; its light blinks
+      tl.to("#in-rec-dot", { opacity: 0.15, duration: 0.55, ease: "sine.inOut", yoyo: true, repeat: 1 }, 0.5);
+      tl.to("#in-title", { opacity: 0, y: -18, filter: "blur(6px)", duration: 0.6, ease: "power2.in" }, 2.2);
+
+      // the side panel settles in
+      tl.fromTo("#in-shot", { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.9, ease: "power3.out" }, 2.75);
+
+      // the cursor glides to Start recording and clicks
+      tl.to("#in-cursor", { x: 950, y: 561, duration: 1.3, ease: "power2.inOut" }, 2.9);
+      const click = 4.4;
+      tl.to("#in-cursor", { scale: 0.88, duration: 0.08, ease: "power2.in", transformOrigin: "2px 2px" }, click - 0.08);
+      tl.to("#in-cursor", { scale: 1, duration: 0.18, ease: "power2.out" }, click);
+      tl.to("#in-rec", { scale: 0.97, duration: 0.08, ease: "power2.in" }, click - 0.08);
+      tl.to("#in-rec", { scale: 1, duration: 0.18, ease: "power2.out" }, click);
+
+      // the card turns live: same place, a soft crossfade; the next scene pulls back from here
+      tl.to("#in-idle", { opacity: 0, duration: 0.4, ease: "power2.inOut" }, click + 0.1);
+      tl.fromTo("#in-live", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.inOut" }, LIVE - 0.1);
+      tl.to("#in-cursor", { x: 1180, y: 1120, opacity: 0, duration: 1.0, ease: "power2.in" }, click + 0.5);
+      tl.set({}, {}, 5.6);
+
+      tl.eventCallback("onUpdate", () => {
+        clock.textContent = "0:0" + Math.max(0, Math.min(3, Math.floor(tl.time() - LIVE)));
+      });
+      // the whole scene plays 1.1x: authored at a calm pace, then sped up a touch (SPEED in every scene)
+      const SPEED = 1.1;
+      const film = gsap.timeline({ paused: true });
+      film.add(tl.paused(false).timeScale(SPEED), 0);
+      window.__timelines["intro"] = film;
+    })();
+  </script>
+</template>

@@ -1,0 +1,264 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      background: #f1f5f9;
+      font-family: Inter, sans-serif;
+      color: #0f172a;
+      overflow: hidden;
+    }
+    /* every title: centred, one size, fades up as a whole */
+    .ttl {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 404px;
+      text-align: center;
+      font: 800 112px/136px Inter, sans-serif;
+      letter-spacing: -0.03em;
+      white-space: nowrap;
+    }
+    #pg-shot {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+    }
+    /* the viewer: Blook's Replay page in a plain browser window, titled with the ZIP it opened */
+    #pg-win {
+      position: absolute;
+      left: 100px;
+      top: 90px;
+      width: 1720px;
+      height: 900px;
+      background: #f8fafc;
+      border-radius: 18px;
+      box-shadow:
+        0 0 0 1px #e2e8f0,
+        0 30px 80px rgba(15, 23, 42, 0.1);
+      overflow: hidden;
+    }
+    #pg-bar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1720px;
+      height: 76px;
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .pg-light {
+      position: absolute;
+      top: 30px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #cbd5e1;
+    }
+    #pg-url {
+      position: absolute;
+      left: 130px;
+      top: 14px;
+      height: 48px;
+      border-radius: 24px;
+      background: #eef2f6;
+      padding: 0 26px 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font: 500 26px/48px Inter, sans-serif;
+      color: #334155;
+    }
+    #pg-url img {
+      width: 30px;
+      height: 30px;
+    }
+    #pg-url span {
+      font: 400 28px/48px "JetBrains Mono", monospace;
+      color: #64748b;
+    }
+    #pg-card {
+      position: absolute;
+      left: 190px;
+      top: 270px;
+      width: 1000px;
+      height: 360px;
+      background: #fff;
+      box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.12),
+        0 25px 50px rgba(0, 0, 0, 0.08);
+    }
+    .pg-row {
+      position: absolute;
+      left: 0;
+      width: 1000px;
+      height: 120px;
+      border-top: 1px solid #ededed;
+    }
+    .pg-row .tg {
+      position: absolute;
+      left: 30px;
+      top: 30px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 2px solid #c9c9c9;
+    }
+    .pg-row .chk {
+      position: absolute;
+      left: 30px;
+      top: 30px;
+      width: 60px;
+      height: 60px;
+    }
+    .pg-row .tx {
+      position: absolute;
+      left: 130px;
+      top: 0;
+      font: 300 50px/120px Inter, sans-serif;
+      color: #484848;
+      white-space: nowrap;
+    }
+    .pg-row .lbl {
+      position: relative;
+      display: inline-block;
+    }
+    .pg-row .strike {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 62px;
+      height: 3px;
+      background: #949494;
+      transform-origin: 0 50%;
+    }
+    /* the element, outlined with its tag and classes */
+    #pg-out {
+      position: absolute;
+      left: 184px;
+      top: 384px;
+      width: 1012px;
+      height: 132px;
+      border: 5px solid #f59e0b;
+      border-radius: 8px;
+    }
+    #pg-tag {
+      position: absolute;
+      left: 1196px;
+      top: 419px;
+      height: 62px;
+      padding: 0 22px;
+      border-radius: 0 10px 10px 0;
+      background: #f59e0b;
+      font: 600 38px/62px "JetBrains Mono", monospace;
+      color: #0f172a;
+      white-space: pre;
+    }
+    /* the scrubber: 0:10 to 0:16 over x 190..1190 */
+    #pg-track {
+      position: absolute;
+      left: 190px;
+      top: 760px;
+      width: 1000px;
+      height: 12px;
+      border-radius: 6px;
+      background: #cbd5e1;
+      overflow: hidden;
+    }
+    #pg-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1000px;
+      height: 12px;
+      background: #334155;
+      transform-origin: 0 50%;
+    }
+    #pg-head {
+      position: absolute;
+      left: -6px;
+      top: 740px;
+      width: 12px;
+      height: 52px;
+      border-radius: 6px;
+      background: #f59e0b;
+    }
+    #pg-time {
+      position: absolute;
+      left: 190px;
+      top: 812px;
+      font: 500 44px/52px "JetBrains Mono", monospace;
+      color: #0f172a;
+    }
+  </style>
+  <div id="root" data-composition-id="page" data-width="1920" data-height="1080">
+    <div class="ttl" id="pg-title">Full replay.<br />Not a video.</div>
+
+    <div id="pg-shot">
+      <div id="pg-win">
+        <div id="pg-bar">
+          <i class="pg-light" style="left: 28px"></i><i class="pg-light" style="left: 54px"></i><i class="pg-light" style="left: 80px"></i>
+          <div id="pg-url"><img src="assets/icon.svg" alt="" />Blook Replay<span>blook-2026-11-03_21-12-51.zip</span></div>
+        </div>
+      </div>
+      <div id="pg-card">
+        <div class="pg-row" style="top: 0; border-top: 0"><div class="tg"></div><div class="tx">Ask the agent to fix the sync error</div></div>
+        <div class="pg-row" style="top: 120px">
+          <div class="tg" id="pg-tg"></div>
+          <svg class="chk" id="pg-chk" viewBox="-10 -18 100 135"><circle cx="50" cy="50" r="50" fill="none" stroke="#59A193" stroke-width="3" /><path fill="#3EA390" d="M72 25L42 71 27 56l-4 4 20 20 34-52z" /></svg>
+          <div class="tx" id="pg-tx"><span class="lbl">Write the release notes<i class="strike" id="pg-strike" data-layout-allow-occlusion></i></span></div>
+        </div>
+        <div class="pg-row" style="top: 240px"><div class="tg"></div><div class="tx">Send the ZIP to the agent</div></div>
+      </div>
+      <div id="pg-out" data-layout-allow-overlap></div>
+      <div id="pg-tag" data-layout-allow-overlap>&lt;li class="completed"&gt;</div>
+      <div id="pg-track"><div id="pg-fill"></div></div>
+      <div id="pg-time">0:12.9</div>
+      <div id="pg-head"></div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const $ = (s) => document.querySelector(s);
+      const tl = gsap.timeline({ paused: true });
+      const X = (t) => 190 + ((t - 10) / 6) * 1000;
+      const ck = { t: 12.95 };
+      const head = $("#pg-head"), fill = $("#pg-fill"), time = $("#pg-time");
+      const tag = $("#pg-tag"), chk = $("#pg-chk"), tg = $("#pg-tg"), tx = $("#pg-tx"), strike = $("#pg-strike");
+      function draw() {
+        const t = ck.t;
+        head.style.transform = "translateX(" + X(t).toFixed(1) + "px)";
+        fill.style.transform = "scaleX(" + ((t - 10) / 6).toFixed(4) + ")";
+        time.textContent = "0:" + t.toFixed(1);
+        const done = t >= 12.9;
+        tag.textContent = done ? '<li class="completed">' : "<li>";
+        chk.style.opacity = done ? "1" : "0";
+        tg.style.opacity = done ? "0" : "1";
+        tx.style.color = done ? "#949494" : "#484848";
+        strike.style.transform = "scaleX(" + (done ? 1 : 0) + ")";
+      }
+      tl.eventCallback("onUpdate", draw);
+
+      // title alone, then the shot
+      tl.fromTo("#pg-title", { opacity: 0, y: 28, filter: "blur(6px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.9, ease: "power3.out" }, 0.15);
+      tl.to("#pg-title", { opacity: 0, y: -18, filter: "blur(6px)", duration: 0.6, ease: "power2.in" }, 2.6);
+      tl.fromTo("#pg-shot", { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.9, ease: "power3.out" }, 3.15);
+
+      // scrub back before the click, then forward past it: the class comes and goes
+      tl.to(ck, { t: 12.4, duration: 1.2, ease: "power2.inOut" }, 4.3);
+      tl.to(ck, { t: 13.3, duration: 1.4, ease: "power2.inOut" }, 6.2);
+      tl.to(ck, { t: 12.95, duration: 0.8, ease: "power2.inOut" }, 8.0);
+
+      // out
+      tl.to("#pg-shot", { opacity: 0, y: -18, duration: 0.6, ease: "power2.in" }, 9.4);
+      tl.set({}, {}, 10.1);
+
+      draw();
+      // the whole scene plays 1.1x: authored at a calm pace, then sped up a touch (SPEED in every scene)
+      const SPEED = 1.1;
+      const film = gsap.timeline({ paused: true });
+      film.add(tl.paused(false).timeScale(SPEED), 0);
+      window.__timelines["page"] = film;
+    })();
+  </script>
+</template>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #f1f5f9;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        font-family: Inter, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Six scenes on one track. intro → record → zip hand off on the same pixels (the live card, the ZIP); the rest dip to the ground; the red dot only appears as a blinking recording light. -->
+    <div id="root" data-composition-id="main" data-start="0" data-duration="47.85" data-width="1920" data-height="1080">
+      <div id="intro" data-composition-id="intro" data-composition-src="compositions/intro.html" data-start="0" data-duration="5.09" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="record" data-composition-id="record" data-composition-src="compositions/record.html" data-start="5.09" data-duration="9.5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="zip" data-composition-id="zip" data-composition-src="compositions/zip.html" data-start="14.59" data-duration="7.18" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="page" data-composition-id="page" data-composition-src="compositions/page.html" data-start="21.77" data-duration="9.18" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="clock" data-composition-id="clock" data-composition-src="compositions/clock.html" data-start="30.95" data-duration="11.45" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="end" data-composition-id="end" data-composition-src="compositions/end.html" data-start="42.4" data-duration="5.45" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <!-- Music: "Background Music" by JonasBlakewood, Pixabay Content License (assets/bgm/CREDITS.md). Pre-edited: its drop lands on Start recording (4.0 s); muffled from Stop until the ZIP lands. -->
+      <audio id="bgm" class="clip" src="assets/bgm/synthwave.mp3" data-start="0" data-duration="47.85" data-track-index="2" data-volume="1.2"></audio>
+      <!-- Sound effects (assets/sfx, Pixabay Content License), placed so each sound (after its file's lead-in) lands on its frame: clicks, the listed recording, the ZIP's flight and landing (on the music's phrase at 13.86 s), one whoosh as the tiles burst out of the ZIP, the bug, a soft chime on the logo. -->
+      <audio id="sfx-start" class="clip" src="assets/sfx/click.mp3" data-start="3.92" data-duration="0.37" data-track-index="3" data-volume="0.85"></audio>
+      <audio id="sfx-tick" class="clip" src="assets/sfx/click.mp3" data-start="8.15" data-duration="0.37" data-track-index="3" data-volume="0.63"></audio>
+      <audio id="sfx-stop" class="clip" src="assets/sfx/click.mp3" data-start="10.74" data-duration="0.37" data-track-index="3" data-volume="0.85"></audio>
+      <audio id="sfx-listed" class="clip" src="assets/sfx/pop.mp3" data-start="11.2" data-duration="0.72" data-track-index="3" data-volume="0.49"></audio>
+      <audio id="sfx-download" class="clip" src="assets/sfx/click.mp3" data-start="12.51" data-duration="0.37" data-track-index="3" data-volume="0.78"></audio>
+      <audio id="sfx-fly" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="13.16" data-duration="0.57" data-track-index="3" data-volume="0.63"></audio>
+      <audio id="sfx-land" class="clip" src="assets/sfx/impact-bass-1.mp3" data-start="13.81" data-duration="2.12" data-track-index="3" data-volume="0.78"></audio>
+      <audio id="sfx-burst" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="17.89" data-duration="0.57" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sfx-bug" class="clip" src="assets/sfx/error.mp3" data-start="37.26" data-duration="1.62" data-track-index="3" data-volume="0.42"></audio>
+      <audio id="sfx-logo" class="clip" src="assets/sfx/chime.mp3" data-start="42.25" data-duration="2.5" data-track-index="3" data-volume="0.56"></audio>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

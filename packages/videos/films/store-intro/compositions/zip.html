@@ -1,0 +1,160 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      background: #f1f5f9;
+      font-family: Inter, sans-serif;
+      color: #0f172a;
+      overflow: hidden;
+    }
+    /* what a recording holds, as on the site: six tiles, 3 x 2, centred */
+    .zp-tile {
+      position: absolute;
+      width: 500px;
+      height: 200px;
+      background: #fff;
+      border: 2px solid #e2e8f0;
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.06);
+      opacity: 0;
+    }
+    .zp-tile .ic {
+      position: absolute;
+      left: 40px;
+      top: 52px;
+      width: 96px;
+      height: 96px;
+      border-radius: 20px;
+      background: #f1f5f9;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .zp-tile .ic svg {
+      width: 52px;
+      height: 52px;
+    }
+    .zp-tile .nm {
+      position: absolute;
+      left: 166px;
+      top: 0;
+      font: 600 50px/200px Inter, sans-serif;
+      letter-spacing: -0.015em;
+      white-space: nowrap;
+    }
+    /* the site's ZIP: a page with a folded corner and a zipper */
+    #zp-zip {
+      position: absolute;
+      left: 810px;
+      top: 170px;
+      width: 300px;
+      height: 375px;
+    }
+    #zp-name {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 600px;
+      text-align: center;
+      font: 500 44px/52px "JetBrains Mono", monospace;
+      color: #334155;
+    }
+    #zp-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 730px;
+      text-align: center;
+      font: 800 88px/104px Inter, sans-serif;
+      letter-spacing: -0.03em;
+      opacity: 0;
+    }
+  </style>
+  <div id="root" data-composition-id="zip" data-width="1920" data-height="1080">
+    <!-- Icons are Lucide paths (ISC), the same as the site: mic, app-window, mouse-pointer-click, arrow-left-right, radio, terminal. -->
+    <div class="zp-tile" style="left: 170px; top: 300px">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><path d="M12 19v3" /></svg></div>
+      <div class="nm">Your voice</div>
+    </div>
+    <div class="zp-tile" style="left: 710px; top: 300px">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" /><path d="M2 8h20" /><path d="M6 4v4" /><path d="M10 4v4" /></svg></div>
+      <div class="nm">The page</div>
+    </div>
+    <div class="zp-tile" style="left: 1250px; top: 300px">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 9 5 12 1.8-5.2L21 14Z" /><path d="M7.2 2.2 8 5.1" /><path d="m5.1 8-2.9-.8" /><path d="M14 4.1 12 6" /><path d="m6 12-1.9 2" /></svg></div>
+      <div class="nm">Every click</div>
+    </div>
+    <div class="zp-tile" style="left: 170px; top: 560px">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4" /><path d="M4 7h16" /><path d="m16 21 4-4-4-4" /><path d="M20 17H4" /></svg></div>
+      <div class="nm">Network</div>
+    </div>
+    <div class="zp-tile" style="left: 710px; top: 560px">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" /><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5" /><path d="M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z" /><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5" /><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19" /></svg></div>
+      <div class="nm">WebSockets</div>
+    </div>
+    <div class="zp-tile" style="left: 1250px; top: 560px">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6" /><path d="M12 19h8" /></svg></div>
+      <div class="nm">Console</div>
+    </div>
+
+    <svg id="zp-zip" viewBox="0 0 200 250">
+      <path d="M24 8h112l48 48v178a8 8 0 0 1-8 8H24a8 8 0 0 1-8-8V16a8 8 0 0 1 8-8Z" fill="#fff" stroke="#cbd5e1" stroke-width="3" />
+      <path d="M136 8v40a8 8 0 0 0 8 8h40" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="3" stroke-linejoin="round" />
+      <g id="zp-teeth">
+        <rect x="88" y="16" width="12" height="8" rx="2" fill="#334155" />
+        <rect x="100" y="28" width="12" height="8" rx="2" fill="#334155" />
+        <rect x="88" y="40" width="12" height="8" rx="2" fill="#334155" />
+        <rect x="100" y="52" width="12" height="8" rx="2" fill="#334155" />
+        <rect x="88" y="64" width="12" height="8" rx="2" fill="#334155" />
+        <rect x="100" y="76" width="12" height="8" rx="2" fill="#334155" />
+        <rect x="88" y="88" width="12" height="8" rx="2" fill="#334155" />
+        <rect x="100" y="100" width="12" height="8" rx="2" fill="#334155" />
+        <rect x="88" y="112" width="12" height="8" rx="2" fill="#334155" />
+      </g>
+      <g id="zp-pull">
+        <rect x="82" y="128" width="36" height="46" rx="6" fill="#334155" />
+        <rect x="92" y="146" width="16" height="18" rx="3" fill="#fff" />
+      </g>
+    </svg>
+    <div id="zp-name">blook-2026-11-03_21-12-51.zip</div>
+    <div id="zp-line">One ZIP holds it all</div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      const tiles = Array.from(document.querySelectorAll(".zp-tile"));
+      const teeth = Array.from(document.querySelectorAll("#zp-teeth rect"));
+      const ZIP = { x: 960, y: 357 }; // the ZIP's centre
+
+      // the downloaded ZIP and its name are already here (the record scene left them); say what it is
+      tl.fromTo("#zp-line", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, 0.3);
+
+      // it unzips, and what a recording holds comes out of it, one tile at a time
+      const U = 2.6;
+      tl.to(["#zp-line", "#zp-name"], { opacity: 0, y: -14, duration: 0.5, ease: "power2.in" }, U);
+      tl.to("#zp-pull", { y: -112, duration: 0.7, ease: "power2.inOut" }, U + 0.2);
+      tl.to(teeth.slice().reverse(), { opacity: 0, duration: 0.15, stagger: 0.06 }, U + 0.2);
+      tl.to("#zp-zip", { opacity: 0, scale: 0.9, transformOrigin: "50% 50%", duration: 0.6, ease: "power2.in" }, U + 0.9);
+      tiles.forEach((el, k) => {
+        const r = { x: parseFloat(el.style.left) + 250, y: parseFloat(el.style.top) + 100 };
+        tl.fromTo(
+          el,
+          { opacity: 0, x: ZIP.x - r.x, y: ZIP.y - r.y, scale: 0.15 },
+          { opacity: 1, x: 0, y: 0, scale: 1, duration: 1.0, ease: "power3.out" },
+          U + 0.9 + k * 0.18,
+        );
+      });
+
+      // out
+      tl.to(tiles, { opacity: 0, y: -18, duration: 0.6, ease: "power2.in" }, 7.2);
+      tl.set({}, {}, 7.9);
+      // the whole scene plays 1.1x: authored at a calm pace, then sped up a touch (SPEED in every scene)
+      const SPEED = 1.1;
+      const film = gsap.timeline({ paused: true });
+      film.add(tl.paused(false).timeScale(SPEED), 0);
+      window.__timelines["zip"] = film;
+    })();
+  </script>
+</template>
