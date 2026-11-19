@@ -8,7 +8,7 @@ The `blook` CLI's main users are coding agents that learn it from `blook --help`
 - **Errors say what went wrong and what to do next**, in two lines: `error: <what>` and a runnable next step. Usage errors also print the command's help, and Commander suggests the closest command or option.
 - **Exit codes are stable, one per class of error.** `packages/cli/src/errors.ts` defines them and `blook --help` lists them. Add codes, never reuse one.
 - **Ask, don't guess.** An input with two readings fails with both spelled out (`3.2` → "use 3.2s for seconds, or 3200 for ms"). Inputs with one obvious reading are accepted (a folder holding one unzipped bundle).
-- **Never block on a prompt.** Without a terminal, `skill install` copies the skill instead of asking, and `extension` doesn't open Chrome.
+- **Never block on a prompt.** Without a terminal, `skill install` copies the skill instead of asking, and `extension` doesn't open the store page.
 - **Output shapes are a contract.** Field names change only with the skill and the docs, in the same change.
 - **Tests run the CLI as an agent would**: as a subprocess against a small synthetic bundle, checking stdout, stderr and the exit code.
 

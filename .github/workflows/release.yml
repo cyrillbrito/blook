@@ -41,7 +41,7 @@ jobs:
           bun run typecheck
           bun run test
 
-      # Versionless name (wxt.config.ts zip.artifactTemplate), so releases/latest/download/blook-chrome.zip always works (install.sh uses it).
+      # The ZIP for the Chrome Web Store upload (packages/store/README.md), attached to the release.
       - name: Build extension
         run: bun run zip
 

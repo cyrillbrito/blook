@@ -1,14 +1,13 @@
 #!/bin/sh
-# Install or update Blook: the CLI, the Chrome extension folder and the agent skill.
+# Install or update Blook: the CLI and the agent skill, then point to the Chrome extension on the Chrome Web Store.
 #   curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh
-# Re-run to update. Env: BLOOK_INSTALL_DIR (default ~/.local/bin), BLOOK_NO_EXTENSION=1, BLOOK_NO_SKILL=1,
+# Re-run to update. Env: BLOOK_INSTALL_DIR (default ~/.local/bin), BLOOK_NO_EXTENSION=1 (no Chrome guide), BLOOK_NO_SKILL=1,
 # BLOOK_DOWNLOAD_URL (default: the latest GitHub release), NO_COLOR.
 set -eu
 
 main() {
   url=${BLOOK_DOWNLOAD_URL:-https://github.com/cyrillbrito/blook/releases/latest/download}
   bin_dir=${BLOOK_INSTALL_DIR:-$HOME/.local/bin}
-  ext_dir=$HOME/Blook/extension # visible and stable: easy to pick in Chrome, keeps its ID and settings
 
   # Styles only on a terminal, and not with NO_COLOR.
   if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
@@ -41,20 +40,6 @@ main() {
   mv "$bin_dir/blook.tmp" "$bin_dir/blook"
   done_ "blook $("$bin_dir/blook" --version)  $d$(tilde "$bin_dir/blook")$r"
 
-  # The extension: always the same folder, so Chrome keeps its ID and settings across updates.
-  if [ -z "${BLOOK_NO_EXTENSION:-}" ]; then
-    command -v unzip >/dev/null || fail "unzip is needed for the extension (or set BLOOK_NO_EXTENSION=1)"
-    mkdir -p "$HOME/Blook"
-    tmp=$(mktemp -d "$HOME/Blook/.tmp.XXXXXX")
-    step "Downloading the Chrome extension"
-    curl -fsSL "$url/blook-chrome.zip" -o "$tmp/blook-chrome.zip" || fail "download failed: $url/blook-chrome.zip"
-    unzip -q "$tmp/blook-chrome.zip" -d "$tmp/extension"
-    rm -rf "$ext_dir"
-    mv "$tmp/extension" "$ext_dir"
-    rm -rf "$tmp"
-    done_ "Chrome extension  $d$(tilde "$ext_dir")$r"
-  fi
-
   case ":$PATH:" in
     *":$bin_dir:"*) ;;
     *) printf '  %s!%s %s is not on your PATH. Add to ~/.zshrc or ~/.bashrc:\n' "$y" "$r" "$(tilde "$bin_dir")"
@@ -78,10 +63,10 @@ main() {
     fi
   fi
 
-  # The Chrome guide comes from the CLI, so `blook extension` shows the same thing.
+  # The Chrome guide comes from the CLI, so `blook extension` shows the same thing. No tab on every update.
   if [ -z "${BLOOK_NO_EXTENSION:-}" ]; then
     echo
-    "$bin_dir/blook" extension || true
+    "$bin_dir/blook" extension --no-open || true
   fi
 }
 

@@ -2,6 +2,8 @@
 import Base from '../layouts/Base.astro';
 import timeline from '../../../store/images/screenshot-1-timeline.png';
 import sidepanel from '../../../store/images/screenshot-4-sidepanel.png';
+import badge from '../../../store/images/chrome-web-store-badge.png';
+import { STORE_URL as store } from '../links';
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const repo = 'https://github.com/cyrillbrito/blook';
@@ -94,6 +96,8 @@ const section = 'border-t border-line py-16 sm:py-24';
 const split = 'grid grid-cols-[minmax(0,1fr)] gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]';
 const copyBtn =
   'shrink-0 cursor-pointer border-l border-line-strong px-4 text-sm font-medium outline-none hover:bg-line focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-inset active:bg-line-strong';
+const addBtn =
+  'inline-flex items-center gap-2.5 rounded-card bg-fg px-5 py-3 font-medium text-white outline-none hover:bg-accent-strong focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2';
 const shot = 'rounded-card border border-line shadow-sm';
 ---
 
@@ -117,13 +121,17 @@ const shot = 'rounded-card border border-line shadow-sm';
         />
       </div>
       <div class="mt-10">
-        <div class="flex items-stretch overflow-hidden rounded-card border border-line-strong bg-surface-sunken">
-          <pre class="min-w-0 flex-1 overflow-x-auto px-4 py-3 font-mono text-sm"><code>{install}</code></pre>
-          <button type="button" data-copy={install} class={copyBtn}>Copy</button>
-        </div>
+        <a class={addBtn} href={store}>
+          <!-- Lucide chromium (ISC) -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5" aria-hidden="true">
+            <path d="M10.88 21.94 15.46 14" /><path d="M21.17 8H12" /><path d="M3.95 6.06 8.54 14" /><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" />
+          </svg>
+          Add to Chrome
+        </a>
         <p class="mt-4 text-muted">
-          On macOS or Linux, then <a class={link} href="#install">load it in Chrome once</a>. Got a recording? <a class={link} href={`${base}viewer/`}
-            >Open it in the viewer</a
+          Free, from the Chrome Web Store. For coding agents, <a class={link} href="#install">install the CLI and skill</a>. Got a recording? <a
+            class={link}
+            href={`${base}viewer/`}>Open it in the viewer</a
           >.
         </p>
       </div>
@@ -275,27 +283,28 @@ blook transcribe blook-2026-11-03_21-12-51.zip</code></pre>
 
     <section id="install" class:list={[section, 'scroll-mt-4']}>
       <h2 class={h2}>Install</h2>
-      <p class="mt-4 text-lg text-muted">One command on macOS or Linux, then one step in Chrome.</p>
-      <div class="mt-8 flex items-stretch overflow-hidden rounded-card border border-line-strong bg-surface-sunken">
-        <pre class="min-w-0 flex-1 overflow-x-auto px-4 py-3 font-mono text-sm"><code>{install}</code></pre>
-        <button type="button" data-copy={install} class={copyBtn}>Copy</button>
-      </div>
+      <p class="mt-4 text-lg text-muted">The extension from the Chrome Web Store, and one command for coding agents.</p>
       <div class="mt-8 grid grid-cols-[minmax(0,1fr)] gap-x-12 gap-y-8 md:grid-cols-2">
         <div>
-          <p class="text-muted">
-            It installs the <code>blook</code> command-line tool and the Chrome extension files in <code>~/Blook/extension</code>, and offers to
-            add the agent skill. Run <code>blook update</code> to update.
-          </p>
-          <p class="mt-4 text-muted">Or download the files from the <a class={link} href={`${repo}/releases/latest`}>latest release</a>.</p>
-        </div>
-        <div>
-          <p class="font-medium">Then load the extension in Chrome once:</p>
+          <p class="font-medium">To record, add the extension:</p>
           <ol class="mt-2 list-decimal space-y-1 pl-5 text-muted">
-            <li>Open <code>chrome://extensions</code>.</li>
-            <li>Turn on <strong class="font-medium text-fg">Developer mode</strong> (top right).</li>
-            <li>Click <strong class="font-medium text-fg">Load unpacked</strong> and pick <code>~/Blook/extension</code>.</li>
+            <li>Open <a class={link} href={store}>Blook on the Chrome Web Store</a>.</li>
+            <li>Click <strong class="font-medium text-fg">Add to Chrome</strong>.</li>
             <li>Pin Blook from the puzzle icon, and click it to open the side panel.</li>
           </ol>
+          <!-- The official badge (developer.chrome.com/docs/webstore/branding): unmodified, and always links to the listing. -->
+          <a href={store} class="mt-5 -ml-3 inline-block rounded-control focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none">
+            <img src={badge.src} width={badge.width / 2} height={badge.height / 2} alt="Available in the Chrome Web Store" />
+          </a>
+          <p class="mt-4 text-muted">Chrome keeps it up to date.</p>
+        </div>
+        <div>
+          <p class="font-medium">For a coding agent to read recordings, on macOS or Linux:</p>
+          <div class="mt-2 flex items-stretch overflow-hidden rounded-card border border-line-strong bg-surface-sunken">
+            <pre class="min-w-0 flex-1 overflow-x-auto px-4 py-3 font-mono text-sm"><code>{install}</code></pre>
+            <button type="button" data-copy={install} class={copyBtn}>Copy</button>
+          </div>
+          <p class="mt-4 text-muted">Then give your agent a recording's ZIP.</p>
         </div>
       </div>
     </section>
@@ -304,6 +313,7 @@ blook transcribe blook-2026-11-03_21-12-51.zip</code></pre>
   <footer class="border-t border-line">
     <div class="mx-auto flex max-w-5xl flex-wrap gap-x-6 gap-y-2 px-5 py-8 text-sm text-muted">
       <span>Blook is free and open source. Chrome only.</span>
+      <a class={link} href={store}>Chrome Web Store</a>
       <a class={link} href={repo}>GitHub</a>
       <a class={link} href={`${repo}/issues`}>Issues</a>
     </div>

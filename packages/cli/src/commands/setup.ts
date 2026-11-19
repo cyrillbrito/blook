@@ -28,7 +28,7 @@ Example:
 
   program
     .command('update')
-    .description('re-run the install script: latest CLI, extension and skill')
+    .description('re-run the install script: latest CLI and skill (Chrome updates the extension)')
     .addHelpText(
       'after',
       `

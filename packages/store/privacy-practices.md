@@ -1,4 +1,4 @@
-# Privacy practices tab (draft)
+# Privacy practices tab
 
 Answers for the Developer Dashboard, **Privacy practices** tab. Reviewers read these; the store shows the data-use part to users.
 

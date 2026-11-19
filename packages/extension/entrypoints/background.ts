@@ -52,10 +52,7 @@ export default defineBackground(() => {
       await onMicError(m.error, m.needsPermission);
       return { ok: true };
     },
-    'mic/permission-granted': async () => {
-      await onMicPermissionGranted();
-      return { ok: true };
-    },
+    'mic/permission-granted': () => onMicPermissionGranted(),
   };
 
   browser.runtime.onMessage.addListener((message: BackgroundMessage | { target?: string }, sender, sendResponse) => {

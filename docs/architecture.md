@@ -15,7 +15,7 @@ The code is a Bun workspaces monorepo. Paths below are inside `packages/extensio
 | `store` | Not a package (no `package.json`): the Chrome Web Store listing, privacy answers, images and their HTML sources, and the demo app recorded for the screenshots. See [packages/store/README.md](../packages/store/README.md) | site, videos (images) |
 | `videos` | Marketing films made with [HyperFrames](https://hyperframes.heygen.com) (HTML and GSAP rendered to MP4): one project per film in `films/`, the shared brief and brand assets. See [packages/videos/README.md](../packages/videos/README.md) | |
 
-Outside `packages/`: the agent skill in `skills/blook/` (at the root, where the skills CLI finds it), the installer `install.sh`, the release build `.github/workflows/release.yml`, and the privacy policy `PRIVACY.md`.
+Outside `packages/`: the agent skill in `skills/blook/` (at the root, where the skills CLI finds it), the CLI and skill installer `install.sh`, the release build `.github/workflows/release.yml`, and the privacy policy `PRIVACY.md`.
 
 ```mermaid
 flowchart TD
@@ -40,7 +40,7 @@ flowchart TD
 
 **CDP capture** (`lib/capture/cdp.ts`). Turns `chrome.debugger` events into requests with bodies, sockets with frames, and console entries.
 
-**Mic** (`entrypoints/offscreen/`, `entrypoints/mic-permission/`). An offscreen document records the mic in chunks of 20 to 40 s, cut at a pause (an AnalyserNode level check, `PauseDetector` in `core/src/vad.ts`). The first mic permission needs a visible page.
+**Mic** (`entrypoints/offscreen/`, `entrypoints/mic-permission/`). An offscreen document records the mic in chunks of 20 to 40 s, cut at a pause (an AnalyserNode level check, `PauseDetector` in `core/src/vad.ts`). The first mic permission needs a visible page. It retries the mic before it closes: "Allow this time" grants only that tab, so the page then asks for a lasting Allow instead of reopening.
 
 **Transcription** (`lib/transcribe/openrouter.ts`). With an OpenRouter key, the background sends each audio chunk to OpenRouter as soon as it's saved and stores the word times per chunk. Export transcribes the chunks still missing. The request and the mapping to session ms are in core (`openrouter.ts`, `transcript.ts`), shared with `blook transcribe`.
 

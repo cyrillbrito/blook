@@ -7,7 +7,10 @@ import { Button, Card } from '@blook/ui';
 import { MicIcon } from '@blook/ui/icons';
 import '@/assets/tailwind.css';
 
-type State = { kind: 'asking' | 'idle' | 'granted' | 'error'; text?: string };
+type State = { kind: 'asking' | 'idle' | 'granted' | 'once' | 'error'; text?: string };
+
+// Blook's own entry in Chrome's site settings, where the mic can be set to Allow.
+const SITE_SETTINGS = `chrome://settings/content/siteDetails?site=${encodeURIComponent(location.origin)}`;
 
 function App() {
   const [s, setS] = useState<State>({ kind: 'idle' });
@@ -18,8 +21,15 @@ function App() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((t) => t.stop());
-      setS({ kind: 'granted', text: 'Microphone allowed. Returning to your recording…' });
-      await sendToBackground({ type: 'mic/permission-granted' });
+      setS({ kind: 'granted', text: 'Microphone allowed. Starting it for your recording…' });
+      const res = await sendToBackground({ type: 'mic/permission-granted' });
+      // On success the background closes this tab.
+      if (!res?.ok) {
+        setS({
+          kind: 'once',
+          text: 'Chrome allowed the microphone for this tab only ("Allow this time"), so the recording can\'t use it. Open Blook\'s settings, set Microphone to Allow, then press Allow microphone again.',
+        });
+      }
     } catch (err) {
       const e = err as DOMException;
       setS({
@@ -48,12 +58,24 @@ function App() {
           </span>
           <h1 className="text-lg font-semibold">Allow the microphone</h1>
         </div>
-        <p className="text-muted">Blook needs microphone access to record your narration. You only need to allow it once.</p>
+        <p className="text-muted">
+          Blook needs microphone access to record your narration. Choose <strong className="text-fg">Allow while visiting the site</strong>,
+          so you only do this once.
+        </p>
         <Button variant="record" disabled={s.kind === 'asking' || s.kind === 'granted'} onClick={() => void ask()}>
           <MicIcon className="h-4 w-4" />
           Allow microphone
         </Button>
-        {s.text && <p className={s.kind === 'error' ? 'text-danger' : s.kind === 'granted' ? 'text-ok' : 'text-muted'}>{s.text}</p>}
+        {s.text && (
+          <p className={s.kind === 'error' || s.kind === 'once' ? 'text-danger' : s.kind === 'granted' ? 'text-ok' : 'text-muted'}>
+            {s.text}
+          </p>
+        )}
+        {s.kind === 'once' && (
+          <Button variant="secondary" onClick={() => void browser.tabs.create({ url: SITE_SETTINGS })}>
+            Open Blook's microphone settings
+          </Button>
+        )}
       </Card>
     </main>
   );

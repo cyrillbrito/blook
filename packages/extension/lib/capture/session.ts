@@ -246,13 +246,22 @@ export async function onMicError(error: string, needsPermission?: boolean) {
   }
 }
 
-export async function onMicPermissionGranted() {
-  if (!active) return;
+/**
+ * Retries the mic while the permission tab is still open, so a failure can't open another tab.
+ * It fails when the user picked "Allow this time": that grant ends with the tab, and the
+ * offscreen document doesn't get it. The page then asks for a lasting Allow.
+ */
+export async function onMicPermissionGranted(): Promise<{ ok: boolean }> {
+  if (!active?.meta.settings.mic) return { ok: true };
+  // A fresh offscreen document, so no state from the denied attempt is left.
+  await closeOffscreen();
+  await startMic();
+  if (!active?.micRunning) return { ok: false };
   const permTab = active.permissionTabId;
   active.permissionTabId = undefined;
   await browser.tabs.update(primaryTab(active.meta), { active: true }).catch(() => {});
   if (permTab !== undefined) await browser.tabs.remove(permTab).catch(() => {});
-  if (active.meta.settings.mic) await startMic();
+  return { ok: true };
 }
 
 export function rrwebHello(tabId: number | undefined): { record: boolean; mask: boolean; canvas: boolean } {

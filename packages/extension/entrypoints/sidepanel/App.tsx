@@ -6,18 +6,7 @@ import { formatDuration, shortUrl, urlHost } from '@blook/core/format';
 import { formatDate, tryBackground } from '@/components/util';
 import { offerFile } from '@/components/handoff';
 import { Alert, Badge, Button, Card, Field, IconButton, Input, LiveDot, SectionTitle, Switch, cx } from '@blook/ui';
-import {
-  DownloadIcon,
-  FolderOpenIcon,
-  GearIcon,
-  MicIcon,
-  MicOffIcon,
-  RecordIcon,
-  SpinnerIcon,
-  StopIcon,
-  TrashIcon,
-  BlookIcon,
-} from '@blook/ui/icons';
+import { DownloadIcon, FolderOpenIcon, GearIcon, MicIcon, MicOffIcon, RecordIcon, SpinnerIcon, StopIcon, TrashIcon } from '@blook/ui/icons';
 
 const NO_ANSWER = 'The background worker did not answer.';
 
@@ -83,7 +72,10 @@ export default function App() {
   );
 }
 
-/** Brand plus "Open bundle…": pick a .zip here, the Replay page opens with it. */
+/**
+ * "Open bundle…": pick a .zip here, the Replay page opens with it.
+ * No brand: Chrome's side panel header already shows the extension icon and name.
+ */
 function Header() {
   const input = useRef<HTMLInputElement>(null);
   const open = (file?: File) => {
@@ -93,10 +85,6 @@ function Header() {
   };
   return (
     <header className="flex items-center gap-2">
-      <span className="flex items-center gap-1.5 font-semibold">
-        <BlookIcon />
-        Blook
-      </span>
       <input
         ref={input}
         type="file"
@@ -135,16 +123,29 @@ function useActiveTab() {
   return tab;
 }
 
+/**
+ * Chrome lets no extension script its own pages or the Web Store, so recording them always fails.
+ * Without the `tabs` permission, a page outside <all_urls> (chrome://, other extensions) shows no URL.
+ */
+function isRecordable(url: string | undefined) {
+  if (!url || !/^(https?|file):/.test(url)) return false;
+  const { hostname, pathname } = new URL(url);
+  return !(hostname === 'chromewebstore.google.com' || (hostname === 'chrome.google.com' && pathname.startsWith('/webstore')));
+}
+
 function IdleCard({ onRecord }: { onRecord: () => void }) {
   const tab = useActiveTab();
+  const blocked = !!tab && !isRecordable(tab.url);
   return (
     <Card className="space-y-2 p-3">
-      <Button variant="record" size="lg" className="w-full" onClick={onRecord}>
+      <Button variant="record" size="lg" className="w-full" onClick={onRecord} disabled={blocked}>
         <RecordIcon className="h-4 w-4" />
         Start recording
       </Button>
-      <p className="truncate text-center text-xs text-muted" title={tab?.url}>
-        {tab?.url ? (
+      <p className={cx('text-center text-xs text-muted', !blocked && 'truncate')} title={tab?.url}>
+        {blocked ? (
+          "Chrome doesn't let extensions record this page. Switch to your web app's tab."
+        ) : tab?.url ? (
           <>
             Records this tab: <span className="text-fg">{tab.title || shortUrl(tab.url)}</span>
           </>

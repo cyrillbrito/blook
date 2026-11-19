@@ -6,7 +6,7 @@ const CODES = {
   ok: [0, 'ok'],
   error: [1, 'unexpected error'],
   usage: [2, 'usage: bad or missing argument, option, time format, tab or selector'],
-  notFound: [3, 'not found or invalid: bundle path, bundle contents, extension folder'],
+  notFound: [3, 'not found or invalid: bundle path, bundle contents'],
   timeRange: [4, 'time outside the recording'],
   browser: [5, 'no browser: run `blook install-browser` or install Google Chrome'],
   network: [6, 'network: a download or request failed'],

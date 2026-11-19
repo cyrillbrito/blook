@@ -31,7 +31,7 @@ Behavior the help doesn't spell out:
 - `transcribe --method whisper` runs whisper.cpp locally (`brew install whisper-cpp`, or `BLOOK_WHISPER_CLI` for the path). The default model, `base.en`, is 148 MB, English only, and takes about 2 s for 30 s of audio on an M1. `small.en` (488 MB) is barely better here. For other languages use a multilingual model such as `small`. Models download once to `~/Blook/models` (`BLOOK_MODELS_DIR`). Headless Chromium decodes the WebM/Opus chunks to 16 kHz WAV, so there is no ffmpeg dependency. Word starts come from whisper.cpp's DTW token times (`-dtw`), which follow the voice more closely than its default token offsets.
 - `BLOOK_OPENROUTER_URL` points `--method openrouter` at another endpoint, for tests.
 - `skill install` runs `npx skills add cyrillbrito/blook --skill blook -g`, which asks which agents to link the skill into. Extra flags go to it (`-a claude-code -y`). With `--copy`, without npx, or without a terminal and flags, it writes the embedded skill to `~/.agents/skills/blook/`.
-- `extension` opens `chrome://extensions` only on macOS at a terminal.
+- `extension` prints the Chrome Web Store link, and opens it in Chrome only on macOS at a terminal. `install.sh` runs it with `--no-open`, so an update opens no tab.
 
 ## Limits
 

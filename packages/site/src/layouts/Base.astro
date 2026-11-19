@@ -2,6 +2,7 @@
 // Page shell: head, the header with the logo, and the stylesheet.
 import '../styles/site.css';
 import iconUrl from '@blook/ui/icon.svg?url';
+import { STORE_URL } from '../links';
 
 interface Props {
   title: string;
@@ -30,12 +31,13 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
     {
       !bare && (
         <header class="border-b border-line">
-          <nav class="mx-auto flex h-14 max-w-5xl items-center gap-5 px-5 text-sm">
+          <nav class="mx-auto flex h-14 max-w-5xl items-center gap-4 px-5 text-sm whitespace-nowrap sm:gap-5">
             <a href={base} class="mr-auto flex items-center gap-2 font-semibold">
               <img src={iconUrl} alt="" width="22" height="22" />
               Blook
             </a>
             <a href={`${base}viewer/`} class="rounded-control hover:underline focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none">Viewer</a>
+            <a href={STORE_URL} class="rounded-control hover:underline focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none">Chrome Web Store</a>
             <a href="https://github.com/cyrillbrito/blook" class="rounded-control hover:underline focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none">GitHub</a>
           </nav>
         </header>

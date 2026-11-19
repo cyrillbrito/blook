@@ -47,7 +47,10 @@ export interface BackgroundRequests {
   'mic/error': { req: { error: string; needsPermission?: boolean }; res: { ok: boolean } };
 
   // Mic permission page → background
-  /** The user allowed the mic on the visible permission page; the background retries the recorder. */
+  /**
+   * The user allowed the mic on the visible permission page; the background retries the recorder.
+   * `ok: false`: the recorder still can't use the mic (an "Allow this time" grant), the page stays open.
+   */
   'mic/permission-granted': { req: {}; res: { ok: boolean } };
 }
 

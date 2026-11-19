@@ -55,7 +55,7 @@ One package: `bun run --filter @blook/cli test`, or run its script from its fold
 
 Packages share TypeScript source through `package.json` `exports` (`@blook/core/bundle`, `@blook/ui`), with no build step. Shared dependency versions are in the root `package.json` catalog (`"react": "catalog:"`), and packages link each other with `workspace:*`. A new package is a folder in `packages/` with a `package.json` (`"name": "@blook/<name>"`, `"private": true`, `exports` to its source), a `tsconfig.json` that extends `../../tsconfig.base.json`, and a `"typecheck": "bun check"` script.
 
-The product has one version, in the root `package.json`. The extension manifest and `blook --version` read it, and packages have none. The manual release workflow (`.github/workflows/release.yml`, input `bump`: patch, minor or major) bumps it, tags, and publishes the zip and CLI binaries. Release notes are a short changelog, never install steps: pass the optional `notes` input (one sentence, then 2 to 6 user-visible bullets), or it lists the commit subjects since the last tag.
+The product has one version, in the root `package.json`. The extension manifest and `blook --version` read it, and packages have none. The manual release workflow (`.github/workflows/release.yml`, input `bump`: patch, minor or major) bumps it, tags, and publishes the extension ZIP and the CLI binaries on GitHub. The ZIP then goes to the Chrome Web Store by hand ([packages/store/README.md](packages/store/README.md)): the store is the only place users get the extension. Release notes are a short changelog, never install steps: pass the optional `notes` input (one sentence, then 2 to 6 user-visible bullets), or it lists the commit subjects since the last tag.
 
 ## Docs
 
@@ -67,7 +67,7 @@ The product has one version, in the root `package.json`. The extension manifest 
 - [packages/viewer/README.md](packages/viewer/README.md) and [packages/ui/README.md](packages/ui/README.md): hosting the viewer, and the UI primitives
 - [skills/blook/SKILL.md](skills/blook/SKILL.md): the agent skill that reads bundles
 - [packages/videos/README.md](packages/videos/README.md): the marketing films, made with HyperFrames and its `hyperframes` skill
-- [packages/store/README.md](packages/store/README.md): the Chrome Web Store listing, privacy answers and images (a folder, not a package)
+- [packages/store/README.md](packages/store/README.md): the Chrome Web Store listing, how to release an update to it, the privacy answers and images (a folder, not a package)
 - [README.md](README.md): install and use, for users
 
 Docs describe the current state, short and plain. `docs/` stays high level, and detail lives next to the code as short comments. The contracts stay exact: `docs/bundle-format.md`, `packages/core/src/types.ts` (stored rows and settings), `packages/extension/lib/messages.ts` (messages between extension contexts). Update the docs in the same change as the code. A stale doc is a bug.

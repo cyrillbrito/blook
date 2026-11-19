@@ -236,10 +236,10 @@ describe('replay', () => {
 });
 
 describe('extension and skill', () => {
-  test('extension --path', () => {
-    const r = run('extension', '--path');
+  test('extension --url', () => {
+    const r = run('extension', '--url');
     expect(r.code).toBe(0);
-    expect(r.stdout).toBe(join(homedir(), 'Blook', 'extension') + '\n');
+    expect(r.stdout).toBe('https://chromewebstore.google.com/detail/njijkneplfdknfbmbokldfpbdhgpppbi\n');
   });
   test('skill path', () => {
     expect(run('skill', 'path').stdout).toBe(join(homedir(), '.agents', 'skills', 'blook') + '\n');

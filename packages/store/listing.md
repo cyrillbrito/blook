@@ -1,4 +1,4 @@
-# Store listing (draft)
+# Store listing
 
 Paste these into the Developer Dashboard, **Store listing** tab.
 
@@ -8,7 +8,7 @@ Comes from `manifest.name`: **Blook**.
 
 ## Summary (manifest `description`, max 132 characters)
 
-From `packages/extension/wxt.config.ts`, 131 characters. The store shows it from the next uploaded version; 0.3.0 went up with the old one, "Record a narrated browser session into a local bundle for coding agents".
+From `packages/extension/wxt.config.ts`, 131 characters. The store shows the summary of the published ZIP.
 
 > Record your browser while you talk: page replay, network, console and your voice in one local ZIP for developers and coding agents.
 
@@ -68,7 +68,7 @@ The `screenshot-*.png` files, used by slide 5, the site and the films, come from
 
 ## Distribution
 
-Visibility: **Unlisted**. Free, all regions.
+Visibility: **Public**. Free, all regions.
 
 ## Other fields
 

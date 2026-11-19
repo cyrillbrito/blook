@@ -4,48 +4,46 @@ Blook is a Chrome extension that records what happens in your browser while you 
 
 Website, and a viewer that opens a recording in your browser: https://cyrillbrito.github.io/blook/
 
+<a href="https://chromewebstore.google.com/detail/njijkneplfdknfbmbokldfpbdhgpppbi"><img src="packages/store/images/chrome-web-store-badge.png" alt="Available in the Chrome Web Store" height="48"></a>
+
 ![The Replay page: the page replay on the left, the timeline on the right](docs/images/replay.png)
 
 ## What it captures
 
-- The page itself, as a DOM replay, with mouse moves, clicks, scrolls and typing
-- HTTP requests and responses, and WebSocket messages
-- Console logs and errors
+- The page itself, with your mouse, clicks, scrolls and typing
+- The network requests and the console
 - Your voice, transcribed word by word
 
-Everything sits on one shared clock. There is no video: the replay rebuilds the page at any moment.
-
-A recording is one local ZIP file. Nothing is uploaded, and there are no accounts.
+Everything lines up in time, and a recording is one ZIP file on your computer. Nothing is uploaded, and there are no accounts.
 
 ## Install
 
-On macOS (Apple silicon or Intel) or Linux (x64), run:
+Add Blook from the [Chrome Web Store](https://chromewebstore.google.com/detail/njijkneplfdknfbmbokldfpbdhgpppbi), pin it in the toolbar, and click it to open the side panel.
+
+## Record
+
+1. On the page you want to record, press **Start recording** in the side panel.
+2. Use the page and talk. Point at things with the mouse.
+3. Press **Stop recording**, then download the ZIP from the side panel.
+
+The first time, Chrome asks for the microphone. Pick **Allow while visiting the site**, so it only asks once.
+
+## Voice transcription (optional)
+
+To get your voice transcribed, click the gear icon in the side panel and paste an [OpenRouter API key](https://openrouter.ai/keys). Without one, the recording still keeps your voice, and it can be transcribed later.
+
+![The settings in the side panel, with the OpenRouter API key field](docs/images/sidepanel-settings.png)
+
+## Open a recording
+
+Click **Open bundle…** in the side panel, or drop the ZIP on the [viewer on the website](https://cyrillbrito.github.io/blook/viewer/).
+
+## For coding agents
+
+To let your coding agent read recordings, run this once on macOS or Linux:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/cyrillbrito/blook/main/install.sh | sh
 ```
-
-It sets up the `blook` command-line tool and the Chrome extension files in `~/Blook/extension`, and can add the `blook` skill to your coding agents. Run `blook update` to update, then click the reload icon on Blook's card in `chrome://extensions`.
-
-Blook isn't on the Chrome Web Store, so load the extension once (`blook extension` shows these steps again):
-
-1. Open `chrome://extensions`.
-2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked** and pick the `~/Blook/extension` folder.
-4. Pin Blook from the puzzle icon in the toolbar, and click it to open the side panel.
-
-![Blook loaded on chrome://extensions with Developer mode on](docs/images/extensions-page.png)
-
-Prefer to download by hand? Everything is on the [releases page](https://github.com/cyrillbrito/blook/releases/latest).
-
-## Voice transcription (optional)
-
-To get your voice transcribed, click the gear icon in the side panel and paste an [OpenRouter API key](https://openrouter.ai/keys). Without a key, Blook still records everything else, and the recording keeps your voice. Whoever opens it can transcribe it later on their own machine with `blook transcribe <bundle>` (one-time setup: `brew install whisper-cpp`).
-
-![The settings in the side panel, with the OpenRouter API key field](docs/images/sidepanel-settings.png)
-
-## For coding agents
-
-An agent reads a recording's ZIP with the `blook` command-line tool and the `blook` skill, which the install command above sets up. If Google Chrome isn't installed, run `blook install-browser` once.
 
 Then give your agent a recording's ZIP.
