@@ -3,7 +3,8 @@
 import { browser } from 'wxt/browser';
 import { getBySession, openBlookDB, putSession } from '../db';
 import type { BroadcastMessage, ContentMessage, OffscreenReply, RecordingStatus } from '../messages';
-import { settingsItem } from '../settings';
+import { getSettings } from '../settings';
+import { isRecordable } from '../recordable';
 import type { MicInfo, RrwebEventRow, SessionMeta } from '@blook/core/types';
 import { CdpCapture, enableDomains, type SendCommand } from './cdp';
 import { closeOffscreen, ensureOffscreen, sendToOffscreen } from './offscreen';
@@ -44,15 +45,15 @@ let status: RecordingStatus = { state: 'idle' };
 let active: Active | undefined;
 let stopping: Promise<RecordingStatus> | undefined;
 
-const send: SendCommand = (tabId, method, params) => browser.debugger.sendCommand({ tabId }, method, params as never) as Promise<any>;
+// chrome.debugger.sendCommand is untyped; SendCommand gives it the CDP types.
+const send = ((tabId: number, method: string, params?: object) => browser.debugger.sendCommand({ tabId }, method, params)) as SendCommand;
 
 export function getStatus(): RecordingStatus {
   return status;
 }
 
 function setStatus(next: RecordingStatus) {
-  // Mirror the mic state of the session so the pages can show it without digging into meta.
-  status = { ...next, mic: next.session?.mic.state ?? next.mic };
+  status = next;
   const msg: BroadcastMessage & ContentMessage = { type: 'status/update', status };
   browser.runtime.sendMessage(msg).catch(() => {}); // no extension page open
   // The pill in each recorded tab. After Stop too, so it can show "Saved".
@@ -150,11 +151,11 @@ function inject(tabId: number) {
 export async function startSession(tabId: number): Promise<RecordingStatus> {
   if (status.state !== 'idle') return status;
   const tab = await browser.tabs.get(tabId).catch(() => undefined);
-  if (!tab?.url || !/^(https?|file):/.test(tab.url)) {
-    setStatus({ state: 'idle', error: 'Blook can only record http(s) and file pages.' });
+  if (!tab?.url || !isRecordable(tab.url)) {
+    setStatus({ state: 'idle', error: "Chrome doesn't let extensions record this page." });
     return status;
   }
-  const settings = await settingsItem.getValue();
+  const settings = await getSettings();
   const { openRouterApiKey: _key, ...safeSettings } = settings;
   const epoch = Date.now();
   const meta: SessionMeta = {
@@ -361,7 +362,6 @@ async function doStop(error?: string): Promise<RecordingStatus> {
     a.meta.mic = { state: 'off', chunks };
   }
 
-  for (const tabId of a.attached) await browser.debugger.detach({ tabId }).catch(() => {});
   a.cdp.finalize();
   await teardown();
   await a.writer.flush();
@@ -373,12 +373,13 @@ async function doStop(error?: string): Promise<RecordingStatus> {
   return status;
 }
 
-/** Clears timers, scripts and in-memory state. Leaves stored rows alone. */
+/** Detaches the debugger, clears timers, scripts and in-memory state. Leaves stored rows alone. */
 async function teardown() {
   const a = active;
-  active = undefined;
+  active = undefined; // first, so the debugger listeners ignore what still arrives
   persist();
   if (a) {
+    for (const tabId of a.attached) await browser.debugger.detach({ tabId }).catch(() => {});
     clearInterval(a.keepalive);
     clearTimeout(a.readyTimer);
     a.writer.stop();

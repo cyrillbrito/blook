@@ -2,9 +2,19 @@
 // WebSocket sockets and frames, console calls, exceptions and browser log entries.
 import type { ConsoleRow, Headers, NetworkRequestRow, SessionId, WebSocketRow } from '@blook/core/types';
 import { BODY_MAX_BYTES, bodyPolicy, capBase64, capText } from '@blook/core/body-policy';
+import type Protocol from 'devtools-protocol';
+import type { ProtocolMapping } from 'devtools-protocol/types/protocol-mapping';
 import type { BatchWriter } from './writer';
 
-export type SendCommand = (tabId: number, method: string, params?: object) => Promise<any>;
+type Commands = ProtocolMapping.Commands;
+/** The params of a CDP event. */
+type Ev<M extends keyof ProtocolMapping.Events> = ProtocolMapping.Events[M][0];
+
+export type SendCommand = <M extends keyof Commands>(
+  tabId: number,
+  method: M,
+  ...params: Commands[M]['paramsType']
+) => Promise<Commands[M]['returnType']>;
 
 /** Commands to run on every attached tab. */
 export async function enableDomains(send: SendCommand, tabId: number) {
@@ -47,24 +57,27 @@ export class CdpCapture {
     return Math.round((ms ?? Date.now()) - this.epoch);
   }
 
-  handle(tabId: number, method: string, p: any) {
+  /** One chrome.debugger event. `params` is untyped there; each case reads it as its CDP event. */
+  handle(tabId: number, method: string, params: unknown) {
     switch (method) {
       case 'Network.requestWillBeSent':
-        return this.onRequest(tabId, p);
+        return this.onRequest(tabId, params as Ev<'Network.requestWillBeSent'>);
       case 'Network.responseReceived':
-        return this.onResponse(p);
+        return this.onResponse(params as Ev<'Network.responseReceived'>);
       case 'Network.dataReceived': {
+        const p = params as Ev<'Network.dataReceived'>;
         const row = this.requests.get(p.requestId);
         if (row) row.responseBodySize = (row.responseBodySize ?? 0) + (p.dataLength ?? 0);
         return;
       }
       case 'Network.loadingFinished':
-        return void this.onFinished(tabId, p);
+        return void this.onFinished(tabId, params as Ev<'Network.loadingFinished'>);
       case 'Network.loadingFailed':
-        return this.onFailed(p);
+        return this.onFailed(params as Ev<'Network.loadingFailed'>);
       case 'Network.webSocketCreated':
-        return this.onSocketCreated(tabId, p);
+        return this.onSocketCreated(tabId, params as Ev<'Network.webSocketCreated'>);
       case 'Network.webSocketWillSendHandshakeRequest': {
+        const p = params as Ev<'Network.webSocketWillSendHandshakeRequest'>;
         this.learnClock(p.timestamp, p.wallTime);
         const s = this.sockets.get(p.requestId);
         if (s) {
@@ -74,6 +87,7 @@ export class CdpCapture {
         return;
       }
       case 'Network.webSocketHandshakeResponseReceived': {
+        const p = params as Ev<'Network.webSocketHandshakeResponseReceived'>;
         const s = this.sockets.get(p.requestId);
         if (s) {
           s.status = p.response?.status;
@@ -84,8 +98,9 @@ export class CdpCapture {
       }
       case 'Network.webSocketFrameSent':
       case 'Network.webSocketFrameReceived':
-        return this.onFrame(p, method === 'Network.webSocketFrameSent' ? 'sent' : 'received');
-      case 'Network.webSocketFrameError':
+        return this.onFrame(params as Ev<'Network.webSocketFrameSent'>, method === 'Network.webSocketFrameSent' ? 'sent' : 'received');
+      case 'Network.webSocketFrameError': {
+        const p = params as Ev<'Network.webSocketFrameError'>;
         return this.consoleRow(tabId, {
           t: this.mono(p.timestamp),
           source: 'log',
@@ -93,7 +108,9 @@ export class CdpCapture {
           text: `WebSocket frame error: ${p.errorMessage}`,
           url: this.sockets.get(p.requestId)?.url,
         });
+      }
       case 'Network.webSocketClosed': {
+        const p = params as Ev<'Network.webSocketClosed'>;
         const s = this.sockets.get(p.requestId);
         if (s) {
           s.closedT = this.mono(p.timestamp);
@@ -103,11 +120,11 @@ export class CdpCapture {
         return;
       }
       case 'Runtime.consoleAPICalled':
-        return this.onConsole(tabId, p);
+        return this.onConsole(tabId, params as Ev<'Runtime.consoleAPICalled'>);
       case 'Runtime.exceptionThrown':
-        return this.onException(tabId, p);
+        return this.onException(tabId, params as Ev<'Runtime.exceptionThrown'>);
       case 'Log.entryAdded':
-        return this.onLog(tabId, p.entry);
+        return this.onLog(tabId, (params as Ev<'Log.entryAdded'>).entry);
     }
   }
 
@@ -119,7 +136,7 @@ export class CdpCapture {
     this.sockets.clear();
   }
 
-  private onRequest(tabId: number, p: any) {
+  private onRequest(tabId: number, p: Ev<'Network.requestWillBeSent'>) {
     this.learnClock(p.timestamp, p.wallTime);
     const url: string = p.request?.url ?? '';
     if (url.startsWith('data:') || url.startsWith('blob:')) return;
@@ -170,7 +187,7 @@ export class CdpCapture {
     if (cut.truncated) Object.assign(row, { requestBodyTruncated: true, requestBodySize: cut.size });
   }
 
-  private onResponse(p: any) {
+  private onResponse(p: Ev<'Network.responseReceived'>) {
     const row = this.requests.get(p.requestId);
     if (!row) return;
     Object.assign(row, responseFields(p.response));
@@ -178,7 +195,7 @@ export class CdpCapture {
     this.writer.upsertRequest(row);
   }
 
-  private async onFinished(tabId: number, p: any) {
+  private async onFinished(tabId: number, p: Ev<'Network.loadingFinished'>) {
     const row = this.requests.get(p.requestId);
     if (!row) return;
     row.endT = this.mono(p.timestamp);
@@ -193,7 +210,7 @@ export class CdpCapture {
     try {
       // Ask right away: Chrome may evict the body from its buffer later.
       const r = await this.send(tabId, 'Network.getResponseBody', { requestId: p.requestId });
-      const body: string = r?.body ?? '';
+      const body = r?.body ?? '';
       // Empty is kept as no body: Chrome returns '' for a fetch read as a blob, and the
       // dataReceived size is then the better number.
       if (body) {
@@ -209,7 +226,7 @@ export class CdpCapture {
     this.writer.upsertRequest(row);
   }
 
-  private onFailed(p: any) {
+  private onFailed(p: Ev<'Network.loadingFailed'>) {
     const row = this.requests.get(p.requestId);
     if (!row) return;
     row.endT = this.mono(p.timestamp);
@@ -219,7 +236,7 @@ export class CdpCapture {
     this.writer.upsertRequest(row);
   }
 
-  private onSocketCreated(tabId: number, p: any) {
+  private onSocketCreated(tabId: number, p: Ev<'Network.webSocketCreated'>) {
     const row: WebSocketRow = {
       sessionId: this.sessionId,
       socketId: p.requestId,
@@ -231,9 +248,9 @@ export class CdpCapture {
     this.writer.upsertSocket(row);
   }
 
-  private onFrame(p: any, direction: 'sent' | 'received') {
-    const payload: string = p.response?.payloadData ?? '';
-    const opcode: number = p.response?.opcode ?? 1;
+  private onFrame(p: Ev<'Network.webSocketFrameSent'>, direction: 'sent' | 'received') {
+    const payload = p.response?.payloadData ?? '';
+    const opcode = p.response?.opcode ?? 1;
     // Same cap as HTTP bodies. Binary payloads (opcode 2) arrive as base64.
     const cut = opcode === 2 ? capBase64(payload, BODY_MAX_BYTES) : capText(payload, BODY_MAX_BYTES);
     this.writer.addFrame({
@@ -248,7 +265,7 @@ export class CdpCapture {
     });
   }
 
-  private onConsole(tabId: number, p: any) {
+  private onConsole(tabId: number, p: Ev<'Runtime.consoleAPICalled'>) {
     const top = p.stackTrace?.callFrames?.[0];
     this.consoleRow(tabId, {
       t: this.wall(p.timestamp),
@@ -262,14 +279,14 @@ export class CdpCapture {
     });
   }
 
-  private onException(tabId: number, p: any) {
-    const d = p.exceptionDetails ?? {};
-    const desc: string | undefined = d.exception?.description;
+  private onException(tabId: number, p: Ev<'Runtime.exceptionThrown'>) {
+    const d = p.exceptionDetails;
+    const desc = d.exception?.description;
     this.consoleRow(tabId, {
       t: this.wall(p.timestamp),
       source: 'exception',
       level: 'error',
-      text: desc ? desc.split('\n')[0] : d.exception?.value !== undefined ? `Uncaught ${String(d.exception.value)}` : d.text,
+      text: desc ? (desc.split('\n')[0] ?? desc) : d.exception?.value !== undefined ? `Uncaught ${String(d.exception.value)}` : d.text,
       url: d.url,
       line: d.lineNumber !== undefined ? d.lineNumber + 1 : undefined,
       column: d.columnNumber !== undefined ? d.columnNumber + 1 : undefined,
@@ -277,7 +294,7 @@ export class CdpCapture {
     });
   }
 
-  private onLog(tabId: number, e: any) {
+  private onLog(tabId: number, e: Protocol.Log.LogEntry | undefined) {
     if (!e) return;
     const level = e.level === 'verbose' ? 'debug' : e.level === 'warning' ? 'warn' : e.level;
     this.consoleRow(tabId, {
@@ -308,7 +325,7 @@ function isExtensionConsole(c: { url?: string; stack?: string }): boolean {
   return !!top?.startsWith('chrome-extension://');
 }
 
-function responseFields(r: any): Partial<NetworkRequestRow> {
+function responseFields(r: Protocol.Network.Response | undefined): Partial<NetworkRequestRow> {
   if (!r) return {};
   return {
     status: r.status,
@@ -318,7 +335,7 @@ function responseFields(r: any): Partial<NetworkRequestRow> {
   };
 }
 
-function normHeaders(h: Record<string, unknown> | undefined): Headers {
+function normHeaders(h: Protocol.Network.Headers | undefined): Headers {
   const out: Headers = {};
   for (const [k, v] of Object.entries(h ?? {})) out[k] = String(v);
   return out;
@@ -341,31 +358,30 @@ function consoleLevel(type: string): ConsoleRow['level'] {
 }
 
 /** Renders a CDP RemoteObject roughly like DevTools does on one line. */
-function formatRemote(o: any): string {
+function formatRemote(o: Protocol.Runtime.RemoteObject | undefined): string {
   if (!o) return '';
-  if (o.type === 'string') return o.value;
+  if (o.type === 'string') return String(o.value);
   if (o.unserializableValue) return o.unserializableValue;
   if (o.type === 'undefined') return 'undefined';
   if ('value' in o && o.type !== 'object') return String(o.value);
   if (o.value === null || o.subtype === 'null') return 'null';
-  if (o.preview?.properties) {
-    const props = o.preview.properties.map((p: any) => (o.preview.subtype === 'array' ? previewValue(p) : `${p.name}: ${previewValue(p)}`));
-    const more = o.preview.overflow ? ', …' : '';
-    return o.preview.subtype === 'array'
+  const preview = o.preview;
+  if (preview?.properties) {
+    const props = preview.properties.map((p) => (preview.subtype === 'array' ? previewValue(p) : `${p.name}: ${previewValue(p)}`));
+    const more = preview.overflow ? ', …' : '';
+    return preview.subtype === 'array'
       ? `${o.description ?? 'Array'} [${props.join(', ')}${more}]`
       : `${o.className && o.className !== 'Object' ? `${o.className} ` : ''}{${props.join(', ')}${more}}`;
   }
   return o.description ?? o.className ?? o.type;
 }
 
-function previewValue(p: any): string {
+function previewValue(p: Protocol.Runtime.PropertyPreview): string {
   return p.type === 'string' ? JSON.stringify(p.value) : (p.value ?? p.type);
 }
 
-function formatStack(st: any): string | undefined {
+function formatStack(st: Protocol.Runtime.StackTrace | undefined): string | undefined {
   const frames = st?.callFrames;
   if (!frames?.length) return undefined;
-  return frames
-    .map((f: any) => `    at ${f.functionName || '<anonymous>'} (${f.url}:${f.lineNumber + 1}:${f.columnNumber + 1})`)
-    .join('\n');
+  return frames.map((f) => `    at ${f.functionName || '<anonymous>'} (${f.url}:${f.lineNumber + 1}:${f.columnNumber + 1})`).join('\n');
 }

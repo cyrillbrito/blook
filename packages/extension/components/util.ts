@@ -1,6 +1,8 @@
 // UI-only helpers shared by the popup, the Recordings page and the Replay page.
 import { sendToBackground, type BackgroundRequests, type BackgroundRequestType } from '@/lib/messages';
 
+export const NO_ANSWER = 'The background worker did not answer.';
+
 /**
  * Request to the background that never throws. Resolves to `undefined` when nobody
  * answers (no listener, no reply, or no reply within `timeoutMs`).

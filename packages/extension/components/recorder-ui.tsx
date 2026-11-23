@@ -1,11 +1,11 @@
 // React pieces shared by the toolbar popup and the Recordings page (with its Settings view).
 import type { PublicPath } from 'wxt/browser';
 import { useCallback, useEffect, useState } from 'react';
-import type { BroadcastMessage, RecordingStatus } from '@/lib/messages';
-import { DEFAULT_SETTINGS, settingsItem } from '@/lib/settings';
-import { TRANSCRIPTION_MODEL, type SessionMeta, type Settings } from '@blook/core/types';
+import type { BroadcastMessage, RecordingStatus, SessionListItem, TranscriptionStatus } from '@/lib/messages';
+import { DEFAULT_SETTINGS, getSettings, updateSettings, watchSettings } from '@/lib/settings';
+import { TRANSCRIPTION_MODEL, type Settings } from '@blook/core/types';
 import { formatDuration, shortUrl, urlHost } from '@blook/core/format';
-import { formatDate, tryBackground } from './util';
+import { formatDate, NO_ANSWER, tryBackground } from './util';
 import { MIC } from './mic';
 import { Badge, Button, Card, Field, IconButton, Input, LiveDot, Switch, cx } from '@blook/ui';
 import { StopIcon } from '@blook/ui/icons';
@@ -14,8 +14,6 @@ import LoaderCircleIcon from 'lucide-react/icons/loader-circle';
 import MicIcon from 'lucide-react/icons/mic';
 import MicOffIcon from 'lucide-react/icons/mic-off';
 import Trash2Icon from 'lucide-react/icons/trash-2';
-
-export const NO_ANSWER = 'The background worker did not answer.';
 
 /** Opens a page of the extension: in this tab with `here` (the Recordings page), else in a new tab (the popup). */
 const openPage = (path: string, here?: boolean) => {
@@ -32,7 +30,7 @@ export const openBundlePicker = () => openPage('/replay.html', location.pathname
 /** The recording status and the stored sessions, kept fresh from the background's broadcasts. */
 export function useRecorder() {
   const [status, setStatus] = useState<RecordingStatus>({ state: 'idle' });
-  const [sessions, setSessions] = useState<SessionMeta[]>([]);
+  const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [error, setError] = useState<string>();
 
   const refreshSessions = useCallback(async () => {
@@ -106,16 +104,6 @@ export function useActiveTab() {
   return tab;
 }
 
-/**
- * Chrome lets no extension script its own pages or the Web Store, so recording them always fails.
- * Without the `tabs` permission, a page outside <all_urls> (chrome://, other extensions) shows no URL.
- */
-export function isRecordable(url: string | undefined) {
-  if (!url || !/^(https?|file):/.test(url)) return false;
-  const { hostname, pathname } = new URL(url);
-  return !(hostname === 'chromewebstore.google.com' || (hostname === 'chrome.google.com' && pathname.startsWith('/webstore')));
-}
-
 /** While starting, recording or stopping: a status line, the page, and Stop. */
 export function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: () => void }) {
   const { state, session, phase } = status;
@@ -130,8 +118,7 @@ export function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: 
 
   const elapsed = session ? Math.max(0, now - session.startedAt) : 0;
   const loading = recording && phase === 'loading-page';
-  const micState = status.mic ?? session?.mic.state;
-  const mic = micState && MIC[micState];
+  const mic = session && MIC[session.mic.state];
   const label = state === 'starting' ? 'Starting…' : state === 'stopping' ? 'Saving…' : loading ? 'Loading page…' : 'Recording';
 
   return (
@@ -179,13 +166,12 @@ export function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: 
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   useEffect(() => {
-    settingsItem.getValue().then(setSettings);
-    return settingsItem.watch((value) => setSettings(value ?? DEFAULT_SETTINGS));
+    void getSettings().then(setSettings);
+    return watchSettings(setSettings);
   }, []);
   const update = (patch: Partial<Settings>) => {
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    settingsItem.setValue(next);
+    setSettings((s) => ({ ...s, ...patch }));
+    void updateSettings(patch);
   };
   return [settings, update] as const;
 }
@@ -230,7 +216,7 @@ export function SessionList({
   onChanged,
   openHere,
 }: {
-  sessions: SessionMeta[];
+  sessions: SessionListItem[];
   activeId?: string;
   onChanged: () => void;
   /** Open a recording in this tab instead of a new one. */
@@ -258,7 +244,7 @@ function SessionRow({
   onChanged,
   openHere,
 }: {
-  session: SessionMeta;
+  session: SessionListItem;
   active: boolean;
   onChanged: () => void;
   openHere?: boolean;
@@ -367,9 +353,10 @@ function SessionRow({
   );
 }
 
-type Transcription = NonNullable<SessionMeta['transcription']>;
-
-const TRANSCRIPTION: Record<Transcription['state'], { label: (t: Transcription) => string; tone?: 'accent' | 'warn' | 'danger' }> = {
+const TRANSCRIPTION: Record<
+  TranscriptionStatus['state'],
+  { label: (t: TranscriptionStatus) => string; tone?: 'accent' | 'warn' | 'danger' }
+> = {
   none: { label: () => '' },
   'no-key': { label: () => 'not transcribed: no API key', tone: 'warn' },
   pending: { label: (t) => `transcribing ${t.done}/${t.total}`, tone: 'accent' },

@@ -1,6 +1,6 @@
 // Message contracts between extension contexts. All go through browser.runtime messaging.
 import type { eventWithTime } from '@rrweb/types';
-import type { MicState, SessionId, SessionMeta } from '@blook/core/types';
+import type { SessionId, SessionMeta } from '@blook/core/types';
 
 /** What the popup, the Recordings page and the pill show. Pushed by the background on every change. */
 export interface RecordingStatus {
@@ -13,12 +13,30 @@ export interface RecordingStatus {
    * full snapshot and its load event (or the load timeout), then 'live'.
    */
   phase?: 'loading-page' | 'live';
-  /** Mic state of the current session. */
-  mic?: MicState;
+}
+
+/** A row of `sessions/list`: the stored meta, plus its transcription progress from the transcripts store. */
+export interface SessionListItem extends SessionMeta {
+  transcription?: TranscriptionStatus;
+}
+
+export interface TranscriptionStatus {
+  /**
+   * none: no audio. no-key: audio but no OpenRouter key. pending: chunks waiting.
+   * transcribing: a request is running. done: every chunk transcribed. partial: some failed.
+   * failed: every attempted chunk failed.
+   */
+  state: 'none' | 'no-key' | 'pending' | 'transcribing' | 'done' | 'partial' | 'failed';
+  /** Chunks transcribed. */
+  done: number;
+  /** Audio chunks saved so far. */
+  total: number;
+  error?: string;
 }
 
 /**
  * Requests to the background, keyed by `type`: `req` is the message, `res` is the reply.
+ * A handler that throws replies `undefined` (and logs the error in the background), as does a worker that doesn't answer.
  * Senders: popup and Recordings page (session/*, sessions/*), pill (session/*), recorder content script (rrweb/*),
  * offscreen document (audio/*, mic/*).
  */
@@ -27,7 +45,7 @@ export interface BackgroundRequests {
   'session/start': { req: { tabId: number }; res: RecordingStatus };
   'session/stop': { req: {}; res: RecordingStatus };
   'session/status': { req: {}; res: RecordingStatus };
-  'sessions/list': { req: {}; res: SessionMeta[] };
+  'sessions/list': { req: {}; res: SessionListItem[] };
   'session/delete': { req: { sessionId: SessionId }; res: { ok: boolean } };
   /** Builds the ZIP (and transcribes if needed), then downloads it. `warning`: downloaded, but the transcript is missing or partial. */
   'session/export': { req: { sessionId: SessionId }; res: { ok: boolean; error?: string; warning?: string } };
@@ -86,8 +104,16 @@ export type BroadcastMessage =
   /** A session's stored data changed (e.g. transcription progress): refresh the list. */
   | { type: 'sessions/changed'; sessionId: SessionId };
 
+/** The background's handler for each request, checked against the contract above. */
+export type BackgroundHandlers = {
+  [K in BackgroundRequestType]: (
+    message: BackgroundRequests[K]['req'],
+    sender: Browser.runtime.MessageSender,
+  ) => BackgroundRequests[K]['res'] | Promise<BackgroundRequests[K]['res']>;
+};
+
 export function sendToBackground<K extends BackgroundRequestType>(
   message: { type: K } & BackgroundRequests[K]['req'],
-): Promise<BackgroundRequests[K]['res']> {
+): Promise<BackgroundRequests[K]['res'] | undefined> {
   return browser.runtime.sendMessage(message);
 }

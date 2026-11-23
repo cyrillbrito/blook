@@ -5,9 +5,10 @@ import { Alert, Button, Card, IconButton, cx } from '@blook/ui';
 import { BlookIcon, RecordIcon } from '@blook/ui/icons';
 import FolderOpenIcon from 'lucide-react/icons/folder-open';
 import SettingsIcon from 'lucide-react/icons/settings';
+import { urlHost } from '@blook/core/format';
+import { isRecordable } from '@/lib/recordable';
 import {
   CaptureSwitches,
-  isRecordable,
   LiveCard,
   openBundlePicker,
   openRecordings,
@@ -59,16 +60,7 @@ export default function App() {
   );
 }
 
-/** The site, not the tab title: titles are often long or noisy. */
-function host(url: string): string {
-  try {
-    return new URL(url).host || url;
-  } catch {
-    return url;
-  }
-}
-
-function IdleCard({ onRecord }: { onRecord: () => void }) {
+function IdleCard({ onRecord }: { onRecord: () => Promise<void> }) {
   const tab = useActiveTab();
   const blocked = !!tab && !isRecordable(tab.url);
   const [starting, setStarting] = useState(false);
@@ -81,7 +73,8 @@ function IdleCard({ onRecord }: { onRecord: () => void }) {
         disabled={blocked || starting}
         onClick={() => {
           setStarting(true);
-          onRecord();
+          // On success the popup closes; on failure Record is enabled again next to the error.
+          void onRecord().finally(() => setStarting(false));
         }}
       >
         <RecordIcon className="h-4 w-4" />
@@ -92,7 +85,8 @@ function IdleCard({ onRecord }: { onRecord: () => void }) {
           "Chrome doesn't let extensions record this page. Switch to your web app's tab."
         ) : tab?.url ? (
           <>
-            Records this tab: <span className="text-fg">{host(tab.url)}</span>
+            Records this tab: {/* The site, not the tab title: titles are often long or noisy. */}
+            <span className="text-fg">{urlHost(tab.url)}</span>
           </>
         ) : (
           'Records the active tab.'

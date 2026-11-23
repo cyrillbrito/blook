@@ -1,5 +1,5 @@
 import { deleteSession, listSessions } from '@/lib/db';
-import type { BackgroundMessage, BackgroundRequests } from '@/lib/messages';
+import type { BackgroundHandlers, BackgroundMessage, SessionListItem } from '@/lib/messages';
 import {
   addRrwebEvents,
   getStatus,
@@ -13,8 +13,6 @@ import {
 } from '@/lib/capture/session';
 import { exportSession } from '@/lib/export/download';
 import { transcribeChunkSoon, transcriptionStatus } from '@/lib/transcribe/openrouter';
-
-type Handler = (msg: any, sender: Browser.runtime.MessageSender) => unknown | Promise<unknown>;
 
 export default defineBackground(() => {
   registerListeners();
@@ -30,18 +28,15 @@ export default defineBackground(() => {
     if (tabId !== undefined) void startSession(tabId);
   });
 
-  const handlers: { [K in keyof BackgroundRequests]: Handler } = {
+  const handlers: BackgroundHandlers = {
     'session/start': (m) => startSession(m.tabId),
     'session/stop': () => stopSession(),
     'session/status': () => getStatus(),
     'sessions/list': async () => {
       const list = await listSessions();
-      await Promise.all(
-        list.map(async (s) => {
-          s.transcription = await transcriptionStatus(s.id).catch(() => undefined);
-        }),
+      return Promise.all(
+        list.map(async (s): Promise<SessionListItem> => ({ ...s, transcription: await transcriptionStatus(s.id).catch(() => undefined) })),
       );
-      return list;
     },
     'session/delete': async (m) => {
       if (getStatus().session?.id === m.sessionId && getStatus().state !== 'idle') return { ok: false };
@@ -70,13 +65,15 @@ export default defineBackground(() => {
 
   browser.runtime.onMessage.addListener((message: BackgroundMessage | { target?: string }, sender, sendResponse) => {
     if ('target' in message && message.target) return undefined; // for the offscreen document
-    const handler = handlers[(message as BackgroundMessage).type];
+    const { type } = message as BackgroundMessage;
+    // One cast: TypeScript can't pair a union message with its handler.
+    const handler = handlers[type] as ((m: BackgroundMessage, s: typeof sender) => unknown) | undefined;
     if (!handler) return undefined;
     ready
-      .then(() => handler(message, sender))
-      .then(sendResponse, (err) => {
-        console.error('[blook]', (message as BackgroundMessage).type, err);
-        sendResponse({ ok: false, error: String(err?.message ?? err) });
+      .then(() => handler(message as BackgroundMessage, sender))
+      .then(sendResponse, (err: unknown) => {
+        console.error('[blook]', type, err);
+        sendResponse(undefined);
       });
     return true;
   });

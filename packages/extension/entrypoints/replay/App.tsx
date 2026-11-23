@@ -4,7 +4,7 @@
 // - /replay.html: the picker for a bundle .zip or folder ("Open bundle…" in the popup and the Recordings page).
 import { buildBundle } from '@/lib/export/bundle';
 import { bundleFromZip, ViewerApp, type Bundle, type ViewerAppProps } from '@blook/viewer';
-import { tryBackground } from '@/components/util';
+import { NO_ANSWER, tryBackground } from '@/components/util';
 
 const sessionId = new URLSearchParams(location.search).get('session') ?? '';
 const back = { href: '/recordings.html', label: 'Recordings' };
@@ -17,7 +17,7 @@ async function loadFromDb(id: string): Promise<Bundle> {
 /** Same as the Recordings page's Download: transcribes if needed, then saves the ZIP. */
 async function download(id: string) {
   const res = await tryBackground({ type: 'session/export', sessionId: id }, 10 * 60_000);
-  if (!res) throw new Error('The background worker did not answer.');
+  if (!res) throw new Error(NO_ANSWER);
   if (!res.ok) throw new Error(res.error ?? 'Download failed.');
 }
 

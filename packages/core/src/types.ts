@@ -27,29 +27,10 @@ export interface SessionMeta {
   settings: Omit<Settings, 'openRouterApiKey'>;
   /** What happened to the mic. */
   mic: MicInfo;
-  /**
-   * Transcription progress. Not stored: the background fills it in for `sessions/list`
-   * from the transcripts store (see the extension's lib/transcribe/openrouter.ts transcriptionStatus).
-   */
-  transcription?: TranscriptionStatus;
   /** Session time of the first rrweb full snapshot of the first tab (DOM available from here). */
   firstSnapshotT?: SessionTime;
   /** Session time the Record reload of the first tab finished loading (its load event). */
   pageReadyT?: SessionTime;
-}
-
-export interface TranscriptionStatus {
-  /**
-   * none: no audio. no-key: audio but no OpenRouter key. pending: chunks waiting.
-   * transcribing: a request is running. done: every chunk transcribed. partial: some failed.
-   * failed: every attempted chunk failed.
-   */
-  state: 'none' | 'no-key' | 'pending' | 'transcribing' | 'done' | 'partial' | 'failed';
-  /** Chunks transcribed. */
-  done: number;
-  /** Audio chunks saved so far. */
-  total: number;
-  error?: string;
 }
 
 /** Result for one audio chunk, kept so later runs only transcribe what's missing. */

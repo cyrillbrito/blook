@@ -89,8 +89,7 @@ function start() {
 
     if (live) {
       const session = s.session!;
-      const micState = s.mic ?? session.mic.state;
-      const mic = MIC[micState];
+      const mic = MIC[session.mic.state];
       // No icon when the mic is off: it would look like a button. Shown when on, or when it should be on but isn't.
       const micShown = mic.on || !!mic.tone;
       const label =
@@ -213,6 +212,7 @@ function start() {
   });
   void sendToBackground({ type: 'session/status' })
     .then((s) => {
+      if (!s) return;
       status = s;
       render();
     })

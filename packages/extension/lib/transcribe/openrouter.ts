@@ -7,9 +7,9 @@ import { chunkResult, chunkTranscript, mergeChunks, type TranscriptSource } from
 import type { BundleOptions } from '@blook/core/bundle';
 import { openRouterEach, openRouterTranscribe, OPENROUTER_ENDPOINT } from '@blook/core/openrouter';
 import { getBySession, openBlookDB } from '../db';
-import type { BroadcastMessage } from '../messages';
-import { settingsItem } from '../settings';
-import type { AudioChunkRow, SessionId, TranscriptChunkResult, TranscriptionStatus, TranscriptRow } from '@blook/core/types';
+import type { BroadcastMessage, TranscriptionStatus } from '../messages';
+import { getSettings } from '../settings';
+import type { AudioChunkRow, SessionId, TranscriptChunkResult, TranscriptRow } from '@blook/core/types';
 import { TRANSCRIPTION_MODEL } from '@blook/core/types';
 
 /** Dev/test only: a fake endpoint URL in storage.local under this key replaces OpenRouter. */
@@ -82,7 +82,7 @@ function runChunk(chunk: AudioChunkRow, apiKey: string): Promise<void> {
  * Without an API key it does nothing (Export or a later key picks it up).
  */
 export async function transcribeChunkSoon(sessionId: SessionId, index: number): Promise<void> {
-  const { openRouterApiKey } = await settingsItem.getValue();
+  const { openRouterApiKey } = await getSettings();
   if (!openRouterApiKey) return notify(sessionId);
   const db = await openBlookDB();
   const chunk = await db.get('audioChunks', [sessionId, index]);
@@ -93,7 +93,7 @@ export async function transcribeChunkSoon(sessionId: SessionId, index: number): 
 /** Transcribes every chunk that has no good result yet. Without an API key it does nothing. */
 export async function ensureTranscript(sessionId: SessionId): Promise<void> {
   const db = await openBlookDB();
-  const { openRouterApiKey } = await settingsItem.getValue();
+  const { openRouterApiKey } = await getSettings();
   if (!openRouterApiKey) return;
   const [chunks, stored] = await Promise.all([getBySession('audioChunks', sessionId), db.get('transcripts', sessionId)]);
   const results = new Map((stored?.chunks ?? []).map((c) => [c.index, c]));
@@ -131,7 +131,7 @@ export async function transcriptionStatus(sessionId: SessionId): Promise<Transcr
   const [total, row, settings] = await Promise.all([
     db.countFromIndex('audioChunks', 'bySession', sessionId),
     db.get('transcripts', sessionId),
-    settingsItem.getValue(),
+    getSettings(),
   ]);
   if (total === 0) return { state: 'none', done: 0, total };
   const done = row?.chunks.filter((c) => isDone(c)).length ?? 0;
