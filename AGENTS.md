@@ -51,6 +51,8 @@ bun run format         # oxfmt, one root config (.oxfmtrc.json); format:check in
 
 One package: `bun run --filter @blook/cli test`, or run its script from its folder. The CLI from source: `cd packages/cli && bun src/cli.ts info <bundle.zip>` ([packages/cli/README.md](packages/cli/README.md)).
 
+`bunfig.toml` sets a one-day `minimumReleaseAge`: `bun install` and `bun update` skip package versions published less than a day ago.
+
 `bun check` is Bun's built-in type checker, so no package needs TypeScript to check. The root `typescript` devDependency is only for editors: keep it on the version `bun -p process.versions.typescript` prints.
 
 Packages share TypeScript source through `package.json` `exports` (`@blook/core/bundle`, `@blook/ui`), with no build step. Shared dependency versions are in the root `package.json` catalog (`"react": "catalog:"`), and packages link each other with `workspace:*`. A new package is a folder in `packages/` with a `package.json` (`"name": "@blook/<name>"`, `"private": true`, `exports` to its source), a `tsconfig.json` that extends `../../tsconfig.base.json`, and a `"typecheck": "bun check"` script.

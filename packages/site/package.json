@@ -10,10 +10,10 @@
     "typecheck": "bun check"
   },
   "dependencies": {
-    "@astrojs/react": "^7.1.2",
+    "@astrojs/react": "^7.1.9",
     "@blook/ui": "workspace:*",
     "@blook/viewer": "workspace:*",
-    "astro": "^7.4.5",
+    "astro": "^7.4.13",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

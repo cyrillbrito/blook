@@ -11,6 +11,6 @@
   },
   "devDependencies": {
     "@types/bun": "catalog:",
-    "hyperframes": "0.9.19"
+    "hyperframes": "0.9.81"
   }
 }

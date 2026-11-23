@@ -16,9 +16,9 @@
     "@blook/core": "workspace:*",
     "@rrweb/replay": "catalog:",
     "@rrweb/types": "catalog:",
-    "commander": "^15",
+    "commander": "^15.1.0",
     "fflate": "catalog:",
-    "playwright-core": "^1.64.1"
+    "playwright-core": "^1.65.1"
   },
   "devDependencies": {
     "@types/bun": "catalog:",
