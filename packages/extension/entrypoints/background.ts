@@ -17,10 +17,18 @@ import { transcribeChunkSoon, transcriptionStatus } from '@/lib/transcribe/openr
 type Handler = (msg: any, sender: Browser.runtime.MessageSender) => unknown | Promise<unknown>;
 
 export default defineBackground(() => {
-  browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => console.error('[blook] setPanelBehavior', err));
-
   registerListeners();
   const ready = restoreSession().catch((err) => console.error('[blook] restore', err));
+
+  // The start/stop shortcut (manifest `commands`, Alt+Shift+R by default): records the active tab, or stops.
+  browser.commands.onCommand.addListener(async (command, tab) => {
+    if (command !== 'toggle-recording') return;
+    await ready;
+    if (getStatus().state === 'recording') return void stopSession();
+    if (getStatus().state !== 'idle') return;
+    const tabId = tab?.id ?? (await browser.tabs.query({ active: true, currentWindow: true }))[0]?.id;
+    if (tabId !== undefined) void startSession(tabId);
+  });
 
   const handlers: { [K in keyof BackgroundRequests]: Handler } = {
     'session/start': (m) => startSession(m.tabId),
@@ -41,6 +49,11 @@ export default defineBackground(() => {
       return { ok: true };
     },
     'session/export': (m) => exportSession(m.sessionId),
+    'session/open': async (m, s) => {
+      const url = browser.runtime.getURL(`/replay.html?session=${encodeURIComponent(m.sessionId)}`);
+      await browser.tabs.create({ url, index: s.tab ? s.tab.index + 1 : undefined, windowId: s.tab?.windowId });
+      return { ok: true };
+    },
     'rrweb/hello': (_m, s) => rrwebHello(s.tab?.id),
     'rrweb/events': (m, s) => ({ ok: addRrwebEvents(s.tab?.id, s.frameId, m.events) }),
     'audio/chunk-saved': (m) => {

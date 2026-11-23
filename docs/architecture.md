@@ -9,7 +9,7 @@ The code is a Bun workspaces monorepo. Paths below are inside `packages/extensio
 | `core` | The bundle format and the logic more than one package needs: data types (`types.ts`), bundle and timeline builders, transcript mapping, VAD, the OpenRouter request, the body policy, display formatting. No browser-extension APIs | extension, viewer, cli |
 | `ui` | UI primitives, icons, the logo (`src/icon.svg`), the Tailwind theme | extension, viewer, site |
 | `viewer` | The React viewer and the zip/folder loader. No `chrome.*`: hosts pass the initial loader and the download handler as props | extension, site |
-| `extension` | The WXT extension: `entrypoints/` (side panel, background, recorder, offscreen mic, Replay page) and `lib/` (capture, IndexedDB, messages, settings, export, transcription) | |
+| `extension` | The WXT extension: `entrypoints/` (popup, Recordings page, background, recorder, pill, offscreen mic, Replay page) and `lib/` (capture, IndexedDB, messages, settings, export, transcription) | |
 | `cli` | The `blook` replay CLI and its single binary, which embeds the files in `src/assets.ts` | |
 | `site` | The Astro website on GitHub Pages (https://cyrillbrito.github.io/blook/): the landing page and `/viewer`. `.github/workflows/site.yml` deploys it on push to main | |
 | `store` | Not a package (no `package.json`): the Chrome Web Store listing, privacy answers, images and their HTML sources, and the demo app recorded for the screenshots. See [packages/store/README.md](../packages/store/README.md) | site, videos (images) |
@@ -19,7 +19,7 @@ Outside `packages/`: the agent skill in `skills/blook/` (at the root, where the 
 
 ```mermaid
 flowchart TD
-  P["Side panel"] -->|"Record / Stop / Export"| BG["Background worker"]
+  P["Popup, pill, Recordings page"] -->|"Record / Stop / Export"| BG["Background worker"]
   RR["rrweb recorder in the page"] --> BG
   CDP["chrome.debugger: network, WebSocket, console"] --> BG
   MIC["Offscreen mic recorder"] --> BG
@@ -32,7 +32,11 @@ flowchart TD
 
 ## Recording
 
-**Side panel** (`entrypoints/sidepanel/`). Record and Stop, settings (mask, mic, canvas, OpenRouter key), past sessions with Replay and Export. It sends messages to the background (`lib/messages.ts`) and keeps settings in extension storage (`lib/settings.ts`).
+**Popup** (`entrypoints/popup/`). The toolbar icon's menu: Record (or Stop), the capture switches (mask, mic, canvas) and the latest recordings. It closes once recording starts. The `toggle-recording` command (Alt+Shift+R) starts and stops without it.
+
+**Pill** (`entrypoints/pill.content.ts`). While recording, a small draggable control on the recorded page: time, mic state, Stop, then "Saved" with Open and Download. The background registers it with the recorder (top frame) and pushes the status to it. It sits in a closed shadow root from the isolated world, so rrweb sees only an empty `<blook-pill>`, and the recorder blocks that element so clicks on it are not recorded.
+
+**Recordings page** (`entrypoints/recordings/`). All recordings with Replay, Download and Delete, the settings with the OpenRouter key, and "Open bundle…". The popup's shared parts are in `components/recorder-ui.tsx`. All of them send messages to the background (`lib/messages.ts`) and keep settings in extension storage (`lib/settings.ts`).
 
 **Background worker** (`entrypoints/background.ts`, `lib/capture/session.ts`). Owns the session. It attaches the debugger, injects the recorder, starts the mic, and writes every event to IndexedDB about once a second (`lib/capture/writer.ts`), so a worker restart loses little.
 
@@ -48,7 +52,7 @@ flowchart TD
 
 ## Reviewing
 
-**Viewer** (`packages/viewer`). A React app that plays the rrweb replay with the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. It runs in the extension's Replay page (`entrypoints/replay/`), which reads a recorded session straight from IndexedDB, or opens a ZIP or folder picked with the side panel's "Open bundle…". The viewer has no extension APIs, so the website's `/viewer` (`packages/site`) hosts it as is, reading the ZIP in the browser.
+**Viewer** (`packages/viewer`). A React app that plays the rrweb replay with the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. It runs in the extension's Replay page (`entrypoints/replay/`), which reads a recorded session straight from IndexedDB, or opens a ZIP or folder picked with "Open bundle…". The viewer has no extension APIs, so the website's `/viewer` (`packages/site`) hosts it as is, reading the ZIP in the browser.
 
 **Agent skill** (`skills/blook/`). Tells an agent how to read a bundle: read order, jq recipes, and workflows for bug triage, task lists and E2E tests.
 
@@ -58,7 +62,7 @@ flowchart TD
 
 - **CDP over patching.** `chrome.debugger` sees every request, including ones made before page scripts run, gets full bodies and WebSocket frames, and needs no code in the page. The cost is Chrome's "debugging this browser" banner, and recording fails if DevTools is already attached to the tab.
 - **rrweb in the MAIN world.** rrweb patches `insertRule`, adopted stylesheets and canvas, and those patches only see the page's calls in the page's own world. Without it, CSS-in-JS styles would be missing from the replay.
-- **Reload on Record.** The tab reloads after the debugger attaches, so the first snapshot is fresh and every request and socket is seen from the start. The reload uses the HTTP cache. The side panel shows "Loading page…" until the load event (`pageReadyT`).
+- **Reload on Record.** The tab reloads after the debugger attaches, so the first snapshot is fresh and every request and socket is seen from the start. The reload uses the HTTP cache. The popup shows "Loading page…" until the load event (`pageReadyT`).
 - **Bodies only for API calls.** Response bodies are kept for XHR, Fetch, EventSource and failed page loads, cut at 1 MB. Scripts, CSS, fonts, images and normal page loads are most of the bytes and rarely the bug, so their bodies aren't fetched. Request bodies are always kept. One function decides: `core/src/body-policy.ts`.
 - **One network.json.** Bodies are inline and JSON bodies are parsed, so jq walks straight into them. The file is queried, not read whole.
 - **One clock.** Every `t` is ms since Record, from one `Date.now()` epoch. rrweb timestamps are shifted to it at export.

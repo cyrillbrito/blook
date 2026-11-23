@@ -2,7 +2,7 @@
 import type { eventWithTime } from '@rrweb/types';
 import type { MicState, SessionId, SessionMeta } from '@blook/core/types';
 
-/** What the side panel shows. Pushed by the background on every change. */
+/** What the popup, the Recordings page and the pill show. Pushed by the background on every change. */
 export interface RecordingStatus {
   state: 'idle' | 'starting' | 'recording' | 'stopping';
   session?: SessionMeta;
@@ -19,11 +19,11 @@ export interface RecordingStatus {
 
 /**
  * Requests to the background, keyed by `type`: `req` is the message, `res` is the reply.
- * Senders: side panel (session/*, sessions/*), content script (rrweb/*),
+ * Senders: popup and Recordings page (session/*, sessions/*), pill (session/*), recorder content script (rrweb/*),
  * offscreen document (audio/*, mic/*).
  */
 export interface BackgroundRequests {
-  // Side panel → background
+  // Popup, Recordings page and pill → background
   'session/start': { req: { tabId: number }; res: RecordingStatus };
   'session/stop': { req: {}; res: RecordingStatus };
   'session/status': { req: {}; res: RecordingStatus };
@@ -31,6 +31,8 @@ export interface BackgroundRequests {
   'session/delete': { req: { sessionId: SessionId }; res: { ok: boolean } };
   /** Builds the ZIP (and transcribes if needed), then downloads it. `warning`: downloaded, but the transcript is missing or partial. */
   'session/export': { req: { sessionId: SessionId }; res: { ok: boolean; error?: string; warning?: string } };
+  /** Opens the Replay page of a session in a new tab. From the pill, which can't open extension pages itself. */
+  'session/open': { req: { sessionId: SessionId }; res: { ok: boolean } };
 
   // Content script (rrweb) → background. tabId and frameId come from the sender.
   /** Asks whether to record and with which rrweb options. */
@@ -72,11 +74,14 @@ export interface OffscreenReply {
   needsPermission?: boolean;
 }
 
-/** Background → content script (browser.tabs.sendMessage). */
-export type ContentMessage = { type: 'rrweb/stop' };
+/**
+ * Background → content scripts of the recorded tabs (browser.tabs.sendMessage, top frame).
+ * rrweb/stop goes to the recorder; status/update to the pill, on every status change.
+ */
+export type ContentMessage = { type: 'rrweb/stop' } | { type: 'status/update'; status: RecordingStatus };
 
-/** Background → side panel broadcast (browser.runtime.sendMessage, no reply). */
-export type PanelMessage =
+/** Background → extension pages broadcast (browser.runtime.sendMessage, no reply). */
+export type BroadcastMessage =
   | { type: 'status/update'; status: RecordingStatus }
   /** A session's stored data changed (e.g. transcription progress): refresh the list. */
   | { type: 'sessions/changed'; sessionId: SessionId };

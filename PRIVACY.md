@@ -18,7 +18,7 @@ Blook records nothing when you are not recording.
 
 ## Where the data goes
 
-- Recordings are stored in the extension's local storage (IndexedDB) on your computer. You can delete them in the side panel at any time. Removing the extension deletes them.
+- Recordings are stored in the extension's local storage (IndexedDB) on your computer. You can delete them in the extension (All recordings) at any time. Removing the extension deletes them.
 - A recording leaves your computer only when you click Download: it is saved as a ZIP file in your Downloads folder. What you do with that file is up to you.
 - **Transcription (optional).** If you paste an OpenRouter API key in the settings, Blook sends your recorded audio to OpenRouter (<https://openrouter.ai>) over HTTPS, with your key, to turn it into text. OpenRouter's privacy policy covers that request: <https://openrouter.ai/privacy>. Without a key, no audio leaves your computer.
 - Your settings, including the API key, are stored in Chrome's extension storage on your computer.

@@ -1,16 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PanelMessage, RecordingStatus } from '@/lib/messages';
+// React pieces shared by the toolbar popup and the Recordings page.
+import { useCallback, useEffect, useState } from 'react';
+import type { BroadcastMessage, RecordingStatus } from '@/lib/messages';
 import { DEFAULT_SETTINGS, settingsItem } from '@/lib/settings';
-import { TRANSCRIPTION_MODEL, type MicState, type SessionMeta, type Settings } from '@blook/core/types';
+import { TRANSCRIPTION_MODEL, type SessionMeta, type Settings } from '@blook/core/types';
 import { formatDuration, shortUrl, urlHost } from '@blook/core/format';
-import { formatDate, tryBackground } from '@/components/util';
-import { offerFile } from '@/components/handoff';
-import { Alert, Badge, Button, Card, Field, IconButton, Input, LiveDot, SectionTitle, Switch, cx } from '@blook/ui';
-import { DownloadIcon, FolderOpenIcon, GearIcon, MicIcon, MicOffIcon, RecordIcon, SpinnerIcon, StopIcon, TrashIcon } from '@blook/ui/icons';
+import { formatDate, tryBackground } from './util';
+import { MIC } from './mic';
+import { Badge, Button, Card, Field, IconButton, Input, LiveDot, Switch, cx } from '@blook/ui';
+import { DownloadIcon, MicIcon, MicOffIcon, SpinnerIcon, StopIcon, TrashIcon } from '@blook/ui/icons';
 
-const NO_ANSWER = 'The background worker did not answer.';
+export const NO_ANSWER = 'The background worker did not answer.';
 
-export default function App() {
+export const openReplay = (sessionId: string) =>
+  browser.tabs.create({ url: browser.runtime.getURL(`/replay.html?session=${encodeURIComponent(sessionId)}`) });
+
+export const openRecordings = () => browser.tabs.create({ url: browser.runtime.getURL('/recordings.html') });
+
+/** The recording status and the stored sessions, kept fresh from the background's broadcasts. */
+export function useRecorder() {
   const [status, setStatus] = useState<RecordingStatus>({ state: 'idle' });
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [error, setError] = useState<string>();
@@ -23,13 +30,13 @@ export default function App() {
   useEffect(() => {
     tryBackground({ type: 'session/status' }).then((s) => s && setStatus(s));
     refreshSessions();
-    const onMessage = (message: PanelMessage) => {
+    const onMessage = (message: BroadcastMessage) => {
       if (message?.type === 'sessions/changed') return void refreshSessions();
       if (message?.type !== 'status/update') return;
       setStatus(message.status);
       refreshSessions();
     };
-    // Other pages (Replay) can change the list too; reread when the panel comes back.
+    // Other pages can change the list too; reread when this one comes back.
     const onVisible = () => document.visibilityState === 'visible' && refreshSessions();
     browser.runtime.onMessage.addListener(onMessage);
     document.addEventListener('visibilitychange', onVisible);
@@ -39,10 +46,11 @@ export default function App() {
     };
   }, [refreshSessions]);
 
+  /** Records the active tab of this window. Resolves to true once recording. */
   const record = async () => {
     setError(undefined);
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    if (tab?.id == null) return setError('No active tab to record.');
+    if (tab?.id == null) return void setError('No active tab to record.');
     setStatus({ state: 'starting' });
     const res = await tryBackground({ type: 'session/start', tabId: tab.id }, 15000);
     if (res) setStatus(res);
@@ -50,6 +58,7 @@ export default function App() {
       setStatus({ state: 'idle' });
       setError(NO_ANSWER);
     }
+    return res?.state === 'recording';
   };
 
   const stop = async () => {
@@ -61,50 +70,11 @@ export default function App() {
     refreshSessions();
   };
 
-  return (
-    <main className="flex min-h-screen flex-col gap-3 bg-surface-muted p-3 text-sm text-fg">
-      <Header />
-      {status.state === 'idle' ? <IdleCard onRecord={record} /> : <LiveCard status={status} onStop={stop} />}
-      {(error || status.error) && <Alert>{error ?? status.error}</Alert>}
-      <SettingsCard locked={status.state !== 'idle'} />
-      <SessionList sessions={sessions} activeId={status.state !== 'idle' ? status.session?.id : undefined} onChanged={refreshSessions} />
-    </main>
-  );
-}
-
-/**
- * "Open bundle…": pick a .zip here, the Replay page opens with it.
- * No brand: Chrome's side panel header already shows the extension icon and name.
- */
-function Header() {
-  const input = useRef<HTMLInputElement>(null);
-  const open = (file?: File) => {
-    if (!file) return;
-    const id = offerFile(file);
-    browser.tabs.create({ url: browser.runtime.getURL(`/replay.html?open=${id}`) });
-  };
-  return (
-    <header className="flex items-center gap-2">
-      <input
-        ref={input}
-        type="file"
-        accept=".zip,application/zip"
-        hidden
-        onChange={(e) => {
-          open(e.target.files?.[0]);
-          e.target.value = '';
-        }}
-      />
-      <Button variant="ghost" size="sm" className="ml-auto" onClick={() => input.current?.click()} title="Open a bundle .zip in the viewer">
-        <FolderOpenIcon className="h-3.5 w-3.5" />
-        Open bundle…
-      </Button>
-    </header>
-  );
+  return { status, sessions, error: error ?? status.error, record, stop, refreshSessions };
 }
 
 /** The tab Record would capture: the active tab of this window. */
-function useActiveTab() {
+export function useActiveTab() {
   const [tab, setTab] = useState<{ url?: string; title?: string }>();
   useEffect(() => {
     const read = () =>
@@ -127,48 +97,14 @@ function useActiveTab() {
  * Chrome lets no extension script its own pages or the Web Store, so recording them always fails.
  * Without the `tabs` permission, a page outside <all_urls> (chrome://, other extensions) shows no URL.
  */
-function isRecordable(url: string | undefined) {
+export function isRecordable(url: string | undefined) {
   if (!url || !/^(https?|file):/.test(url)) return false;
   const { hostname, pathname } = new URL(url);
   return !(hostname === 'chromewebstore.google.com' || (hostname === 'chrome.google.com' && pathname.startsWith('/webstore')));
 }
 
-function IdleCard({ onRecord }: { onRecord: () => void }) {
-  const tab = useActiveTab();
-  const blocked = !!tab && !isRecordable(tab.url);
-  return (
-    <Card className="space-y-2 p-3">
-      <Button variant="record" size="lg" className="w-full" onClick={onRecord} disabled={blocked}>
-        <RecordIcon className="h-4 w-4" />
-        Start recording
-      </Button>
-      <p className={cx('text-center text-xs text-muted', !blocked && 'truncate')} title={tab?.url}>
-        {blocked ? (
-          "Chrome doesn't let extensions record this page. Switch to your web app's tab."
-        ) : tab?.url ? (
-          <>
-            Records this tab: <span className="text-fg">{tab.title || shortUrl(tab.url)}</span>
-          </>
-        ) : (
-          'Records the active tab.'
-        )}
-      </p>
-    </Card>
-  );
-}
-
-// Mic state in muted text; colour only when something is wrong.
-const MIC: Record<MicState, { label: string; tone?: 'warn' | 'danger'; on: boolean }> = {
-  off: { label: 'Mic off', on: false },
-  starting: { label: 'Mic starting…', on: true },
-  recording: { label: 'Mic on', on: true },
-  'needs-permission': { label: 'Mic needs permission', tone: 'warn', on: false },
-  failed: { label: 'Mic failed', tone: 'danger', on: false },
-  stopped: { label: 'Mic stopped', on: false },
-};
-
 /** While starting, recording or stopping: a status line, the page, and Stop. */
-function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: () => void }) {
+export function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: () => void }) {
   const { state, session, phase } = status;
   const recording = state === 'recording';
   const [now, setNow] = useState(Date.now());
@@ -227,76 +163,68 @@ function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: () => v
   );
 }
 
-function SettingsCard({ locked }: { locked: boolean }) {
+export function useSettings() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [open, setOpen] = useState(false);
-
   useEffect(() => {
     settingsItem.getValue().then(setSettings);
     return settingsItem.watch((value) => setSettings(value ?? DEFAULT_SETTINGS));
   }, []);
-
   const update = (patch: Partial<Settings>) => {
     const next = { ...settings, ...patch };
     setSettings(next);
     settingsItem.setValue(next);
   };
+  return [settings, update] as const;
+}
 
+/** Mic, masking and canvas. Locked while recording: they apply at Record. */
+export function CaptureSwitches({ locked, className }: { locked: boolean; className?: string }) {
+  const [settings, update] = useSettings();
   return (
-    <Card className="p-3">
-      <div className="flex items-start gap-2">
-        <div className="flex flex-1 flex-col items-start gap-2 text-xs">
-          <Switch label="Microphone" checked={settings.mic} disabled={locked} onChange={(mic) => update({ mic })} />
-          <Switch label="Mask inputs and text" checked={settings.mask} disabled={locked} onChange={(mask) => update({ mask })} />
-          <Switch label="Canvas (2 fps)" checked={settings.canvas} disabled={locked} onChange={(canvas) => update({ canvas })} />
-        </div>
-        <IconButton
-          label={open ? 'Hide settings' : 'Settings'}
-          onClick={() => setOpen(!open)}
-          className={cx(open && 'bg-surface-sunken text-fg')}
-        >
-          <GearIcon className="h-3.5 w-3.5" />
-        </IconButton>
-      </div>
-      {!open && !settings.openRouterApiKey && (
-        <button className="mt-2 cursor-pointer text-xs text-warn hover:underline" onClick={() => setOpen(true)}>
-          No OpenRouter API key: narration won't be transcribed.
-        </button>
-      )}
-      {open && (
-        <div className="mt-3 space-y-2 border-t border-line pt-3">
-          <Field label="OpenRouter API key">
-            <Input
-              type="password"
-              className="font-mono"
-              placeholder="sk-or-…"
-              value={settings.openRouterApiKey}
-              onChange={(e) => update({ openRouterApiKey: e.target.value.trim() })}
-            />
-          </Field>
-          <p className="text-xs text-muted">Narration is transcribed with {TRANSCRIPTION_MODEL} on OpenRouter.</p>
-        </div>
-      )}
-    </Card>
+    <div className={cx('flex flex-col items-start gap-2 text-xs', className)}>
+      <Switch label="Microphone" checked={settings.mic} disabled={locked} onChange={(mic) => update({ mic })} />
+      <Switch label="Mask inputs and text" checked={settings.mask} disabled={locked} onChange={(mask) => update({ mask })} />
+      <Switch label="Canvas (2 fps)" checked={settings.canvas} disabled={locked} onChange={(canvas) => update({ canvas })} />
+    </div>
   );
 }
 
-function SessionList({ sessions, activeId, onChanged }: { sessions: SessionMeta[]; activeId?: string; onChanged: () => void }) {
+export function ApiKeyField() {
+  const [settings, update] = useSettings();
   return (
-    <section className="space-y-1.5">
-      <SectionTitle>Recordings {sessions.length > 0 && <span className="font-normal">({sessions.length})</span>}</SectionTitle>
-      {sessions.length === 0 ? (
-        <Card className="px-3 py-6 text-center text-xs text-muted">
-          No recordings yet. Press Start recording and talk while you use the page.
-        </Card>
-      ) : (
-        <Card className="divide-y divide-line overflow-hidden">
-          {sessions.map((s) => (
-            <SessionRow key={s.id} session={s} active={s.id === activeId} onChanged={onChanged} />
-          ))}
-        </Card>
-      )}
-    </section>
+    <div className="space-y-1">
+      <Field label="OpenRouter API key">
+        <Input
+          type="password"
+          className="font-mono"
+          placeholder="sk-or-…"
+          value={settings.openRouterApiKey}
+          onChange={(e) => update({ openRouterApiKey: e.target.value.trim() })}
+        />
+      </Field>
+      <p className="text-xs text-muted">
+        {settings.openRouterApiKey
+          ? `Narration is transcribed with ${TRANSCRIPTION_MODEL} on OpenRouter.`
+          : 'Without a key, narration is kept but not transcribed. Add one later and download again.'}
+      </p>
+    </div>
+  );
+}
+
+export function SessionList({ sessions, activeId, onChanged }: { sessions: SessionMeta[]; activeId?: string; onChanged: () => void }) {
+  if (sessions.length === 0) {
+    return (
+      <Card className="px-3 py-6 text-center text-xs text-muted">
+        No recordings yet. Press Start recording and talk while you use the page.
+      </Card>
+    );
+  }
+  return (
+    <Card className="divide-y divide-line overflow-hidden">
+      {sessions.map((s) => (
+        <SessionRow key={s.id} session={s} active={s.id === activeId} onChanged={onChanged} />
+      ))}
+    </Card>
   );
 }
 
@@ -312,8 +240,6 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
     const id = setTimeout(() => setConfirming(false), 4000);
     return () => clearTimeout(id);
   }, [confirming]);
-
-  const openReplay = () => browser.tabs.create({ url: browser.runtime.getURL(`/replay.html?session=${encodeURIComponent(session.id)}`) });
 
   const exportZip = async () => {
     setBusy('export');
@@ -345,7 +271,7 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
       <div className="flex items-center gap-2">
         <button
           className="min-w-0 flex-1 cursor-pointer truncate rounded-control text-left font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-default disabled:no-underline"
-          onClick={openReplay}
+          onClick={() => openReplay(session.id)}
           disabled={live}
           title={live ? 'Stop the recording to open it' : `Open in the viewer: ${session.url}`}
         >

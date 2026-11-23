@@ -11,6 +11,11 @@ const FLUSH_MS = 500;
 /** Elements with this class are left out of the recording when masking is on. */
 const BLOCK_CLASS = 'blook-block';
 const MASK_TEXT_SELECTOR = '[data-blook-mask], .blook-mask';
+/**
+ * The recording pill's host (pill.content.ts). Its content is already hidden in a closed shadow root;
+ * blocking it also drops the clicks on it, so pressing Stop is not a step in the timeline.
+ */
+const PILL_SELECTOR = 'blook-pill';
 
 declare global {
   interface Window {
@@ -60,6 +65,7 @@ async function start(opts: RecorderEvents['blook:start']) {
       collectFonts: true,
       // Marks each input event as user-made or programmatic, so the timeline can drop the latter.
       userTriggeredOnInput: true,
+      blockSelector: PILL_SELECTOR,
       ...(opts.canvas ? { recordCanvas: true, sampling: { canvas: 2 }, dataURLOptions: { type: 'image/webp', quality: 0.5 } } : {}),
       ...(opts.mask
         ? { maskAllInputs: true, maskTextSelector: MASK_TEXT_SELECTOR, blockClass: BLOCK_CLASS }

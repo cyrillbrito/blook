@@ -34,7 +34,7 @@ The export is a ZIP with one folder, `blook-<sessionId>/`. All paths below are r
 ```
 session.json                  entry point: meta, counts, mic outcome, files map
 timeline.json                 every event in one array sorted by t, with refs
-rrweb.json                    rrweb events per tab (DOM replay source of truth)
+rrweb.json                    rrweb events per tab (DOM replay source of truth; Blook's own Stop pill is an empty, blocked <blook-pill> element)
 network.json                  HTTP requests, with kept bodies inline
 websockets.json               WebSocket connections with their frames, payloads inline
 console.json                  console calls, uncaught exceptions, browser log entries

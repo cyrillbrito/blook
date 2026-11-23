@@ -1,5 +1,5 @@
 // The viewer with its loading states. It shows one replay: hosts pass an optional initial loader
-// (IndexedDB or a file handed over by the side panel). Only while nothing is loaded can the user
+// (IndexedDB or a file handed over by the Recordings page). Only while nothing is loaded can the user
 // drop or pick a bundle .zip or unzipped folder; once a bundle is open there are no load-other controls.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Card } from '@blook/ui';

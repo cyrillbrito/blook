@@ -13,7 +13,7 @@ Blook is a Chrome extension for personal use. I press Record in my web app and t
 
 **Reviewing.** Two kinds of readers open the bundle:
 
-- A person, for example a developer opening a Jira ticket with the ZIP attached. They open it from the extension's side panel ("Open bundle…") in the Replay page and see the replay, timeline, transcript, network, WebSockets and console in sync.
+- A person, for example a developer opening a Jira ticket with the ZIP attached. They open it from the extension's menu ("Open bundle…") in the Replay page and see the replay, timeline, transcript, network, WebSockets and console in sync.
 - A coding agent. It uses the `blook` skill: jq over the JSON files, and the replay CLI for a screenshot, the DOM or the element under the mouse at any time T.
 
 The bundle has no screenshots or video. The replay rebuilds the page at any time, so it is the source of truth.
@@ -78,7 +78,7 @@ The extension, the bundle, the viewer, the CLI, the site, the skill and the docs
 
 - **Bundle change** (capture, export, a field, a file; mostly `packages/core`): update [docs/bundle-format.md](docs/bundle-format.md) (its version is `BUNDLE_FORMAT_VERSION` in `packages/core/src/bundle.ts`), the viewer, the CLI (`packages/cli/src/bundle.ts` and its test fixture), and the skill's files table and recipes.
 - **CLI change** (a command, option, output shape or exit code): update `--help`, [packages/cli/README.md](packages/cli/README.md), the tests, and the skill's CLI section.
-- **Viewer or UI change**: check every host still works (the extension's Replay page and side panel, and the site's `/viewer`).
+- **Viewer or UI change**: check every host still works (the extension's Replay page, popup and Recordings page, and the site's `/viewer`).
 - **Skill change**: run its commands and jq recipes against a real bundle.
 - **Any change**: update the docs it touches (README.md for users, AGENTS.md and docs/ for developers).
 

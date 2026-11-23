@@ -21,7 +21,7 @@ Developer Tools. Language: English.
 ```text
 Blook records what happens in your browser while you talk, so a developer or a coding agent can replay it later.
 
-Press Record in the side panel, use your web app, and narrate: walk through a flow, point with the mouse, describe a bug. Press Stop and download one ZIP file with everything that happened.
+Click the Blook icon and press Record, use your web app, and narrate: walk through a flow, point with the mouse, describe a bug. Press Stop and download one ZIP file with everything that happened.
 
 WHAT A RECORDING HOLDS
 • A DOM replay of the page (rrweb), with mouse moves, clicks, scrolls and typing

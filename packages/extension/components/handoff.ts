@@ -1,4 +1,4 @@
-// Hands a bundle file picked in the side panel to the Replay page it opens.
+// Hands a bundle file picked in the Recordings page to the Replay page it opens.
 // Extension pages share an origin, so a BroadcastChannel can carry the File itself
 // (structured clone), with no copy through storage or the background.
 const CHANNEL = 'blook-open-bundle';
@@ -8,7 +8,7 @@ type Msg = { type: 'want'; id: string } | { type: 'file'; id: string; file: File
 const pending = new Map<string, File>();
 let channel: BroadcastChannel | undefined;
 
-/** Side panel: keeps `file` until the Replay page asks for it. Returns the id to put in `?open=`. */
+/** Recordings page: keeps `file` until the Replay page asks for it. Returns the id to put in `?open=`. */
 export function offerFile(file: File): string {
   const id = crypto.randomUUID();
   pending.set(id, file);
@@ -25,7 +25,7 @@ export function offerFile(file: File): string {
   return id;
 }
 
-/** Replay page: asks the panel for the file with `id`. Undefined when nobody answers in time. */
+/** Replay page: asks the Recordings page for the file with `id`. Undefined when nobody answers in time. */
 export function claimFile(id: string, timeoutMs = 3000): Promise<File | undefined> {
   return new Promise((resolve) => {
     const ch = new BroadcastChannel(CHANNEL);

@@ -7,7 +7,7 @@ import { chunkResult, chunkTranscript, mergeChunks, type TranscriptSource } from
 import type { BundleOptions } from '@blook/core/bundle';
 import { openRouterEach, openRouterTranscribe, OPENROUTER_ENDPOINT } from '@blook/core/openrouter';
 import { getBySession, openBlookDB } from '../db';
-import type { PanelMessage } from '../messages';
+import type { BroadcastMessage } from '../messages';
 import { settingsItem } from '../settings';
 import type { AudioChunkRow, SessionId, TranscriptChunkResult, TranscriptionStatus, TranscriptRow } from '@blook/core/types';
 import { TRANSCRIPTION_MODEL } from '@blook/core/types';
@@ -38,8 +38,8 @@ const inflight = new Map<string, Promise<void>>();
 let writeChain: Promise<unknown> = Promise.resolve();
 
 function notify(sessionId: SessionId) {
-  const msg: PanelMessage = { type: 'sessions/changed', sessionId };
-  browser.runtime.sendMessage(msg).catch(() => {}); // no panel open
+  const msg: BroadcastMessage = { type: 'sessions/changed', sessionId };
+  browser.runtime.sendMessage(msg).catch(() => {}); // no extension page open
 }
 
 function isDone(r: TranscriptChunkResult | undefined) {
@@ -125,7 +125,7 @@ export async function transcriptOptions(sessionId: SessionId): Promise<BundleOpt
   }
 }
 
-/** Progress for the side panel's session row. */
+/** Progress for a session row in the popup and the Recordings page. */
 export async function transcriptionStatus(sessionId: SessionId): Promise<TranscriptionStatus> {
   const db = await openBlookDB();
   const [total, row, settings] = await Promise.all([

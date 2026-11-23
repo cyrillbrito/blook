@@ -22,7 +22,7 @@ function extension(opts: { url?: boolean; open: boolean }) {
   process.stdout.write(`${bold('Next: add the extension to Chrome')}
   1. Open ${cyan(STORE_URL)}${openedChrome ? dim('  (opened)') : ''}
   2. Click Add to Chrome
-  3. Pin Blook from the puzzle icon in the toolbar, and click it to open the side panel
+  3. Pin Blook from the puzzle icon in the toolbar, and click it to start recording
 ${dim('Chrome keeps it up to date.')}
 `);
 }

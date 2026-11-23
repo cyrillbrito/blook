@@ -1,4 +1,4 @@
-// UI-only helpers shared by the side panel and the replay page.
+// UI-only helpers shared by the popup, the Recordings page and the Replay page.
 import { sendToBackground, type BackgroundRequests, type BackgroundRequestType } from '@/lib/messages';
 
 /**

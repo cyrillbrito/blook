@@ -2,7 +2,7 @@
 // debugger attach and detach, recorder injection, mic, batching and status broadcasts.
 import { browser } from 'wxt/browser';
 import { getBySession, openBlookDB, putSession } from '../db';
-import type { OffscreenReply, PanelMessage, RecordingStatus } from '../messages';
+import type { BroadcastMessage, ContentMessage, OffscreenReply, RecordingStatus } from '../messages';
 import { settingsItem } from '../settings';
 import type { MicInfo, RrwebEventRow, SessionMeta } from '@blook/core/types';
 import { CdpCapture, enableDomains, type SendCommand } from './cdp';
@@ -16,6 +16,10 @@ const RECORDER_JS = '/content-scripts/recorder.js';
 const RECORDER_MAIN_JS = '/content-scripts/recorder-main.js';
 const RECORDER_MAIN_ID = 'blook-recorder-main';
 const RECORDER_ID = 'blook-recorder';
+/** The on-page recording pill, top frame only. */
+const PILL_JS = '/content-scripts/pill.js';
+const PILL_ID = 'blook-pill';
+const SCRIPT_IDS = [RECORDER_ID, RECORDER_MAIN_ID, PILL_ID];
 /** Saved in storage.session so a restarted service worker can resume the session. */
 const ACTIVE_KEY = 'blook-active';
 
@@ -47,10 +51,12 @@ export function getStatus(): RecordingStatus {
 }
 
 function setStatus(next: RecordingStatus) {
-  // Mirror the mic state of the session so the panel can show it without digging into meta.
+  // Mirror the mic state of the session so the pages can show it without digging into meta.
   status = { ...next, mic: next.session?.mic.state ?? next.mic };
-  const msg: PanelMessage = { type: 'status/update', status };
-  browser.runtime.sendMessage(msg).catch(() => {}); // no side panel open
+  const msg: BroadcastMessage & ContentMessage = { type: 'status/update', status };
+  browser.runtime.sendMessage(msg).catch(() => {}); // no extension page open
+  // The pill in each recorded tab. After Stop too, so it can show "Saved".
+  for (const { tabId } of status.session?.tabs ?? []) browser.tabs.sendMessage(tabId, msg, { frameId: 0 }).catch(() => {});
   // Toolbar badge while recording; cleared on stop and failure (both end in idle).
   const rec = status.state !== 'idle';
   void browser.action.setBadgeText({ text: rec ? 'REC' : '' });
@@ -111,7 +117,7 @@ async function attach(tabId: number) {
 }
 
 async function registerRecorder() {
-  await browser.scripting.unregisterContentScripts({ ids: [RECORDER_ID, RECORDER_MAIN_ID] }).catch(() => {});
+  await browser.scripting.unregisterContentScripts({ ids: SCRIPT_IDS }).catch(() => {});
   await browser.scripting.registerContentScripts([
     {
       id: RECORDER_MAIN_ID,
@@ -130,6 +136,7 @@ async function registerRecorder() {
       runAt: 'document_start',
       persistAcrossSessions: false,
     },
+    { id: PILL_ID, js: [PILL_JS], matches: ['<all_urls>'], runAt: 'document_start', persistAcrossSessions: false },
   ]);
 }
 
@@ -137,6 +144,7 @@ async function registerRecorder() {
 function inject(tabId: number) {
   browser.scripting.executeScript({ target: { tabId, allFrames: true }, files: [RECORDER_MAIN_JS], world: 'MAIN' }).catch(() => {});
   browser.scripting.executeScript({ target: { tabId, allFrames: true }, files: [RECORDER_JS] }).catch(() => {});
+  browser.scripting.executeScript({ target: { tabId }, files: [PILL_JS] }).catch(() => {});
 }
 
 export async function startSession(tabId: number): Promise<RecordingStatus> {
@@ -376,7 +384,7 @@ async function teardown() {
     a.writer.stop();
     if (a.permissionTabId !== undefined) browser.tabs.remove(a.permissionTabId).catch(() => {});
   }
-  await browser.scripting.unregisterContentScripts({ ids: [RECORDER_ID, RECORDER_MAIN_ID] }).catch(() => {});
+  await browser.scripting.unregisterContentScripts({ ids: SCRIPT_IDS }).catch(() => {});
 }
 
 // ---- Browser events. Registered synchronously at service worker start. ----

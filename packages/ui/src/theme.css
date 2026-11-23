@@ -1,4 +1,4 @@
-/* Design tokens shared by the side panel, the viewer and the small pages. See packages/ui/README.md.
+/* Design tokens shared by the extension pages, the viewer and the site. See packages/ui/README.md.
    Import after "tailwindcss": @import "@blook/ui/theme.css". The @source scans these primitives. */
 @source "./";
 
