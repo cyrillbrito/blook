@@ -61,20 +61,24 @@ The product has one version, in the root `package.json`. The extension manifest 
 
 ## Docs
 
-- [docs/architecture.md](docs/architecture.md): the packages, the parts of the recorder and viewer, and the key decisions
-- [docs/bundle-format.md](docs/bundle-format.md): the exact bundle layout and fields
-- [docs/cli-design.md](docs/cli-design.md): the rules the CLI follows for agents and people
-- [docs/references.md](docs/references.md): similar tools, cloned in `references/`
-- [packages/cli/README.md](packages/cli/README.md): running, building and the behavior of the replay CLI
-- [packages/viewer/README.md](packages/viewer/README.md) and [packages/ui/README.md](packages/ui/README.md): hosting the viewer, and the UI primitives
-- [skills/blook/SKILL.md](skills/blook/SKILL.md): the agent skill that reads bundles
-- [packages/videos/README.md](packages/videos/README.md): the marketing films, made with HyperFrames and its `hyperframes` skill
-- [packages/store/README.md](packages/store/README.md): the Chrome Web Store listing, how to release an update to it, the privacy answers and images (a folder, not a package)
-- [README.md](README.md): install and use, for users
+Open a doc when your task touches what it covers:
 
-Docs describe the current state, short and plain. `docs/` stays high level, and detail lives next to the code as short comments. The contracts stay exact: `docs/bundle-format.md`, `packages/core/src/types.ts` (stored rows and settings), `packages/extension/lib/messages.ts` (messages between extension contexts). Update the docs in the same change as the code. A stale doc is a bug.
+- [docs/architecture.md](docs/architecture.md): the packages, how the recorder's parts and the viewer fit together, and the key decisions. The starting point in an unfamiliar area.
+- [docs/bundle-format.md](docs/bundle-format.md): the exact bundle layout and fields, for any change to capture, export or what reads a bundle.
+- [docs/cli-design.md](docs/cli-design.md): the rules every `blook` command, output and exit code follows.
+- [docs/references.md](docs/references.md): similar tools cloned in `references/`, useful when designing a feature or when rrweb, CDP or the mic misbehave.
+- [packages/cli/README.md](packages/cli/README.md): running and building the replay CLI, replay behavior and `transcribe`.
+- [packages/viewer/README.md](packages/viewer/README.md) and [packages/ui/README.md](packages/ui/README.md): hosting the viewer, and the UI primitives to build any screen with.
+- [skills/blook/SKILL.md](skills/blook/SKILL.md): how an agent reads a bundle; it follows every bundle and CLI change.
+- [packages/videos/README.md](packages/videos/README.md): the marketing films (HyperFrames), which need a pass when the UI they show changes.
+- [packages/store/README.md](packages/store/README.md): the Chrome Web Store listing, privacy answers and images, and how to release an update.
+- [README.md](README.md): install and use, for users, so it changes with any user-visible flow, label or setting.
 
-## Keep every part in sync
+Docs are for someone new to the area: what a part is, how it works with the others, and what is easy to get wrong, with the files to open next. They describe the current state, short and plain, and leave history to git. `docs/` stays high level, and detail lives next to the code as short comments. Each topic has one doc: link to it instead of copying. The contracts stay exact: `docs/bundle-format.md`, `packages/core/src/types.ts` (stored rows and settings), `packages/extension/lib/messages.ts` (messages between extension contexts). Update the docs in the same change as the code. A stale doc is a bug. After renaming a heading or moving a doc, grep for the old name, since other docs and skills link to it.
+
+Not ours to edit: the vendored skills in `.agents/skills/` (they update from their source, see `skills-lock.json`), and the film plans in `packages/videos/films/*/` (`STORYLINES.md`, `SPEC.md`, `REVIEW.md`), which are history.
+
+## Review checks
 
 The extension, the bundle, the viewer, the CLI, the site, the skill and the docs describe one product. Implement every change across all of them in one go: a change is done only when every package, the skill and the docs match it. No half-done features, no compatibility shims, no old names left behind:
 

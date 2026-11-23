@@ -6,8 +6,8 @@ This folder holds what the dashboard shows:
 
 - [listing.md](listing.md): title, summary, description, category, images
 - [privacy-practices.md](privacy-practices.md): single purpose, permission justifications, remote code, data usage
-- [../PRIVACY.md](../PRIVACY.md): the privacy policy, linked from the dashboard
-- `images/`: store icon, the 5 listing screenshots (`listing-*.png`, 1280×800), the real product screenshots (`screenshot-*.png`), small promo tile (440×280), and `chrome-web-store-badge.png`, Google's unmodified "Available in the Chrome Web Store" badge for the README and the site ([branding rules](https://developer.chrome.com/docs/webstore/branding))
+- [PRIVACY.md](../../PRIVACY.md): the privacy policy, linked from the dashboard
+- `images/`: store icon, the 5 listing screenshots (`listing-*.png`, 1280×800), the real product screenshots (`screenshot-*.png`; `screenshot-4-popup.png` is the toolbar popup at 2x, shown on the site, and `screenshot-4-sidepanel.png` is the old side panel, still used by the `store-intro` film), small promo tile (440×280), and `chrome-web-store-badge.png`, Google's unmodified "Available in the Chrome Web Store" badge for the README and the site ([branding rules](https://developer.chrome.com/docs/webstore/branding))
 - [screenshots.html](screenshots.html): the source of the listing screenshots
 - [promo-small.html](promo-small.html): the source of the promo tile (logo on light slate, a faint vermilion glow); render it at 440×280 and screenshot
 - [demo-app/](demo-app/): the fictional team chat recorded for the screenshots and the site's example timeline. `bun packages/store/demo-app/server.ts` serves it on `http://localhost:4317` (restart it for a clean channel). A message with an emoji fails to save (500, `console.error`), and the WebSocket sync removes it.
@@ -15,7 +15,7 @@ This folder holds what the dashboard shows:
 ## Releasing an update
 
 1. Run the release workflow (see `AGENTS.md`). It bumps the version and attaches `blook-chrome.zip` to the GitHub release. The store rejects a ZIP whose version isn't higher than the published one.
-2. In the dashboard, open **Package**, upload that ZIP, and submit it for review.
+2. In the dashboard's [Package page for Blook](https://chrome.google.com/webstore/devconsole/c9806a17-57e3-495f-8cef-7a4245cfb141/njijkneplfdknfbmbokldfpbdhgpppbi/edit/package), upload that ZIP and submit it for review.
 3. Chrome updates installed copies within a few hours of approval.
 
 A change to the listing texts or images goes in this folder first, then into the **Store listing** or **Privacy** tab.

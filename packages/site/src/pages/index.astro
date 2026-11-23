@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import timeline from '../../../store/images/screenshot-1-timeline.png';
-import sidepanel from '../../../store/images/screenshot-4-sidepanel.png';
+import popup from '../../../store/images/screenshot-4-popup.png';
 import badge from '../../../store/images/chrome-web-store-badge.png';
 import { STORE_URL as store } from '../links';
 
@@ -111,13 +111,13 @@ const shot = 'rounded-card border border-line shadow-sm';
             A Chrome extension that saves the page, the network, the console and your voice in one ZIP, for a developer or a coding agent.
           </p>
         </div>
-        <!-- The side panel, cropped from the store screenshot at its real size: where a recording starts and stops. -->
+        <!-- The toolbar popup at its real size (a 2x screenshot): where a recording starts. -->
         <img
-          src={sidepanel.src}
-          width={sidepanel.width}
-          height={sidepanel.height}
-          alt="The Blook side panel while recording: Recording 0:16, a Stop recording button, the settings, and the recordings kept in the browser"
-          class:list={[shot, 'h-[400px] w-[320px] justify-self-center object-none object-[100%_0] shadow-card']}
+          src={popup.src}
+          width={popup.width / 2}
+          height={popup.height / 2}
+          alt="The Blook popup: a Start recording button for this tab, the Microphone and Mask inputs and text switches, All recordings and Open bundle"
+          class:list={[shot, 'justify-self-center shadow-card']}
         />
       </div>
       <div class="mt-10">

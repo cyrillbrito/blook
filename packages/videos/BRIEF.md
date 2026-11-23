@@ -52,11 +52,12 @@ Never invent product UI. Sources, in `shared/` (symlinks to the real files; link
 
 - `screenshot-1-timeline.png` (1280×800): the Replay page. Header "Blook", "React • TodoMVC", "1 errors", "1 failed requests", "Download bundle". Tabs "Timeline 18 / Transcript 0 / Network 7 / WebSockets 0 / Console ✖ 3", a "Follow" toggle, filter chips, timeline rows with type pills, a JSON detail pane, a scrubber with "Play", "0:08.6 / 0:17.2" and a legend "error / failed request / click / navigation / speech".
 - `screenshot-2-network.png`, `screenshot-3-console.png`: Network and Console tabs.
-- `screenshot-4-sidepanel.png`: the side panel next to TodoMVC: "Blook", "Open bundle…", "● Recording 0:17", "Mic off", "Stop recording", toggles "Microphone / Mask inputs and text / Canvas (2 fps)", "Recordings (1)".
+- `screenshot-4-popup.png` (640×542, 2x): the toolbar popup, where a recording starts now: "Blook", a gear, "Start recording", "Records this tab: localhost:4317", switches "Microphone" and "Mask inputs and text", "All recordings", "Open bundle…". While recording, a pill on the page shows the time and Stop (`packages/extension/entrypoints/pill.content.ts`).
+- `screenshot-4-sidepanel.png`: the old side panel, which the popup and pill replaced. Only `store-intro` still shows it. The side panel next to TodoMVC: "Blook", "Open bundle…", "● Recording 0:17", "Mic off", "Stop recording", toggles "Microphone / Mask inputs and text / Canvas (2 fps)", "Recordings (1)".
 - `replay.png`, `recordings-page.png`: more of the same.
-- The live code, to confirm labels and styles: `../../packages/viewer/src/` (panels.tsx, ui.tsx, Viewer.tsx) and `../../packages/extension/entrypoints/sidepanel/`.
+- The live code, to confirm labels and styles: `../../packages/viewer/src/` (panels.tsx, ui.tsx, Viewer.tsx) and `../../packages/extension/entrypoints/popup/` with `../../packages/extension/components/recorder-ui.tsx`.
 
-You may use a screenshot as a plate, and you may rebuild the one piece a beat uses in HTML (timeline rows, the Record/Stop card, a type pill) at 1.6–2× size, with its real labels, colours and fonts. Ignore the "sidepanel says Mic off / no transcript" detail of the screenshots when the story needs narration: the Transcript tab and speech rows are real features (speech rows are light blue pills, `bg-blue-100 text-blue-800`).
+You may use a screenshot as a plate, and you may rebuild the one piece a beat uses in HTML (timeline rows, the Record/Stop card, a type pill) at 1.6 to 2× size, with its real labels, colours and fonts. Ignore the "side panel says Mic off / no transcript" detail of the screenshots when the story needs narration: the Transcript tab and speech rows are real features (speech rows are light blue pills, `bg-blue-100 text-blue-800`).
 
 ## Brand
 
