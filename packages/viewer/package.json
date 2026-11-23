@@ -15,7 +15,8 @@
     "@blook/ui": "workspace:*",
     "@rrweb/replay": "catalog:",
     "@rrweb/types": "catalog:",
-    "fflate": "catalog:"
+    "fflate": "catalog:",
+    "lucide-react": "catalog:"
   },
   "devDependencies": {
     "@types/react": "catalog:",

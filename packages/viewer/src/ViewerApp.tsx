@@ -1,11 +1,14 @@
 // The viewer with its loading states. It shows one replay: hosts pass an optional initial loader
-// (IndexedDB or a file handed over by the Recordings page). Only while nothing is loaded can the user
+// (IndexedDB). Only while nothing is loaded can the user
 // drop or pick a bundle .zip or unzipped folder; once a bundle is open there are no load-other controls.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, Card } from '@blook/ui';
-import { BlookIcon, FolderOpenIcon, SpinnerIcon } from '@blook/ui/icons';
+import { Alert, Button, Card } from '@blook/ui';
+import { BlookIcon } from '@blook/ui/icons';
+import ArrowLeftIcon from 'lucide-react/icons/arrow-left';
+import FolderOpenIcon from 'lucide-react/icons/folder-open';
+import LoaderCircleIcon from 'lucide-react/icons/loader-circle';
 import { bundleFromUserFiles, filesFromDrop, filesFromInput, type Bundle } from './bundle';
-import { Viewer } from './Viewer';
+import { Viewer, type BackLink } from './Viewer';
 
 type State =
   | { state: 'empty' }
@@ -20,9 +23,11 @@ export interface ViewerAppProps {
   onDownload?: () => Promise<void>;
   /** Host content under the picker, while nothing is loaded. */
   note?: ReactNode;
+  /** A link back to the host's page, in the viewer header and above the picker. */
+  back?: BackLink;
 }
 
-export function ViewerApp({ initial, onDownload, note }: ViewerAppProps) {
+export function ViewerApp({ initial, onDownload, note, back }: ViewerAppProps) {
   const [s, setS] = useState<State>(initial ? { state: 'loading', what: initial.label } : { state: 'empty' });
   const [dragging, setDragging] = useState(false);
   const zipInput = useRef<HTMLInputElement>(null);
@@ -83,7 +88,7 @@ export function ViewerApp({ initial, onDownload, note }: ViewerAppProps) {
     };
   }, [ready]);
 
-  if (ready) return <Viewer bundle={s.bundle} onDownload={onDownload} />;
+  if (ready) return <Viewer bundle={s.bundle} onDownload={onDownload} back={back} />;
 
   const pick = (list: FileList | null) => {
     if (!list?.length) return;
@@ -92,7 +97,7 @@ export function ViewerApp({ initial, onDownload, note }: ViewerAppProps) {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-muted p-6 text-sm text-fg">
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-6 text-sm text-fg">
       <input ref={zipInput} type="file" accept=".zip,application/zip" hidden onChange={(e) => pick(e.target.files)} />
       <input
         ref={dirInput}
@@ -107,38 +112,46 @@ export function ViewerApp({ initial, onDownload, note }: ViewerAppProps) {
           <span className="rounded-control bg-surface px-4 py-2 text-sm font-medium shadow">Drop the bundle .zip or folder</span>
         </div>
       )}
-      <Card className="w-full max-w-md space-y-4 p-6 shadow-sm">
-        <h1 className="flex items-center gap-2 text-base font-semibold">
-          <BlookIcon className="h-5 w-5" />
-          Blook viewer
-        </h1>
-        {s.state === 'loading' ? (
-          <p className="flex items-center gap-2 text-muted">
-            <SpinnerIcon /> Loading {s.what}…
-          </p>
-        ) : (
-          <>
-            {s.state === 'error' && <p className="rounded-control bg-danger-soft p-2 text-red-800">{s.message}</p>}
-            <button
-              type="button"
-              className="flex w-full cursor-pointer flex-col items-center gap-1 rounded-card border-2 border-dashed border-line-strong p-8 text-muted hover:border-accent hover:bg-accent-soft/50"
-              onClick={() => zipInput.current?.click()}
-            >
-              <FolderOpenIcon className="h-6 w-6" />
-              <span className="text-fg">Drop a Blook bundle here</span>
-              <span className="text-xs">a .zip, or the unzipped folder</span>
-            </button>
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={() => zipInput.current?.click()}>
-                Choose .zip…
-              </Button>
-              <Button onClick={() => dirInput.current?.click()}>Choose folder…</Button>
-            </div>
-            <p className="text-xs text-muted">Everything stays in this browser tab. Nothing is uploaded.</p>
-            {note}
-          </>
+      <div className="w-full max-w-md space-y-3">
+        {back && (
+          <a href={back.href} className="flex items-center gap-1.5 text-xs font-medium text-muted hover:text-fg">
+            <ArrowLeftIcon className="h-3.5 w-3.5" />
+            {back.label}
+          </a>
         )}
-      </Card>
+        <Card className="space-y-4 p-6">
+          <h1 className="flex items-center gap-2 text-base font-semibold">
+            <BlookIcon className="h-5 w-5" />
+            Blook viewer
+          </h1>
+          {s.state === 'loading' ? (
+            <p className="flex items-center gap-2 text-muted">
+              <LoaderCircleIcon className="h-4 w-4 animate-spin" /> Loading {s.what}…
+            </p>
+          ) : (
+            <>
+              {s.state === 'error' && <Alert>{s.message}</Alert>}
+              <button
+                type="button"
+                className="flex w-full cursor-pointer flex-col items-center gap-1 rounded-card border-2 border-dashed border-line-strong p-8 text-muted hover:border-accent hover:bg-accent-soft/50"
+                onClick={() => zipInput.current?.click()}
+              >
+                <FolderOpenIcon className="h-6 w-6" />
+                <span className="text-fg">Drop a Blook bundle here</span>
+                <span className="text-xs">a .zip, or the unzipped folder</span>
+              </button>
+              <div className="flex gap-2">
+                <Button variant="primary" onClick={() => zipInput.current?.click()}>
+                  Choose .zip…
+                </Button>
+                <Button onClick={() => dirInput.current?.click()}>Choose folder…</Button>
+              </div>
+              <p className="text-xs text-muted">Everything stays in this browser tab. Nothing is uploaded.</p>
+              {note}
+            </>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

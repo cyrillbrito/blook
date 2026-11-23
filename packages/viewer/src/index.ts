@@ -2,5 +2,5 @@
 // hosts pass what they own (the initial loader, the download handler) as ViewerApp props.
 // Styles: @import "@blook/viewer/styles.css" in the host's Tailwind stylesheet.
 export { ViewerApp, type ViewerAppProps } from './ViewerApp';
-export { Viewer } from './Viewer';
+export { Viewer, type BackLink } from './Viewer';
 export * from './bundle';

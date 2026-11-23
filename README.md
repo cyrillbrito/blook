@@ -23,7 +23,7 @@ Add Blook from the [Chrome Web Store](https://chromewebstore.google.com/detail/n
 ## Record
 
 1. On the page you want to record, click the Blook icon and press **Start recording**, or press Alt+Shift+R.
-2. Use the page and talk. Point at things with the mouse. A small pill on the page shows the time and the Stop button. Drag it anywhere it isn't in the way; it stays out of the recording.
+2. Use the page and talk. Point at things with the mouse. A pill at the bottom of the page shows the time and the Stop button. Drag it anywhere it isn't in the way; it stays out of the recording.
 3. Press **Stop** on the pill, then **Download** for the ZIP. Every recording is also in the Blook menu and in **All recordings**.
 
 Change the shortcut in `chrome://extensions/shortcuts`.
@@ -32,9 +32,9 @@ The first time, Chrome asks for the microphone. Pick **Allow while visiting the 
 
 ## Voice transcription (optional)
 
-To get your voice transcribed, click the gear icon in the Blook menu (it opens **All recordings**) and paste an [OpenRouter API key](https://openrouter.ai/keys). Without one, the recording still keeps your voice, and it can be transcribed later.
+To get your voice transcribed, click the gear icon in the Blook menu (it opens **Settings**) and paste an [OpenRouter API key](https://openrouter.ai/keys). Without one, the recording still keeps your voice, and it can be transcribed later.
 
-![The All recordings page: the list of recordings, the recording settings and the OpenRouter API key field](docs/images/recordings-page.png)
+![The Recordings page: the list of recordings, with Settings one tab away](docs/images/recordings-page.png)
 
 ## Open a recording
 

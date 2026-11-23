@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { sendToBackground } from '@/lib/messages';
 import { Button, Card } from '@blook/ui';
-import { MicIcon } from '@blook/ui/icons';
+import MicIcon from 'lucide-react/icons/mic';
 import '@/assets/tailwind.css';
 
 type State = { kind: 'asking' | 'idle' | 'granted' | 'once' | 'error'; text?: string };
@@ -50,8 +50,8 @@ function App() {
   }, []);
 
   return (
-    <main className="flex min-h-screen items-start justify-center bg-surface-muted px-4 pt-24 text-sm text-fg">
-      <Card className="w-full max-w-md space-y-4 p-6 shadow-sm">
+    <main className="flex min-h-screen items-start justify-center bg-canvas px-4 pt-24 text-sm text-fg">
+      <Card className="w-full max-w-md space-y-4 p-6">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-recording-soft text-recording">
             <MicIcon className="h-5 w-5" />

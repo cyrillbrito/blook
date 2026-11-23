@@ -1,4 +1,5 @@
-// React pieces shared by the toolbar popup and the Recordings page.
+// React pieces shared by the toolbar popup and the Recordings page (with its Settings view).
+import type { PublicPath } from 'wxt/browser';
 import { useCallback, useEffect, useState } from 'react';
 import type { BroadcastMessage, RecordingStatus } from '@/lib/messages';
 import { DEFAULT_SETTINGS, settingsItem } from '@/lib/settings';
@@ -7,14 +8,26 @@ import { formatDuration, shortUrl, urlHost } from '@blook/core/format';
 import { formatDate, tryBackground } from './util';
 import { MIC } from './mic';
 import { Badge, Button, Card, Field, IconButton, Input, LiveDot, Switch, cx } from '@blook/ui';
-import { DownloadIcon, MicIcon, MicOffIcon, SpinnerIcon, StopIcon, TrashIcon } from '@blook/ui/icons';
+import { StopIcon } from '@blook/ui/icons';
+import DownloadIcon from 'lucide-react/icons/download';
+import LoaderCircleIcon from 'lucide-react/icons/loader-circle';
+import MicIcon from 'lucide-react/icons/mic';
+import MicOffIcon from 'lucide-react/icons/mic-off';
+import Trash2Icon from 'lucide-react/icons/trash-2';
 
 export const NO_ANSWER = 'The background worker did not answer.';
 
-export const openReplay = (sessionId: string) =>
-  browser.tabs.create({ url: browser.runtime.getURL(`/replay.html?session=${encodeURIComponent(sessionId)}`) });
+/** Opens a page of the extension: in this tab with `here` (the Recordings page), else in a new tab (the popup). */
+const openPage = (path: string, here?: boolean) => {
+  if (here) location.assign(path);
+  else browser.tabs.create({ url: browser.runtime.getURL(path as PublicPath) });
+};
 
-export const openRecordings = () => browser.tabs.create({ url: browser.runtime.getURL('/recordings.html') });
+export const openReplay = (sessionId: string, here?: boolean) => openPage(`/replay.html?session=${encodeURIComponent(sessionId)}`, here);
+export const openRecordings = () => openPage('/recordings.html');
+export const openSettings = () => openPage('/recordings.html#settings');
+/** The Replay page without a session is the bundle picker. The popup can't hold a file picker: it closes when the dialog takes focus. */
+export const openBundlePicker = () => openPage('/replay.html', location.pathname === '/recordings.html');
 
 /** The recording status and the stored sessions, kept fresh from the background's broadcasts. */
 export function useRecorder() {
@@ -124,7 +137,7 @@ export function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: 
   return (
     <Card className="space-y-3 p-3">
       <div className="flex items-center gap-2">
-        {recording ? <LiveDot /> : <SpinnerIcon className="h-3.5 w-3.5 text-muted" />}
+        {recording ? <LiveDot /> : <LoaderCircleIcon className="h-3.5 w-3.5 text-muted animate-spin" />}
         <span className="font-medium">{label}</span>
         <span className="text-muted tabular-nums">{formatDuration(recording ? elapsed : (session?.durationMs ?? elapsed))}</span>
         {/* Always rendered so the row doesn't shift when the mic state arrives. */}
@@ -155,8 +168,8 @@ export function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: 
         </div>
       </div>
 
-      <Button variant="secondary" className="h-10 w-full" disabled={!recording} onClick={onStop}>
-        {recording ? <StopIcon className="h-3.5 w-3.5" /> : <SpinnerIcon className="h-3.5 w-3.5" />}
+      <Button size="lg" className="w-full" disabled={!recording} onClick={onStop}>
+        {recording ? <StopIcon className="h-3.5 w-3.5" /> : <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" />}
         {recording ? 'Stop recording' : state === 'starting' ? 'Starting…' : 'Stopping…'}
       </Button>
     </Card>
@@ -177,14 +190,14 @@ export function useSettings() {
   return [settings, update] as const;
 }
 
-/** Mic, masking and canvas. Locked while recording: they apply at Record. */
-export function CaptureSwitches({ locked, className }: { locked: boolean; className?: string }) {
+/** Mic, masking and (with `canvas`, outside the popup) canvas. Locked while recording: they apply at Record. */
+export function CaptureSwitches({ locked, canvas, className }: { locked: boolean; canvas?: boolean; className?: string }) {
   const [settings, update] = useSettings();
   return (
     <div className={cx('flex flex-col items-start gap-2 text-xs', className)}>
       <Switch label="Microphone" checked={settings.mic} disabled={locked} onChange={(mic) => update({ mic })} />
       <Switch label="Mask inputs and text" checked={settings.mask} disabled={locked} onChange={(mask) => update({ mask })} />
-      <Switch label="Canvas (2 fps)" checked={settings.canvas} disabled={locked} onChange={(canvas) => update({ canvas })} />
+      {canvas && <Switch label="Canvas (2 fps)" checked={settings.canvas} disabled={locked} onChange={(canvas) => update({ canvas })} />}
     </div>
   );
 }
@@ -211,7 +224,18 @@ export function ApiKeyField() {
   );
 }
 
-export function SessionList({ sessions, activeId, onChanged }: { sessions: SessionMeta[]; activeId?: string; onChanged: () => void }) {
+export function SessionList({
+  sessions,
+  activeId,
+  onChanged,
+  openHere,
+}: {
+  sessions: SessionMeta[];
+  activeId?: string;
+  onChanged: () => void;
+  /** Open a recording in this tab instead of a new one. */
+  openHere?: boolean;
+}) {
   if (sessions.length === 0) {
     return (
       <Card className="px-3 py-6 text-center text-xs text-muted">
@@ -222,13 +246,23 @@ export function SessionList({ sessions, activeId, onChanged }: { sessions: Sessi
   return (
     <Card className="divide-y divide-line overflow-hidden">
       {sessions.map((s) => (
-        <SessionRow key={s.id} session={s} active={s.id === activeId} onChanged={onChanged} />
+        <SessionRow key={s.id} session={s} active={s.id === activeId} onChanged={onChanged} openHere={openHere} />
       ))}
     </Card>
   );
 }
 
-function SessionRow({ session, active, onChanged }: { session: SessionMeta; active: boolean; onChanged: () => void }) {
+function SessionRow({
+  session,
+  active,
+  onChanged,
+  openHere,
+}: {
+  session: SessionMeta;
+  active: boolean;
+  onChanged: () => void;
+  openHere?: boolean;
+}) {
   const [busy, setBusy] = useState<'export' | 'delete'>();
   const [confirming, setConfirming] = useState(false);
   const [note, setNote] = useState<{ text: string; tone: 'danger' | 'warn' }>();
@@ -271,7 +305,7 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
       <div className="flex items-center gap-2">
         <button
           className="min-w-0 flex-1 cursor-pointer truncate rounded-control text-left font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-default disabled:no-underline"
-          onClick={() => openReplay(session.id)}
+          onClick={() => openReplay(session.id, openHere)}
           disabled={live}
           title={live ? 'Stop the recording to open it' : `Open in the viewer: ${session.url}`}
         >
@@ -294,10 +328,10 @@ function SessionRow({ session, active, onChanged }: { session: SessionMeta; acti
             )}
           >
             <IconButton label="Download bundle .zip" onClick={exportZip} disabled={!!busy || live}>
-              {busy === 'export' ? <SpinnerIcon className="h-3.5 w-3.5" /> : <DownloadIcon className="h-3.5 w-3.5" />}
+              {busy === 'export' ? <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" /> : <DownloadIcon className="h-3.5 w-3.5" />}
             </IconButton>
             <IconButton label="Delete" onClick={() => setConfirming(true)} disabled={!!busy || live} className="hover:text-danger">
-              <TrashIcon className="h-3.5 w-3.5" />
+              <Trash2Icon className="h-3.5 w-3.5" />
             </IconButton>
           </div>
         )}

@@ -3,10 +3,15 @@
 @source "./";
 
 @theme {
-  /* Neutrals are Tailwind slate, the logo's own scale (its window is slate-700). Use slate-*, never gray-*. */
+  /* Neutrals are Tailwind slate, the logo's own scale (its window is slate-700). Use slate-*, never gray-*.
+     Layers: pages sit on `canvas`, content sits in white `surface` cards, `surface-muted` marks bars
+     inside a card (toolbars, detail headers), `surface-sunken` marks wells (the replay stage, inline code). */
+  --color-canvas: #e9edf2; /* between slate-100 and slate-200 */
   --color-surface: var(--color-white);
   --color-surface-muted: var(--color-slate-50);
   --color-surface-sunken: var(--color-slate-100);
+  /* Lines, lightest first: between list rows, between parts of a card, and card edges and main dividers. */
+  --color-line-soft: var(--color-slate-100);
   --color-line: var(--color-slate-200);
   --color-line-strong: var(--color-slate-300);
   --color-fg: var(--color-slate-900);
@@ -15,12 +20,16 @@
   --color-accent: var(--color-slate-700); /* #334155, 10.4:1 with white */
   --color-accent-strong: var(--color-slate-800);
   --color-accent-soft: var(--color-slate-100);
-  --color-danger: var(--color-red-600);
+  --color-danger: var(--color-red-600); /* 4.8:1 with white */
+  --color-danger-strong: var(--color-red-700);
   --color-danger-soft: var(--color-red-50);
   --color-warn: var(--color-amber-700); /* text on white: 5:1 (amber-600 is 3.2:1) */
-  --color-ok: var(--color-green-600);
+  --color-warn-soft: var(--color-amber-50);
+  --color-ok: var(--color-green-700);
+  --color-ok-soft: var(--color-green-50);
   --color-recording: #f2542d; /* dots and fills only: 3.5:1 with white */
   --color-recording-strong: #cc3f1d; /* under white text: 4.9:1 */
+  --color-recording-hover: #b52e15;
   --color-recording-soft: #fff3f0;
   /* "Now" in the viewer: the scrubber head, the row and the word at the playhead. */
   --color-playhead: var(--color-amber-500);
@@ -28,6 +37,9 @@
 
   --radius-control: 0.375rem;
   --radius-card: 0.5rem;
+
+  /* Height of every small control (sm buttons, inputs, selects, toggles): `h-control`. */
+  --spacing-control: 1.75rem;
 
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;

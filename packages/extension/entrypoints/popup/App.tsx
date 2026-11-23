@@ -1,47 +1,43 @@
 // The toolbar popup: Record (or Stop), the capture switches, and the latest recordings.
 // It closes once recording starts; the pill on the page (pill.content.ts) takes over.
 import { useState } from 'react';
-import { shortUrl } from '@blook/core/format';
-import { Alert, Button, IconButton, cx } from '@blook/ui';
-import { BlookIcon, FolderOpenIcon, GearIcon, RecordIcon } from '@blook/ui/icons';
+import { Alert, Button, Card, IconButton, cx } from '@blook/ui';
+import { BlookIcon, RecordIcon } from '@blook/ui/icons';
+import FolderOpenIcon from 'lucide-react/icons/folder-open';
+import SettingsIcon from 'lucide-react/icons/settings';
 import {
   CaptureSwitches,
   isRecordable,
   LiveCard,
+  openBundlePicker,
   openRecordings,
+  openSettings,
   SessionList,
   useActiveTab,
   useRecorder,
-  useSettings,
 } from '@/components/recorder-ui';
 
 const RECENT = 3;
 
 export default function App() {
   const { status, sessions, error, record, stop, refreshSessions } = useRecorder();
-  const [settings] = useSettings();
   const idle = status.state === 'idle';
   const onRecord = async () => {
     if (await record()) window.close();
   };
 
   return (
-    <main className="flex flex-col gap-3 bg-surface-muted p-3 text-sm text-fg">
+    <main className="flex flex-col gap-3 bg-canvas p-3 text-sm text-fg">
       <header className="flex items-center gap-2">
         <BlookIcon className="h-5 w-5" />
         <span className="font-semibold">Blook</span>
-        <IconButton label="Settings and all recordings" className="ml-auto" onClick={openRecordings}>
-          <GearIcon className="h-3.5 w-3.5" />
+        <IconButton label="Settings" className="ml-auto" onClick={openSettings}>
+          <SettingsIcon className="h-3.5 w-3.5" />
         </IconButton>
       </header>
 
       {idle ? <IdleCard onRecord={onRecord} /> : <LiveCard status={status} onStop={stop} />}
       {error && <Alert>{error}</Alert>}
-      {idle && !settings.openRouterApiKey && (
-        <button className="cursor-pointer text-left text-xs text-warn hover:underline" onClick={openRecordings}>
-          No OpenRouter API key: narration won't be transcribed.
-        </button>
-      )}
 
       {sessions.length > 0 && (
         <section className="space-y-1.5">
@@ -54,8 +50,7 @@ export default function App() {
         <Button variant="ghost" size="sm" onClick={openRecordings}>
           All recordings{sessions.length > 0 && ` (${sessions.length})`}
         </Button>
-        {/* The Replay page without a bundle is a picker. The popup itself can't hold a file picker: it closes when the dialog takes focus. */}
-        <Button variant="ghost" size="sm" onClick={() => browser.tabs.create({ url: browser.runtime.getURL('/replay.html') })}>
+        <Button variant="ghost" size="sm" onClick={openBundlePicker}>
           <FolderOpenIcon className="h-3.5 w-3.5" />
           Open bundle…
         </Button>
@@ -64,12 +59,21 @@ export default function App() {
   );
 }
 
+/** The site, not the tab title: titles are often long or noisy. */
+function host(url: string): string {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
+}
+
 function IdleCard({ onRecord }: { onRecord: () => void }) {
   const tab = useActiveTab();
   const blocked = !!tab && !isRecordable(tab.url);
   const [starting, setStarting] = useState(false);
   return (
-    <div className="space-y-3 rounded-card border border-line bg-surface p-3">
+    <Card className="space-y-3 p-3">
       <Button
         variant="record"
         size="lg"
@@ -88,13 +92,13 @@ function IdleCard({ onRecord }: { onRecord: () => void }) {
           "Chrome doesn't let extensions record this page. Switch to your web app's tab."
         ) : tab?.url ? (
           <>
-            Records this tab: <span className="text-fg">{tab.title || shortUrl(tab.url)}</span>
+            Records this tab: <span className="text-fg">{host(tab.url)}</span>
           </>
         ) : (
           'Records the active tab.'
         )}
       </p>
       <CaptureSwitches locked={false} className="border-t border-line pt-3" />
-    </div>
+    </Card>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { Clock } from './playback';
 
 /** The clock's time, re-rendering at most every `step` ms of session time. */
@@ -25,10 +25,12 @@ export function usePlaying(clock: Clock): { playing: boolean; speed: number } {
 }
 
 /**
- * Marks row `index` in a list with `data-active` and scrolls it into view when `follow` is on.
+ * Marks row `index` in a list with `data-active` and scrolls it into view when `follow` is on,
+ * unless the user scrolled the list in the last few seconds.
  * Rows are the list's children with `data-i`. Done on the DOM so the list doesn't re-render.
  */
 export function useActiveRow(listRef: RefObject<HTMLElement | null>, index: number, follow: boolean) {
+  const userScrolledAt = useUserScroll(listRef);
   useLayoutEffect(() => {
     const list = listRef.current;
     if (!list) return;
@@ -37,7 +39,7 @@ export function useActiveRow(listRef: RefObject<HTMLElement | null>, index: numb
     const row = list.querySelector<HTMLElement>(`[data-i="${index}"]`);
     if (!row) return;
     row.setAttribute('data-active', '');
-    if (follow) {
+    if (follow && Date.now() - userScrolledAt.current > USER_SCROLL_HOLD_MS) {
       // Scroll only the list, never the page. The list is `relative`, so offsetTop is within it.
       const top = row.offsetTop;
       if (top < list.scrollTop + 24 || top + row.offsetHeight > list.scrollTop + list.clientHeight - 24) {
@@ -45,6 +47,24 @@ export function useActiveRow(listRef: RefObject<HTMLElement | null>, index: numb
       }
     }
   });
+}
+
+export const USER_SCROLL_HOLD_MS = 4000;
+
+/** When the user last scrolled `ref` by hand (wheel, touch, keys), so following can wait. */
+export function useUserScroll(ref: RefObject<HTMLElement | null>) {
+  const at = useRef(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const mark = () => (at.current = Date.now());
+    const events = ['wheel', 'touchmove', 'keydown'] as const;
+    for (const e of events) el.addEventListener(e, mark, { passive: true });
+    return () => {
+      for (const e of events) el.removeEventListener(e, mark);
+    };
+  }, [ref]);
+  return at;
 }
 
 export function prettyJson(text: string): { text: string; json: boolean } {

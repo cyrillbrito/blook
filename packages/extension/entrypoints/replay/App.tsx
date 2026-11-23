@@ -1,16 +1,13 @@
-// Extension host of the viewer. Three ways in:
+// Extension host of the viewer. Two ways in, both with "← Recordings" back to the Recordings page:
 // - /replay.html?session=<id>: loads from IndexedDB, through the same bundle builder as Export,
 //   so it shows exactly what the exported ZIP would hold. Offers "Download bundle".
-// - /replay.html?open=<id>: the Recordings page's "Open bundle…" hands over the picked file (components/handoff.ts).
-// - /replay.html: the file picker (the popup's "Open bundle…"), also the fallback when the handoff is gone.
+// - /replay.html: the picker for a bundle .zip or folder ("Open bundle…" in the popup and the Recordings page).
 import { buildBundle } from '@/lib/export/bundle';
-import { bundleFromUserFiles, bundleFromZip, ViewerApp, type Bundle, type ViewerAppProps } from '@blook/viewer';
-import { claimFile } from '@/components/handoff';
+import { bundleFromZip, ViewerApp, type Bundle, type ViewerAppProps } from '@blook/viewer';
 import { tryBackground } from '@/components/util';
 
-const params = new URLSearchParams(location.search);
-const sessionId = params.get('session') ?? '';
-const openId = params.get('open') ?? '';
+const sessionId = new URLSearchParams(location.search).get('session') ?? '';
+const back = { href: '/recordings.html', label: 'Recordings' };
 
 async function loadFromDb(id: string): Promise<Bundle> {
   const { folder, zip } = await buildBundle(id);
@@ -25,21 +22,8 @@ async function download(id: string) {
 }
 
 function props(): ViewerAppProps {
-  if (sessionId) {
-    return { initial: { label: `session ${sessionId}`, load: () => loadFromDb(sessionId) }, onDownload: () => download(sessionId) };
-  }
-  if (openId) {
-    return {
-      initial: {
-        label: 'bundle',
-        load: async () => {
-          const file = await claimFile(openId);
-          return file && bundleFromUserFiles([{ file, path: file.name }]);
-        },
-      },
-    };
-  }
-  return {};
+  if (!sessionId) return { back };
+  return { back, initial: { label: `session ${sessionId}`, load: () => loadFromDb(sessionId) }, onDownload: () => download(sessionId) };
 }
 
 export default function App() {

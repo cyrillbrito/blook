@@ -32,11 +32,11 @@ flowchart TD
 
 ## Recording
 
-**Popup** (`entrypoints/popup/`). The toolbar icon's menu: Record (or Stop), the capture switches (mask, mic, canvas) and the latest recordings. It closes once recording starts. The `toggle-recording` command (Alt+Shift+R) starts and stops without it.
+**Popup** (`entrypoints/popup/`). The toolbar icon's menu: Record (or Stop), the mic and mask switches (canvas is in Settings) and the latest recordings. It closes once recording starts. The `toggle-recording` command (Alt+Shift+R) starts and stops without it.
 
-**Pill** (`entrypoints/pill.content.ts`). While recording, a small draggable control on the recorded page: time, mic state, Stop, then "Saved" with Open and Download. The background registers it with the recorder (top frame) and pushes the status to it. It sits in a closed shadow root from the isolated world, so rrweb sees only an empty `<blook-pill>`, and the recorder blocks that element so clicks on it are not recorded.
+**Pill** (`entrypoints/pill.content.ts`). While recording, a draggable control on the recorded page, bottom center until moved: time, the mic (only when it is used), Stop, then "Saved" with Open and Download. It pops in with a few red rings when a recording starts. The background registers it with the recorder (top frame) and pushes the status to it. It sits in a closed shadow root from the isolated world, so rrweb sees only an empty `<blook-pill>`, and the recorder blocks that element so clicks on it are not recorded.
 
-**Recordings page** (`entrypoints/recordings/`). All recordings with Replay, Download and Delete, the settings with the OpenRouter key, and "Open bundle…". The popup's shared parts are in `components/recorder-ui.tsx`. All of them send messages to the background (`lib/messages.ts`) and keep settings in extension storage (`lib/settings.ts`).
+**Recordings page** (`entrypoints/recordings/`). The extension's full page, with two views in one header: Recordings (every recording with Replay, Download and Delete, and "Open bundle…") and Settings (`#settings`: mic, mask, canvas, the OpenRouter key, the shortcut). The popup's gear opens Settings, "All recordings" opens Recordings. A recording opens in the same tab, and the Replay page links back with "← Recordings". The popup's shared parts are in `components/recorder-ui.tsx`. All of them send messages to the background (`lib/messages.ts`) and keep settings in extension storage (`lib/settings.ts`).
 
 **Background worker** (`entrypoints/background.ts`, `lib/capture/session.ts`). Owns the session. It attaches the debugger, injects the recorder, starts the mic, and writes every event to IndexedDB about once a second (`lib/capture/writer.ts`), so a worker restart loses little.
 
@@ -52,7 +52,7 @@ flowchart TD
 
 ## Reviewing
 
-**Viewer** (`packages/viewer`). A React app that plays the rrweb replay with the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. It runs in the extension's Replay page (`entrypoints/replay/`), which reads a recorded session straight from IndexedDB, or opens a ZIP or folder picked with "Open bundle…". The viewer has no extension APIs, so the website's `/viewer` (`packages/site`) hosts it as is, reading the ZIP in the browser.
+**Viewer** (`packages/viewer`). A React app that plays the rrweb replay with the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. It runs in the extension's Replay page (`entrypoints/replay/`), which reads a recorded session straight from IndexedDB, or, without a session, is the picker for a ZIP or folder ("Open bundle…"). The viewer has no extension APIs, so the website's `/viewer` (`packages/site`) hosts it as is, reading the ZIP in the browser.
 
 **Agent skill** (`skills/blook/`). Tells an agent how to read a bundle: read order, jq recipes, and workflows for bug triage, task lists and E2E tests.
 

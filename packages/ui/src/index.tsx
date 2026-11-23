@@ -1,5 +1,5 @@
 // Tiny UI primitives on the theme tokens of theme.css. See README.md.
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
 
 export function cx(...parts: (string | false | undefined | null)[]): string {
   return parts.filter(Boolean).join(' ');
@@ -12,19 +12,24 @@ const VARIANT: Record<Variant, string> = {
   primary: 'bg-accent text-white hover:bg-accent-strong',
   secondary: 'border border-line-strong bg-surface text-fg hover:bg-surface-sunken',
   ghost: 'text-muted hover:bg-surface-sunken hover:text-fg',
-  danger: 'bg-danger text-white hover:bg-red-700',
-  record: 'bg-recording-strong text-white shadow-sm hover:bg-[#b52e15]',
+  danger: 'bg-danger text-white hover:bg-danger-strong',
+  record: 'bg-recording-strong text-white shadow-sm hover:bg-recording-hover',
 };
 
 const SIZE: Record<Size, string> = {
-  sm: 'h-6 gap-1 px-2 text-xs',
+  sm: 'h-control gap-1.5 px-2.5 text-xs',
   md: 'h-8 gap-1.5 px-3 text-sm',
   lg: 'h-12 gap-2 px-4 text-base font-semibold',
 };
 
-const ICON_SIZE: Record<Size, string> = { sm: 'h-6 w-6', md: 'h-8 w-8', lg: 'h-12 w-12' };
+const ICON_SIZE: Record<Size, string> = { sm: 'size-control', md: 'size-8', lg: 'size-12' };
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size };
+
+/** A pressed toggle looks like `primary`, a released one like `secondary`. */
+export function Toggle({ pressed, ...rest }: Omit<ButtonProps, 'variant'> & { pressed: boolean }) {
+  return <Button variant={pressed ? 'primary' : 'secondary'} size="sm" aria-pressed={pressed} {...rest} />;
+}
 
 const base =
   'inline-flex shrink-0 cursor-pointer items-center justify-center rounded-control font-medium whitespace-nowrap transition-colors ' +
@@ -51,11 +56,11 @@ export function IconButton({
 type Tone = 'neutral' | 'accent' | 'danger' | 'warn' | 'ok' | 'recording';
 
 const TONE: Record<Tone, string> = {
-  neutral: 'bg-surface-sunken text-slate-600',
+  neutral: 'bg-surface-sunken text-muted',
   accent: 'bg-accent-soft text-accent-strong',
-  danger: 'bg-danger-soft text-red-700',
-  warn: 'bg-amber-50 text-amber-700',
-  ok: 'bg-green-50 text-green-700',
+  danger: 'bg-danger-soft text-danger-strong',
+  warn: 'bg-warn-soft text-warn',
+  ok: 'bg-ok-soft text-ok',
   recording: 'bg-recording-soft text-recording-strong',
 };
 
@@ -99,8 +104,17 @@ export function Switch(props: { label: ReactNode; checked: boolean; disabled?: b
   );
 }
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cx('rounded-card border border-line bg-surface', className)}>{children}</div>;
+/** One tab in an underlined tab row; the row sets the height and the bottom line. */
+export function tabClass(active: boolean) {
+  return cx(
+    '-mb-px flex cursor-pointer items-center gap-1 border-b-2 px-2 whitespace-nowrap outline-none focus-visible:bg-accent-soft',
+    active ? 'border-accent font-medium text-fg' : 'border-transparent text-muted hover:text-fg',
+  );
+}
+
+/** White content on the canvas. Every card has the same edge and shadow. */
+export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cx('rounded-card border border-line-strong bg-surface shadow-sm', className)} {...rest} />;
 }
 
 /** Small heading for a group, with optional actions on the right. */
@@ -117,7 +131,7 @@ export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputEleme
   return (
     <input
       className={cx(
-        'h-7 w-full rounded-control border border-line-strong bg-surface px-2 text-xs outline-none focus:border-accent',
+        'h-control w-full rounded-control border border-line-strong bg-surface px-2 text-xs outline-none placeholder:text-muted focus:border-accent',
         className,
       )}
       {...rest}
@@ -149,7 +163,7 @@ export function Alert({ tone = 'danger', children }: { tone?: 'danger' | 'warn';
     <p
       className={cx(
         'rounded-control border px-2 py-1.5 text-xs',
-        tone === 'danger' ? 'border-red-200 bg-danger-soft text-red-700' : 'border-amber-200 bg-amber-50 text-amber-800',
+        tone === 'danger' ? 'border-red-200 bg-danger-soft text-danger-strong' : 'border-amber-200 bg-warn-soft text-warn',
       )}
     >
       {children}

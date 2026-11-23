@@ -5,14 +5,22 @@ import { AudioSync, Clock, TabReplay, lastAtOrBefore } from './playback';
 import { ConsolePanel, NetworkPanel, TimelinePanel, TranscriptPanel, WebSocketsPanel, type Focus, type PanelId } from './panels';
 import { formatDuration, formatTime, shortUrl } from '@blook/core/format';
 import { useNow, usePlaying } from './util';
-import { Badge, Button, Switch, cx } from '@blook/ui';
-import { BlookIcon, DownloadIcon, PauseIcon, PlayIcon, SpinnerIcon, VolumeIcon } from '@blook/ui/icons';
+import { Badge, Button, Card, Toggle, cx, tabClass } from '@blook/ui';
+import { KIND, type Kind } from './kinds';
+import { BlookIcon, PauseIcon, PlayIcon } from '@blook/ui/icons';
+import ArrowLeftIcon from 'lucide-react/icons/arrow-left';
+import DownloadIcon from 'lucide-react/icons/download';
+import LoaderCircleIcon from 'lucide-react/icons/loader-circle';
+import Volume2Icon from 'lucide-react/icons/volume-2';
+import VolumeXIcon from 'lucide-react/icons/volume-x';
 
 const SPEEDS = [0.5, 1, 2, 4, 8];
 
 type Download = () => Promise<void>;
+/** A link out of the viewer, shown first in the header (the extension's "← Recordings"). */
+export type BackLink = { href: string; label: string };
 
-export function Viewer({ bundle, onDownload }: { bundle: Bundle; onDownload?: Download }) {
+export function Viewer({ bundle, onDownload, back }: { bundle: Bundle; onDownload?: Download; back?: BackLink }) {
   // Created in an effect, so StrictMode's mount-unmount-mount gets a fresh pair.
   const [pb, setPb] = useState<{ clock: Clock; audio: AudioSync; bundle: Bundle }>();
   useEffect(() => {
@@ -25,10 +33,22 @@ export function Viewer({ bundle, onDownload }: { bundle: Bundle; onDownload?: Do
     };
   }, [bundle]);
   if (pb?.bundle !== bundle) return null;
-  return <ViewerBody bundle={bundle} onDownload={onDownload} clock={pb.clock} audio={pb.audio} />;
+  return <ViewerBody bundle={bundle} onDownload={onDownload} back={back} clock={pb.clock} audio={pb.audio} />;
 }
 
-function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDownload?: Download; clock: Clock; audio: AudioSync }) {
+function ViewerBody({
+  bundle,
+  onDownload,
+  back,
+  clock,
+  audio,
+}: {
+  bundle: Bundle;
+  onDownload?: Download;
+  back?: BackLink;
+  clock: Clock;
+  audio: AudioSync;
+}) {
   const tabs = useMemo(() => [...bundle.rrweb.keys()], [bundle]);
   const allTabs = useMemo(() => {
     const ids = new Set([...bundle.session.tabs.map((t) => t.tabId), ...tabs]);
@@ -37,7 +57,6 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
   const [tabId, setTabId] = useState<number | undefined>(tabs[0]);
   const [panel, setPanel] = useState<PanelId>('timeline');
   const [focus, setFocus] = useState<Focus>();
-  const [follow, setFollow] = useState(true);
   const [split, setSplit] = useState(() => Math.round(innerWidth * 0.55));
 
   const seek = useCallback(
@@ -79,17 +98,24 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
   };
   // Timeline errors skip Chrome's "Failed to load resource" lines, which failed requests already cover.
   const errors = bundle.timeline.filter((x) => x.type === 'error').length;
-  const failed = bundle.network.filter((x) => x.failed).length;
-  const panelProps = { bundle, tabs: allTabs, clock, follow, seek, open, focus };
+  const panelProps = { bundle, tabs: allTabs, clock, seek, open, focus };
 
   return (
-    <div className="flex h-screen flex-col bg-surface text-xs text-fg">
-      <header className="flex h-10 shrink-0 items-center gap-3 border-b border-line bg-surface-muted px-3">
-        <span className="flex shrink-0 items-center gap-1.5 font-semibold">
-          <BlookIcon />
-          Blook
-        </span>
-        <span className="h-4 w-px shrink-0 bg-line" />
+    // Layers: the header sits on a tinted canvas; the replay and the panels are white cards on it.
+    <div className="flex h-screen flex-col bg-canvas text-xs text-fg antialiased">
+      <header className="flex h-11 shrink-0 items-center gap-3 px-4">
+        {back ? (
+          <a href={back.href} className="flex shrink-0 items-center gap-1.5 font-medium text-muted hover:text-fg">
+            <ArrowLeftIcon className="h-3.5 w-3.5" />
+            {back.label}
+          </a>
+        ) : (
+          <span className="flex shrink-0 items-center gap-1.5 font-semibold">
+            <BlookIcon />
+            Blook
+          </span>
+        )}
+        <span className="h-4 w-px shrink-0 bg-line-strong" />
         <span className="min-w-0 truncate text-sm font-medium" title={s.url}>
           {s.title || shortUrl(s.url)}
         </span>
@@ -101,32 +127,22 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
           {s.settings.mask && <Badge>masked</Badge>}
           {s.settings.canvas && <Badge>canvas</Badge>}
         </span>
-        <span className="ml-auto flex shrink-0 items-center gap-2">
-          {errors > 0 && <Badge tone="danger">{errors} errors</Badge>}
-          {failed > 0 && <Badge tone="danger">{failed} failed requests</Badge>}
-          {onDownload && <DownloadButton onDownload={onDownload} />}
-        </span>
+        <span className="ml-auto flex shrink-0 items-center gap-2">{onDownload && <DownloadButton onDownload={onDownload} />}</span>
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-col" style={{ width: split }}>
+      <div className="flex min-h-0 flex-1 px-2 pb-2">
+        <Card className="flex min-w-0 flex-col overflow-hidden" style={{ width: split - 8 }}>
           {tabs.length > 1 && (
-            <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-line px-2 py-1">
+            <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-line px-2 py-1.5">
               {tabs.map((id, i) => {
                 const url = s.tabs.find((t) => t.tabId === id)?.url || s.navigations.find((n) => n.tabId === id)?.url;
                 return (
-                  <button
-                    key={id}
-                    title={url}
-                    onClick={() => setTabId(id)}
-                    className={cx(
-                      'max-w-56 shrink-0 truncate rounded-control px-2 py-0.5',
-                      id === tabId ? 'bg-fg text-white' : 'border border-line-strong hover:bg-surface-sunken',
-                    )}
-                  >
-                    Tab {i + 1}
-                    {url && `: ${shortUrl(url)}`}
-                  </button>
+                  <Toggle key={id} pressed={id === tabId} title={url} onClick={() => setTabId(id)} className="max-w-56">
+                    <span className="truncate">
+                      Tab {i + 1}
+                      {url && `: ${shortUrl(url)}`}
+                    </span>
+                  </Toggle>
                 );
               })}
             </nav>
@@ -140,40 +156,32 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
             </div>
           )}
           <Controls bundle={bundle} clock={clock} audio={audio} />
-        </div>
+        </Card>
 
         <Splitter onDrag={(x) => setSplit(Math.max(320, Math.min(innerWidth - 360, x)))} />
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex shrink-0 items-center gap-0.5 border-b border-line bg-surface-muted px-1">
-            {(
-              [
-                ['timeline', 'Timeline'],
-                ['transcript', 'Transcript'],
-                ['network', 'Network'],
-                ['websockets', 'WebSockets'],
-                ['console', 'Console'],
-              ] as [PanelId, string][]
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                onClick={() => setPanel(id)}
-                aria-pressed={panel === id}
-                className={cx(
-                  '-mb-px cursor-pointer border-b-2 px-2 pt-2 pb-1.5 outline-none focus-visible:bg-accent-soft',
-                  panel === id ? 'border-accent font-medium text-fg' : 'border-transparent text-slate-600 hover:text-fg',
-                )}
-              >
-                {label}{' '}
-                <span className={cx('text-muted tabular-nums', id === 'console' && errors > 0 && 'text-danger')}>
-                  {id === 'console' && errors > 0 && '✖ '}
-                  {c[id]}
-                </span>
-              </button>
-            ))}
-            <span className="ml-auto px-2 text-slate-600">
-              <Switch label="Follow" checked={follow} onChange={setFollow} title="Scroll lists to the playhead while playing" />
-            </span>
+        <Card className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex h-9 shrink-0 items-stretch gap-0.5 border-b border-line-strong px-1.5">
+            {PANELS.map(([id, label, none]) => {
+              const empty = c[id] === 0;
+              return (
+                <button
+                  key={id}
+                  onClick={() => setPanel(id)}
+                  aria-pressed={panel === id}
+                  title={empty ? none : undefined}
+                  className={cx(tabClass(panel === id), empty && 'italic opacity-70')}
+                >
+                  {label}
+                  {!empty && (
+                    <span className={cx('font-normal text-muted tabular-nums', id === 'console' && errors > 0 && 'text-danger')}>
+                      {id === 'console' && errors > 0 && '✖ '}
+                      {c[id]}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
           <div className="flex min-h-0 flex-1 flex-col">
             {panel === 'timeline' && <TimelinePanel {...panelProps} />}
@@ -182,16 +190,26 @@ function ViewerBody({ bundle, onDownload, clock, audio }: { bundle: Bundle; onDo
             {panel === 'websockets' && <WebSocketsPanel {...panelProps} />}
             {panel === 'console' && <ConsolePanel {...panelProps} />}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );
 }
 
+/** The panels, in tab order: [id, label, tooltip when empty]. */
+const PANELS: [PanelId, string, string][] = [
+  ['timeline', 'Timeline', 'Nothing happened in this recording'],
+  ['console', 'Console', 'No console messages in this recording'],
+  ['network', 'Network', 'No HTTP requests in this recording'],
+  ['websockets', 'WebSockets', 'No WebSockets in this recording'],
+  ['transcript', 'Transcript', 'No speech was transcribed in this recording'],
+];
+
+/** The gap between the cards; a line shows on hover. */
 function Splitter({ onDrag }: { onDrag: (x: number) => void }) {
   return (
     <div
-      className="w-1 shrink-0 cursor-col-resize bg-line transition-colors hover:bg-accent active:bg-accent"
+      className="group flex w-2 shrink-0 cursor-col-resize justify-center"
       onPointerDown={(e) => {
         const el = e.currentTarget;
         el.setPointerCapture(e.pointerId);
@@ -203,7 +221,9 @@ function Splitter({ onDrag }: { onDrag: (x: number) => void }) {
         el.addEventListener('pointermove', move);
         el.addEventListener('pointerup', up);
       }}
-    />
+    >
+      <div className="w-0.5 rounded-full transition-colors group-hover:bg-accent group-active:bg-accent" />
+    </div>
   );
 }
 
@@ -213,8 +233,8 @@ function AddressBar({ bundle, tabId, clock }: { bundle: Bundle; tabId?: number; 
   const navs = useMemo(() => bundle.session.navigations.filter((n) => n.tabId === tabId), [bundle, tabId]);
   const url = navs[lastAtOrBefore(navs, now)]?.url ?? bundle.session.tabs.find((t) => t.tabId === tabId)?.url ?? '';
   return (
-    <div className="shrink-0 border-b border-line px-2 py-1">
-      <div className="truncate rounded bg-surface-sunken px-2 py-0.5 font-mono text-slate-700" title={url}>
+    <div className="shrink-0 border-b border-line-strong px-2 py-1.5">
+      <div className="truncate rounded-control bg-surface-sunken px-3 py-1 text-sm" title={url}>
         {url || '—'}
       </div>
     </div>
@@ -279,12 +299,12 @@ function Stage({ bundle, tabId, clock }: { bundle: Bundle; tabId: number; clock:
         : undefined);
 
   return (
-    <div ref={boxRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-line">
+    <div ref={boxRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-surface-sunken">
       <div
         ref={rootRef}
         className={cx('overflow-hidden bg-surface shadow [&_iframe]:border-0 [&_iframe]:bg-surface', overlay && 'opacity-40')}
       />
-      {overlay && <span className="absolute top-2 left-1/2 -translate-x-1/2 rounded bg-slate-800/85 px-3 py-1 text-white">{overlay}</span>}
+      {overlay && <span className="absolute top-2 left-1/2 -translate-x-1/2 rounded-control bg-fg/85 px-3 py-1 text-white">{overlay}</span>}
     </div>
   );
 }
@@ -292,17 +312,11 @@ function Stage({ bundle, tabId, clock }: { bundle: Bundle; tabId: number; clock:
 interface Marker {
   t: number;
   endT?: number;
-  kind: 'error' | 'failed' | 'speech' | 'click' | 'nav';
+  kind: Extract<Kind, 'error' | 'failed' | 'speech' | 'user' | 'nav'>;
   label: string;
 }
 
-const MARKER_STYLE: Record<Marker['kind'], string> = {
-  error: 'bg-red-600',
-  failed: 'bg-orange-500',
-  click: 'bg-sky-500',
-  nav: 'bg-violet-600',
-  speech: 'bg-blue-400/60',
-};
+const LEGEND: Marker['kind'][] = ['error', 'failed', 'user', 'nav', 'speech'];
 
 function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audio: AudioSync }) {
   const { playing, speed } = usePlaying(clock);
@@ -331,7 +345,7 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
     for (const e of bundle.timeline) {
       if (e.type === 'error') m.push({ t: e.t, kind: 'error', label: e.summary });
       else if (e.type === 'request-failed') m.push({ t: e.t, kind: 'failed', label: e.summary });
-      else if (e.type === 'click') m.push({ t: e.t, kind: 'click', label: e.summary });
+      else if (e.type === 'click') m.push({ t: e.t, kind: 'user', label: e.summary });
       else if (e.type === 'navigation' && e.t > 0) m.push({ t: e.t, kind: 'nav', label: e.summary });
     }
     for (const s of bundle.transcript.segments) m.push({ t: s.t, endT: s.endT, kind: 'speech', label: s.text });
@@ -346,7 +360,7 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
   const speech = hover ? markers.find((m) => m.kind === 'speech' && hover.t >= m.t && hover.t <= m.endT!) : undefined;
 
   return (
-    <div className="shrink-0 border-t border-line bg-surface-muted px-2 py-1.5">
+    <div className="shrink-0 border-t border-line-strong px-2 pt-1.5 pb-2">
       <div
         ref={barRef}
         className="relative h-6 cursor-pointer select-none"
@@ -367,32 +381,32 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
           .map((m, i) => (
             <div
               key={`s${i}`}
-              className={cx('absolute top-0 h-1.5 rounded-sm', MARKER_STYLE.speech)}
+              className={cx('absolute top-0 h-1.5 rounded-sm', KIND.speech.mark)}
               style={{ left: `${(m.t / end) * 100}%`, width: `${Math.max(0.3, ((m.endT! - m.t) / end) * 100)}%` }}
             />
           ))}
-        <div className="absolute top-2 right-0 left-0 h-1.5 rounded bg-slate-300">
-          <div ref={fillRef} className="h-full rounded bg-fg/70" />
+        <div className="absolute top-2 right-0 left-0 h-1.5 rounded-full bg-line-strong">
+          <div ref={fillRef} className="h-full rounded-full bg-accent" />
         </div>
         {markers
           .filter((m) => m.kind !== 'speech')
           .map((m, i) => (
             <div
               key={`m${i}`}
-              className={cx('absolute w-0.5', MARKER_STYLE[m.kind], m.kind === 'click' ? 'top-4 h-1.5 opacity-70' : 'top-3.5 h-2.5')}
+              className={cx('absolute w-0.5', KIND[m.kind].mark, m.kind === 'user' ? 'top-4 h-1.5 opacity-70' : 'top-3.5 h-2.5')}
               style={{ left: `${(m.t / end) * 100}%` }}
             />
           ))}
         <div ref={headRef} className="pointer-events-none absolute top-0.5 h-5 w-1 -translate-x-1/2 rounded-full bg-playhead" />
         {hover && (
           <div
-            className="pointer-events-none absolute bottom-7 z-20 max-w-80 -translate-x-1/2 rounded bg-slate-900 px-2 py-1 text-[11px] text-white shadow"
+            className="pointer-events-none absolute bottom-7 z-20 max-w-80 -translate-x-1/2 rounded-control bg-fg px-2 py-1 text-2xs text-white shadow-md"
             style={{ left: Math.max(60, Math.min(hover.x, (barRef.current?.clientWidth ?? 0) - 60)) }}
           >
-            <div className="font-mono">{formatTime(hover.t)}</div>
+            <div className="tabular-nums">{formatTime(hover.t)}</div>
             {speech && <div className="truncate text-blue-200">🗣 {speech.label}</div>}
             {near.map((m, i) => (
-              <div key={i} className={cx('truncate', m.kind === 'error' || m.kind === 'failed' ? 'text-red-300' : 'text-slate-300')}>
+              <div key={i} className={cx('truncate', m.kind === 'error' || m.kind === 'failed' ? 'text-red-300' : 'text-white/70')}>
                 {(m.kind === 'error' || m.kind === 'failed') && '✖ '}
                 {m.label}
               </div>
@@ -405,13 +419,13 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
           {playing ? <PauseIcon className="h-3.5 w-3.5" /> : <PlayIcon className="h-3.5 w-3.5" />}
           {playing ? 'Pause' : 'Play'}
         </Button>
-        <span className="font-mono tabular-nums">
+        <span className="tabular-nums">
           <span ref={timeRef} /> <span className="text-muted">/ {formatTime(bundle.endT)}</span>
         </span>
         <select
           value={speed}
           onChange={(e) => clock.setSpeed(Number(e.target.value))}
-          className="h-6 rounded-control border border-line-strong bg-surface px-1"
+          className="h-control rounded-control border border-line-strong bg-surface px-1.5 outline-none focus:border-accent"
           title="Speed"
         >
           {SPEEDS.map((v) => (
@@ -429,16 +443,14 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
             }}
             title={speed > 4 ? 'Audio is off above 4×' : 'Mic audio'}
           >
-            <VolumeIcon muted={muted} className="h-3.5 w-3.5" />
+            {muted ? <VolumeXIcon className="h-3.5 w-3.5" /> : <Volume2Icon className="h-3.5 w-3.5" />}
             {muted ? 'Muted' : 'Audio'}
           </Button>
         )}
-        <span className="ml-auto flex gap-2 text-[11px] text-muted">
-          <Legend cls={MARKER_STYLE.error} label="error" />
-          <Legend cls={MARKER_STYLE.failed} label="failed request" />
-          <Legend cls={MARKER_STYLE.click} label="click" />
-          <Legend cls={MARKER_STYLE.nav} label="navigation" />
-          <Legend cls={MARKER_STYLE.speech} label="speech" />
+        <span className="ml-auto flex gap-2 text-2xs text-muted">
+          {LEGEND.map((k) => (
+            <Legend key={k} cls={KIND[k].mark} label={KIND[k].label} />
+          ))}
         </span>
       </div>
     </div>
@@ -451,7 +463,7 @@ function DownloadButton({ onDownload }: { onDownload: Download }) {
   return (
     <>
       {error && (
-        <span className="max-w-64 truncate text-red-700" title={error}>
+        <span className="max-w-64 truncate text-danger" title={error}>
           {error}
         </span>
       )}
@@ -466,7 +478,7 @@ function DownloadButton({ onDownload }: { onDownload: Download }) {
           setBusy(false);
         }}
       >
-        {busy ? <SpinnerIcon className="h-3.5 w-3.5" /> : <DownloadIcon className="h-3.5 w-3.5" />}
+        {busy ? <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" /> : <DownloadIcon className="h-3.5 w-3.5" />}
         {busy ? 'Preparing…' : 'Download bundle'}
       </Button>
     </>
