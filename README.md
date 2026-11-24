@@ -40,6 +40,8 @@ To get your voice transcribed, click the gear icon in the Blook menu (it opens *
 
 Click **Open bundle…** in the Blook menu, or drop the ZIP on the [viewer on the website](https://cyrillbrito.github.io/blook/viewer/).
 
+In the viewer, Space plays and pauses, and ←/→ step 1 second (5 with Shift). In a list, ↑/↓ move from one entry to the next, and the replay follows.
+
 ## For coding agents
 
 To let your coding agent read recordings, run this once on macOS or Linux:

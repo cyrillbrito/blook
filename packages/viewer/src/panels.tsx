@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Bundle, ConsoleOut, FrameOut, RequestOut, SocketOut, TimelineEntry, TimelineRef } from './bundle';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { Bundle, ConsoleOut, FrameOut, RequestOut, SegmentOut, SocketOut, TimelineEntry, TimelineRef } from './bundle';
 import { lastAtOrBefore } from './playback';
 import {
   Body,
@@ -21,9 +21,8 @@ import {
 import { formatBytes, formatMs, formatTime, urlName } from '@blook/core/format';
 import { BODY_MAX_BYTES } from '@blook/core/body-policy';
 import { isCanceled } from '@blook/core/bundle';
-import { Button, cx } from '@blook/ui';
+import { Button, cx, tabPanelProps } from '@blook/ui';
 import { KIND, TYPE_KIND } from './kinds';
-import { USER_SCROLL_HOLD_MS, useNow, useUserScroll } from './util';
 
 export type PanelId = 'timeline' | 'transcript' | 'network' | 'websockets' | 'console';
 
@@ -57,7 +56,8 @@ function useSelection(panel: PanelId, focus: Focus | undefined) {
     if (focus?.panel === panel) setSel(focus.key);
   }, [focus, panel]);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setSel(undefined);
+    // Esc first closes an open popover (the filter menu), which is still open while the key is dispatched.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector(':popover-open') && setSel(undefined);
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
   }, []);
@@ -171,6 +171,7 @@ export function TimelinePanel({ bundle, tabs, clock, seek, open, focus }: Props)
           seek(e.t, e.tabId);
         }}
         clock={clock}
+        label="Timeline"
         empty="No timeline entries match."
       />
       {selected && <TimelineDetail bundle={bundle} entry={selected} onClose={() => setSel(undefined)} open={open} />}
@@ -311,6 +312,7 @@ export function NetworkPanel({ bundle, tabs, clock, seek, focus }: Props) {
           seek(x.t, x.tabId);
         }}
         clock={clock}
+        label="Requests"
         empty="No requests match."
       />
       {r && <RequestDetail r={r} onClose={() => setSel(undefined)} />}
@@ -321,6 +323,7 @@ export function NetworkPanel({ bundle, tabs, clock, seek, focus }: Props) {
 /** A request's headers, payload and response. Shared by the Network and Timeline panels. */
 export function RequestDetail({ r, onClose, actions }: { r: RequestOut; onClose: () => void; actions?: ReactNode }) {
   const [tab, setTab] = useState<'headers' | 'payload' | 'response'>('headers');
+  const tabsId = useId();
   return (
     <Detail
       title={
@@ -332,69 +335,72 @@ export function RequestDetail({ r, onClose, actions }: { r: RequestOut; onClose:
       actions={actions}
     >
       <SubTabs
+        id={tabsId}
         tabs={[
-          ['headers', 'Headers'],
-          ['payload', 'Payload'],
-          ['response', 'Response'],
+          { id: 'headers', label: 'Headers' },
+          { id: 'payload', label: 'Payload' },
+          { id: 'response', label: 'Response' },
         ]}
         value={tab}
         onChange={setTab}
       />
-      {tab === 'headers' && (
-        <>
-          <Section title="General">
-            <KeyValues
-              entries={[
-                ['URL', r.url],
-                ['Method', r.method],
-                ['Status', r.status != null ? `${r.status} ${r.statusText ?? ''}` : undefined],
-                [
-                  'Error',
-                  r.errorText && (
-                    <span key="error" className="text-danger">
-                      {r.errorText}
-                    </span>
-                  ),
-                ],
-                ['Type', r.resourceType],
-                ['MIME', r.mimeType],
-                ['Started', formatTime(r.t)],
-                ['Duration', r.durationMs != null ? formatMs(r.durationMs) : 'unfinished at Stop'],
-                ['Request id', r.id],
-              ]}
-            />
-          </Section>
-          <Section title="Response headers">
-            <KeyValues entries={Object.entries(r.responseHeaders ?? {})} />
-          </Section>
-          <Section title="Request headers">
-            <KeyValues entries={Object.entries(r.requestHeaders ?? {})} />
-          </Section>
-        </>
-      )}
-      {tab === 'payload' && (
-        <Body
-          key={`${r.id}-req`}
-          {...bodyProps(r.requestBody, r.requestBodyEncoding)}
-          note={r.requestBody === undefined ? 'No request body.' : r.requestBodyTruncated ? cutNote(r.requestBodySize) : undefined}
-        />
-      )}
-      {tab === 'response' && (
-        <Body
-          key={`${r.id}-res`}
-          {...bodyProps(r.responseBody, r.responseBodyEncoding)}
-          mime={r.mimeType}
-          note={
-            r.responseBodyNotKept
-              ? `Body not kept: ${r.responseBodyNotKept}${r.responseBodySize !== undefined ? ` (${formatBytes(r.responseBodySize)})` : ''}.`
-              : r.responseBodyTruncated
-                ? cutNote(r.responseBodySize)
-                : r.responseBody === undefined
-                  ? 'No body (none sent, or Chrome did not keep it).'
-                  : undefined
-          }
-        />
-      )}
+      <div {...tabPanelProps(tabsId, tab)}>
+        {tab === 'headers' && (
+          <>
+            <Section title="General">
+              <KeyValues
+                entries={[
+                  ['URL', r.url],
+                  ['Method', r.method],
+                  ['Status', r.status != null ? `${r.status} ${r.statusText ?? ''}` : undefined],
+                  [
+                    'Error',
+                    r.errorText && (
+                      <span key="error" className="text-danger">
+                        {r.errorText}
+                      </span>
+                    ),
+                  ],
+                  ['Type', r.resourceType],
+                  ['MIME', r.mimeType],
+                  ['Started', formatTime(r.t)],
+                  ['Duration', r.durationMs != null ? formatMs(r.durationMs) : 'unfinished at Stop'],
+                  ['Request id', r.id],
+                ]}
+              />
+            </Section>
+            <Section title="Response headers">
+              <KeyValues entries={Object.entries(r.responseHeaders ?? {})} />
+            </Section>
+            <Section title="Request headers">
+              <KeyValues entries={Object.entries(r.requestHeaders ?? {})} />
+            </Section>
+          </>
+        )}
+        {tab === 'payload' && (
+          <Body
+            key={`${r.id}-req`}
+            {...bodyProps(r.requestBody, r.requestBodyEncoding)}
+            note={r.requestBody === undefined ? 'No request body.' : r.requestBodyTruncated ? cutNote(r.requestBodySize) : undefined}
+          />
+        )}
+        {tab === 'response' && (
+          <Body
+            key={`${r.id}-res`}
+            {...bodyProps(r.responseBody, r.responseBodyEncoding)}
+            mime={r.mimeType}
+            note={
+              r.responseBodyNotKept
+                ? `Body not kept: ${r.responseBodyNotKept}${r.responseBodySize !== undefined ? ` (${formatBytes(r.responseBodySize)})` : ''}.`
+                : r.responseBodyTruncated
+                  ? cutNote(r.responseBodySize)
+                  : r.responseBody === undefined
+                    ? 'No body (none sent, or Chrome did not keep it).'
+                    : undefined
+            }
+          />
+        )}
+      </div>
     </Detail>
   );
 }
@@ -473,15 +479,18 @@ export function WebSocketsPanel({ bundle, tabs, clock, seek, focus }: Props) {
     <>
       <div className="max-h-[30%] shrink-0 overflow-auto border-b border-line">
         {sockets.map((s) => (
-          <div
+          <button
+            type="button"
             key={s.id}
+            aria-pressed={s.id === socketId}
+            title="Show this socket's frames and details"
             onClick={() => {
               setSocketId(s.id === socketId ? undefined : s.id);
               setSel(`${s.id}:`);
               seek(s.t, s.tabId);
             }}
             className={cx(
-              'flex cursor-default items-center gap-2 border-b border-line-soft px-2 py-0.5 tabular-nums hover:bg-surface-muted',
+              'flex w-full cursor-default items-center gap-2 border-b border-line-soft px-2 py-0.5 text-left tabular-nums -outline-offset-2 hover:bg-surface-muted',
               s.id === socketId && 'bg-accent-soft',
             )}
           >
@@ -495,7 +504,7 @@ export function WebSocketsPanel({ bundle, tabs, clock, seek, focus }: Props) {
               <span className="text-ok">↑{s.sentCount}</span> <span className="text-accent">↓{s.receivedCount}</span>
             </span>
             <span className="w-14 shrink-0 text-right text-muted">{s.endT != null ? formatMs(s.durationMs) : 'open'}</span>
-          </div>
+          </button>
         ))}
       </div>
       <Toolbar>
@@ -521,6 +530,7 @@ export function WebSocketsPanel({ bundle, tabs, clock, seek, focus }: Props) {
           seek(f.t, f.socket.tabId);
         }}
         clock={clock}
+        label="Frames"
         empty="No frames."
       />
       {frame && <FrameDetail key={sel} frame={frame} onClose={() => setSel(undefined)} />}
@@ -625,6 +635,7 @@ export function ConsolePanel({ bundle, tabs, clock, seek, focus }: Props) {
           seek(c.t, c.tabId);
         }}
         clock={clock}
+        label="Console messages"
         empty="No console entries match."
       />
     </>
@@ -636,19 +647,57 @@ export function ConsolePanel({ bundle, tabs, clock, seek, focus }: Props) {
 export function TranscriptPanel({ bundle, clock, seek, focus }: Props) {
   const { transcript, audio } = bundle;
   const segments = transcript.segments;
-  const now = useNow(clock);
   const listRef = useRef<HTMLDivElement>(null);
   const [sel, setSel] = useSelection('transcript', focus);
-  const active = lastAtOrBefore(segments, now);
-  const inSegment = active >= 0 && now < segments[active]!.endT + 300;
-  const userScrolledAt = useUserScroll(listRef);
 
+  // The word at the playhead gets `data-now`, set on the DOM each tick so the rows don't re-render.
   useEffect(() => {
-    const following = clock.playing && Date.now() - userScrolledAt.current > USER_SCROLL_HOLD_MS;
-    const target = sel != null ? Number(sel) : following ? active : -1;
-    if (target < 0) return;
-    listRef.current?.querySelector(`[data-i="${target}"]`)?.scrollIntoView({ block: 'nearest' });
-  }, [active, sel, clock, userScrolledAt]);
+    let at = '';
+    let marked: Element | null | undefined;
+    const mark = () => {
+      const now = clock.now();
+      const i = lastAtOrBefore(segments, now);
+      const words = segments[i]?.words ?? [];
+      const w = lastAtOrBefore(words, now);
+      const next = w >= 0 && now < words[w]!.endT ? `${i}:${w}` : '';
+      if (next === at) return;
+      at = next;
+      marked?.removeAttribute('data-now');
+      marked = next ? listRef.current?.querySelector(`[data-i="${i}"] [data-w="${w}"]`) : undefined;
+      marked?.setAttribute('data-now', '');
+    };
+    mark();
+    return clock.onTick(mark);
+  }, [clock, segments]);
+
+  const render = useCallback(
+    (s: SegmentOut) => (
+      <div className="flex gap-2 px-2 py-1">
+        <Time t={s.t} />
+        <p className="min-w-0 flex-1 text-sm leading-relaxed">
+          {s.words.length
+            ? s.words.map((w, j) => (
+                // A click on a word seeks to it; the keyboard selects whole segments.
+                // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+                <span
+                  key={j}
+                  data-w={j}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSel(String(s.index));
+                    seek(w.t);
+                  }}
+                  className="cursor-pointer rounded-sm hover:bg-accent-soft data-now:bg-playhead/40"
+                >
+                  {w.word}{' '}
+                </span>
+              ))
+            : s.text}
+        </p>
+      </div>
+    ),
+    [seek, setSel],
+  );
 
   return (
     <>
@@ -671,45 +720,20 @@ export function TranscriptPanel({ bundle, clock, seek, focus }: Props) {
           {transcript.source.method} {transcript.source.model}, by the {transcript.source.by}
         </div>
       )}
-      <div ref={listRef} className="relative min-h-0 flex-1 overflow-auto">
-        {segments.map((s, i) => (
-          <div
-            key={s.index}
-            data-i={i}
-            className={cx(
-              'flex gap-2 border-b border-l-2 border-line-soft border-l-transparent px-2 py-1 hover:bg-surface-muted',
-              i === active && inSegment && 'border-l-playhead bg-playhead-soft',
-              sel === String(i) && 'bg-accent-soft',
-            )}
-            onClick={() => {
-              setSel(String(i));
-              seek(s.t);
-            }}
-          >
-            <button className="w-14 shrink-0 text-left text-muted tabular-nums hover:text-accent" title="Seek here">
-              {formatTime(s.t)}
-            </button>
-            <p className="min-w-0 flex-1 text-sm leading-relaxed">
-              {s.words.length
-                ? s.words.map((w, j) => (
-                    <span
-                      key={j}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSel(String(i));
-                        seek(w.t);
-                      }}
-                      className={cx('cursor-pointer rounded-sm hover:bg-accent-soft', now >= w.t && now < w.endT && 'bg-playhead/40')}
-                    >
-                      {w.word}{' '}
-                    </span>
-                  ))
-                : s.text}
-            </p>
-          </div>
-        ))}
-        {!segments.length && (
-          <div className="space-y-2 p-4 text-center text-muted">
+      <RowList
+        ref={listRef}
+        items={segments}
+        getKey={(s) => String(s.index)}
+        render={render}
+        selectedKey={sel}
+        onSelect={(s) => {
+          setSel(String(s.index));
+          seek(s.t);
+        }}
+        clock={clock}
+        label="Transcript"
+        empty={
+          <div className="space-y-2">
             <div>No transcript segments.</div>
             {audio.length > 0 && (
               <div>
@@ -718,8 +742,8 @@ export function TranscriptPanel({ bundle, clock, seek, focus }: Props) {
               </div>
             )}
           </div>
-        )}
-      </div>
+        }
+      />
     </>
   );
 }

@@ -34,8 +34,32 @@ export default defineContentScript({
 function start() {
   const host = document.createElement('blook-pill');
   const root = host.attachShadow({ mode: 'closed' });
-  root.innerHTML = `<style>${CSS}</style><div class="pill" hidden></div>`;
-  const pill = root.querySelector<HTMLDivElement>('.pill')!;
+  // Built once and updated in place, so a status update never drops keyboard focus from a button.
+  root.innerHTML = `<style>${CSS}</style>
+    <div class="pill" role="group" aria-label="Blook" hidden>
+      <span class="view live">
+        <span class="dot"></span><span class="time"></span><span class="mic" role="img"></span>
+        <button class="stop" data-action="stop"></button>
+      </span>
+      <span class="view saved">
+        <span class="ok" aria-hidden="true"></span><span class="what"></span>
+        <button class="ghost" data-action="open">Open</button>
+        <button class="ghost" data-action="download"></button>
+        <button class="x" data-action="close" aria-label="Close">✕</button>
+      </span>
+    </div>`;
+  const $ = <E extends HTMLElement>(selector: string) => root.querySelector<E>(selector)!;
+  const pill = $<HTMLDivElement>('.pill');
+  const liveView = $('.live');
+  const savedView = $('.saved');
+  const dot = $('.dot');
+  const time = $('.time');
+  const micEl = $('.mic');
+  const stopBtn = $<HTMLButtonElement>('.stop');
+  const okEl = $('.ok');
+  const what = $('.what');
+  const openBtn = $<HTMLButtonElement>('[data-action=open]');
+  const downloadBtn = $<HTMLButtonElement>('[data-action=download]');
 
   let status: RecordingStatus = { state: 'idle' };
   /** The session this page showed live; "Saved" is shown only for it. */
@@ -86,11 +110,14 @@ function start() {
     if (!visible) return;
     attach();
 
+    // Stop is focused when the recording ends: hand focus to Open instead of losing it with the live view.
+    const stopHadFocus = root.activeElement === stopBtn;
+    liveView.hidden = !live;
+    savedView.hidden = live;
+
     if (live) {
       const session = s.session!;
       const mic = MIC[session.mic.state];
-      // No icon when the mic is off: it would look like a button. Shown when on, or when it should be on but isn't.
-      const micShown = mic.on || !!mic.tone;
       const label =
         s.state === 'starting'
           ? 'Starting…'
@@ -100,12 +127,15 @@ function start() {
               ? 'Loading page…'
               : 'Recording';
       pill.title = [label, mic.label, s.error].filter(Boolean).join(' · ');
-      pill.innerHTML = `
-        <span class="dot ${s.state === 'recording' ? '' : 'idle'}"></span>
-        <span class="time"></span>
-        ${micShown ? `<span class="mic ${mic.tone ?? ''}">${mic.on ? MIC_SVG : MIC_OFF_SVG}</span>` : ''}
-        <button class="stop" data-action="stop" ${s.state === 'recording' ? '' : 'disabled'}>${s.state === 'stopping' ? 'Saving…' : 'Stop'}</button>`;
-      const time = pill.querySelector<HTMLSpanElement>('.time')!;
+      dot.classList.toggle('idle', s.state !== 'recording');
+      // No icon when the mic is off: it would look like a button. Shown when on, or when it should be on but isn't.
+      micEl.hidden = !mic.on && !mic.tone;
+      micEl.className = `mic ${mic.tone ?? ''}`;
+      micEl.setAttribute('aria-label', mic.label);
+      micEl.innerHTML = mic.on ? MIC_SVG : MIC_OFF_SVG;
+      // aria-disabled, not disabled: a disabled button drops focus.
+      stopBtn.setAttribute('aria-disabled', String(s.state !== 'recording'));
+      stopBtn.textContent = s.state === 'stopping' ? 'Saving…' : 'Stop';
       const tick = () => {
         time.textContent = formatDuration(
           s.state === 'recording' ? Math.max(0, Date.now() - session.startedAt) : (session.durationMs ?? 0),
@@ -115,16 +145,15 @@ function start() {
       if (s.state === 'recording') timer = setInterval(tick, 500);
     } else if (saved) {
       pill.title = saved.error ?? 'Saved in Blook';
-      pill.innerHTML = `
-        <span class="ok">${saved.error ? '!' : '✓'}</span>
-        <span>Saved${saved.durationMs != null ? ` · ${formatDuration(saved.durationMs)}` : ''}</span>
-        <button class="ghost" data-action="open">Open</button>
-        <button class="ghost" data-action="download" ${saved.busy ? 'disabled' : ''}>${saved.busy ?? 'Download'}</button>
-        <button class="x" data-action="close" title="Close">✕</button>`;
-      pill.querySelector('.ok')!.classList.toggle('warn', !!saved.error);
-      // Hide when the time is up, unless the pointer is on it.
+      okEl.textContent = saved.error ? '!' : '✓';
+      okEl.classList.toggle('warn', !!saved.error);
+      what.textContent = `Saved${saved.durationMs != null ? ` · ${formatDuration(saved.durationMs)}` : ''}`;
+      downloadBtn.setAttribute('aria-disabled', String(!!saved.busy));
+      downloadBtn.textContent = saved.busy ?? 'Download';
+      if (stopHadFocus) openBtn.focus();
+      // Hide when the time is up, unless the pointer or the focus is on it.
       timer = setInterval(() => {
-        if (!saved || pill.matches(':hover')) return void (saved && (saved.until = Date.now() + 2000));
+        if (!saved || pill.matches(':hover') || root.activeElement) return void (saved && (saved.until = Date.now() + 2000));
         if (Date.now() >= saved.until) render();
       }, 1000);
     }
@@ -140,8 +169,9 @@ function start() {
   }
 
   pill.addEventListener('click', async (e) => {
-    const action = (e.target as HTMLElement).closest<HTMLElement>('[data-action]')?.dataset.action;
-    if (!action || moved) return;
+    const button = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
+    const action = button?.dataset.action;
+    if (!action || moved || button!.ariaDisabled === 'true') return;
     if (action === 'stop') {
       status = { ...status, state: 'stopping' };
       render();
@@ -224,7 +254,8 @@ const MIC_OFF_SVG =
 // Colours from packages/ui/src/theme.css (slate, and the recording vermilion).
 const CSS = `
 :host { all: initial; }
-.pill[hidden] { display: none; }
+.pill[hidden], .view[hidden], .mic[hidden] { display: none; }
+.view { display: contents; }
 .pill {
   position: fixed; z-index: 2147483647; left: ${MARGIN}px; top: ${MARGIN}px;
   display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 6px 0 16px; box-sizing: border-box;
@@ -255,12 +286,12 @@ button {
   border-radius: 999px; font-weight: 600; cursor: pointer;
 }
 button:focus-visible { outline: 2px solid #94a3b8; outline-offset: 1px; }
-button[disabled] { opacity: 0.6; cursor: default; }
+button[aria-disabled="true"] { opacity: 0.6; cursor: default; }
 .stop { background: #cc3f1d; }
-.stop:not([disabled]):hover { background: #b52e15; }
+.stop:not([aria-disabled="true"]):hover { background: #b52e15; }
 .stop::before { content: ""; width: 10px; height: 10px; border-radius: 2px; background: #fff; }
 .ghost { background: #1e293b; }
-.ghost:not([disabled]):hover { background: #334155; }
+.ghost:not([aria-disabled="true"]):hover { background: #334155; }
 .x { width: 32px; padding: 0; justify-content: center; color: #94a3b8; font-weight: 400; }
 .x:hover { color: #fff; }
 `;

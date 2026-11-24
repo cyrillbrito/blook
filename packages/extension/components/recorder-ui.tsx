@@ -1,6 +1,6 @@
 // React pieces shared by the toolbar popup and the Recordings page (with its Settings view).
 import type { PublicPath } from 'wxt/browser';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import type { BroadcastMessage, RecordingStatus, SessionListItem, TranscriptionStatus } from '@/lib/messages';
 import { DEFAULT_SETTINGS, getSettings, updateSettings, watchSettings } from '@/lib/settings';
 import { TRANSCRIPTION_MODEL, type Settings } from '@blook/core/types';
@@ -8,9 +8,8 @@ import { formatDuration, shortUrl, urlHost } from '@blook/core/format';
 import { formatDate, NO_ANSWER, tryBackground } from './util';
 import { MIC } from './mic';
 import { Badge, Button, Card, Field, IconButton, Input, LiveDot, Switch, cx } from '@blook/ui';
-import { StopIcon } from '@blook/ui/icons';
+import { Spinner, StopIcon } from '@blook/ui/icons';
 import DownloadIcon from 'lucide-react/icons/download';
-import LoaderCircleIcon from 'lucide-react/icons/loader-circle';
 import MicIcon from 'lucide-react/icons/mic';
 import MicOffIcon from 'lucide-react/icons/mic-off';
 import Trash2Icon from 'lucide-react/icons/trash-2';
@@ -124,7 +123,7 @@ export function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: 
   return (
     <Card className="space-y-3 p-3">
       <div className="flex items-center gap-2">
-        {recording ? <LiveDot /> : <LoaderCircleIcon className="h-3.5 w-3.5 text-muted animate-spin" />}
+        {recording ? <LiveDot /> : <Spinner className="h-3.5 w-3.5 text-muted" />}
         <span className="font-medium">{label}</span>
         <span className="text-muted tabular-nums">{formatDuration(recording ? elapsed : (session?.durationMs ?? elapsed))}</span>
         {/* Always rendered so the row doesn't shift when the mic state arrives. */}
@@ -156,7 +155,7 @@ export function LiveCard({ status, onStop }: { status: RecordingStatus; onStop: 
       </div>
 
       <Button size="lg" className="w-full" disabled={!recording} onClick={onStop}>
-        {recording ? <StopIcon className="h-3.5 w-3.5" /> : <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" />}
+        {recording ? <StopIcon className="h-3.5 w-3.5" /> : <Spinner className="h-3.5 w-3.5" />}
         {recording ? 'Stop recording' : state === 'starting' ? 'Starting…' : 'Stopping…'}
       </Button>
     </Card>
@@ -197,6 +196,8 @@ export function ApiKeyField() {
           type="password"
           className="font-mono"
           placeholder="sk-or-…"
+          autoComplete="off"
+          spellCheck={false}
           value={settings.openRouterApiKey}
           onChange={(e) => update({ openRouterApiKey: e.target.value.trim() })}
         />
@@ -255,10 +256,17 @@ function SessionRow({
   const live = active;
   const duration = session.durationMs ?? (session.endedAt ? session.endedAt - session.startedAt : undefined);
 
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const deleteRef = useRef<HTMLButtonElement>(null);
+  const promptId = useId();
+  const wasConfirming = useRef(false);
+
+  // Each button swaps the other out, so move focus along: to the confirm Delete, and back to the bin on Cancel.
   useEffect(() => {
-    if (!confirming) return;
-    const id = setTimeout(() => setConfirming(false), 4000);
-    return () => clearTimeout(id);
+    if (confirming) confirmRef.current?.focus();
+    else if (wasConfirming.current && !busy) deleteRef.current?.focus();
+    wasConfirming.current = confirming;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [confirming]);
 
   const exportZip = async () => {
@@ -271,6 +279,8 @@ function SessionRow({
     else if (!res.ok) setNote({ text: res.error ?? 'Download failed.', tone: 'danger' });
     else if (res.warning) setNote({ text: res.warning, tone: 'warn' });
   };
+
+  const cancelOnEsc = (e: KeyboardEvent) => e.key === 'Escape' && setConfirming(false);
 
   const remove = async () => {
     setConfirming(false);
@@ -290,7 +300,7 @@ function SessionRow({
     <div className={cx('group px-3 py-2', live ? 'bg-recording-soft/60' : 'hover:bg-surface-muted')}>
       <div className="flex items-center gap-2">
         <button
-          className="min-w-0 flex-1 cursor-pointer truncate rounded-control text-left font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-default disabled:no-underline"
+          className="min-w-0 flex-1 cursor-pointer truncate rounded-control text-left font-medium hover:underline disabled:cursor-default disabled:no-underline"
           onClick={() => openReplay(session.id, openHere)}
           disabled={live}
           title={live ? 'Stop the recording to open it' : `Open in the viewer: ${session.url}`}
@@ -298,11 +308,11 @@ function SessionRow({
           {session.title || shortUrl(session.url)}
         </button>
         {confirming ? (
-          <div className="flex shrink-0 items-center gap-1">
-            <Button variant="danger" size="sm" onClick={remove}>
+          <div role="group" aria-label="Confirm delete" className="flex shrink-0 items-center gap-1">
+            <Button ref={confirmRef} variant="danger" size="sm" onClick={remove} onKeyDown={cancelOnEsc} aria-describedby={promptId}>
               Delete
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setConfirming(false)}>
+            <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} onKeyDown={cancelOnEsc}>
               Cancel
             </Button>
           </div>
@@ -314,9 +324,15 @@ function SessionRow({
             )}
           >
             <IconButton label="Download bundle .zip" onClick={exportZip} disabled={!!busy || live}>
-              {busy === 'export' ? <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" /> : <DownloadIcon className="h-3.5 w-3.5" />}
+              {busy === 'export' ? <Spinner className="h-3.5 w-3.5" /> : <DownloadIcon className="h-3.5 w-3.5" />}
             </IconButton>
-            <IconButton label="Delete" onClick={() => setConfirming(true)} disabled={!!busy || live} className="hover:text-danger">
+            <IconButton
+              ref={deleteRef}
+              label="Delete"
+              onClick={() => setConfirming(true)}
+              disabled={!!busy || live}
+              className="hover:text-danger"
+            >
               <Trash2Icon className="h-3.5 w-3.5" />
             </IconButton>
           </div>
@@ -347,7 +363,11 @@ function SessionRow({
       </div>
       {/* Stored as recording but not the live session: the browser closed or crashed before Stop. */}
       {!live && session.status === 'recording' && <div className="mt-0.5 text-xs text-warn">Ended without Stop.</div>}
-      {confirming && <div className="mt-1 text-xs text-danger">Delete this recording? This can't be undone.</div>}
+      {confirming && (
+        <div id={promptId} className="mt-1 text-xs text-danger">
+          Delete this recording? This can't be undone.
+        </div>
+      )}
       {note && <div className={cx('mt-1 text-xs', note.tone === 'danger' ? 'text-danger' : 'text-warn')}>{note.text}</div>}
     </div>
   );

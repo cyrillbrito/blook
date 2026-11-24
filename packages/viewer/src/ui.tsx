@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import type { Clock } from './playback';
 import { lastAtOrBefore } from './playback';
 import { formatBytes, formatTime } from '@blook/core/format';
-import { Button, cx, IconButton, Input, tabClass, Toggle } from '@blook/ui';
-import CheckIcon from 'lucide-react/icons/check';
+import { Button, cx, IconButton, Input, Tabs, Toggle, type TabItem } from '@blook/ui';
 import ChevronDownIcon from 'lucide-react/icons/chevron-down';
 import ListFilterIcon from 'lucide-react/icons/list-filter';
 import SearchIcon from 'lucide-react/icons/search';
@@ -17,8 +16,9 @@ export interface PanelProps {
 }
 
 /**
- * A t-sorted list where the row at the playhead gets `data-active` and clicks seek.
- * Rows are built once per items/selection change, so playback doesn't re-render them.
+ * A t-sorted list where the row at the playhead gets `data-active`. A listbox: clicks and the arrow keys
+ * (Home, End) select, and selecting seeks. Rows are built once per items/selection change, so playback
+ * doesn't re-render them. `ref` is the scrolling element.
  */
 export function RowList<T extends { t: number }>({
   items,
@@ -27,8 +27,10 @@ export function RowList<T extends { t: number }>({
   selectedKey,
   onSelect,
   clock,
+  label,
   header,
   empty = 'Nothing here.',
+  ref,
 }: {
   items: T[];
   getKey: (item: T) => string;
@@ -36,22 +38,35 @@ export function RowList<T extends { t: number }>({
   selectedKey?: string;
   onSelect: (item: T) => void;
   clock: Clock;
+  /** The listbox's accessible name. */
+  label: string;
   header?: ReactNode;
   empty?: ReactNode;
+  ref?: RefObject<HTMLDivElement | null>;
 }) {
-  const listRef = useRef<HTMLDivElement>(null);
+  const ownRef = useRef<HTMLDivElement>(null);
+  const listRef = ref ?? ownRef;
+  const id = useId();
   const now = useNow(clock);
   // Lists follow the playhead while playing.
   useActiveRow(listRef, lastAtOrBefore(items, now), clock.playing);
+  const selIndex = useMemo(
+    () => (selectedKey == null ? -1 : items.findIndex((it) => getKey(it) === selectedKey)),
+    [items, selectedKey, getKey],
+  );
 
   const rows = useMemo(
     () =>
       items.map((item, i) => {
-        const key = getKey(item);
-        const selected = key === selectedKey;
+        const selected = i === selIndex;
         return (
+          // Options aren't focusable: the listbox holds focus and points at the selection (aria-activedescendant).
+          // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus
           <div
-            key={key}
+            key={getKey(item)}
+            id={`${id}-${i}`}
+            role="option"
+            aria-selected={selected}
             data-i={i}
             onClick={() => onSelect(item)}
             className={cx(
@@ -64,21 +79,42 @@ export function RowList<T extends { t: number }>({
         );
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, selectedKey, render],
+    [items, selIndex, render],
   );
 
-  // Bring the selection into view when it's set from elsewhere (e.g. "open in Network").
+  // Bring the selection into view: after arrow keys, or when set from elsewhere (e.g. "Show in Network").
   useEffect(() => {
-    if (selectedKey == null) return;
-    const i = items.findIndex((it) => getKey(it) === selectedKey);
-    listRef.current?.querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' });
+    if (selIndex >= 0) listRef.current?.querySelector(`[data-i="${selIndex}"]`)?.scrollIntoView({ block: 'nearest' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedKey]);
+  }, [selIndex]);
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    // Without a selection, the arrows start from the row at the playhead.
+    const from = selIndex >= 0 ? selIndex : lastAtOrBefore(items, clock.now());
+    const to = { ArrowDown: from + 1, ArrowUp: from - 1, Home: 0, End: items.length - 1 }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    const i = Math.max(0, Math.min(items.length - 1, to));
+    if (i !== selIndex) onSelect(items[i]!);
+  };
 
   return (
-    <div ref={listRef} className="relative min-h-0 flex-1 overflow-auto">
+    <div ref={listRef} className={cx('relative min-h-0 flex-1 overflow-auto', header ? 'scroll-pt-7' : undefined)}>
       {header && <div className="sticky top-0 z-10 border-b border-line bg-surface-muted">{header}</div>}
-      {items.length === 0 ? <div className="p-4 text-center text-muted">{empty}</div> : rows}
+      {items.length === 0 ? (
+        <div className="p-4 text-center text-muted">{empty}</div>
+      ) : (
+        <div
+          role="listbox"
+          tabIndex={0}
+          aria-label={label}
+          aria-activedescendant={selIndex >= 0 ? `${id}-${selIndex}` : undefined}
+          onKeyDown={onKeyDown}
+          className="-outline-offset-2"
+        >
+          {rows}
+        </div>
+      )}
     </div>
   );
 }
@@ -97,10 +133,17 @@ export function Search({
   placeholder?: string;
 }) {
   return (
-    <label className="relative flex min-w-32 flex-1">
+    <div className="relative flex min-w-32 flex-1">
       <SearchIcon className="pointer-events-none absolute top-2 left-2 h-3 w-3 text-muted" />
-      <Input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="pl-6" />
-    </label>
+      <Input
+        type="search"
+        aria-label={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="pl-6"
+      />
+    </div>
   );
 }
 
@@ -124,20 +167,7 @@ export function FilterMenu({
   /** The default selection, offered as "Reset" when it differs from `shown`. */
   reset?: Set<string>;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    addEventListener('pointerdown', onDown);
-    addEventListener('keydown', onKey);
-    return () => {
-      removeEventListener('pointerdown', onDown);
-      removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
+  const id = useId();
   const on = options.filter((o) => shown.has(o.id)).length;
   const toggle = (id: string) => {
     const next = new Set(shown);
@@ -146,10 +176,12 @@ export function FilterMenu({
     onChange(next);
   };
   const isReset = !reset || (reset.size === shown.size && [...reset].every((id) => shown.has(id)));
+  const link = 'cursor-pointer hover:text-fg';
 
+  // A native popover: light dismiss and Esc for free, and the invoker is its anchor.
   return (
-    <div ref={ref} className="relative">
-      <Button size="sm" onClick={() => setOpen(!open)} aria-expanded={open} className={cx(open && 'bg-surface-sunken')}>
+    <>
+      <Button size="sm" popoverTarget={id}>
         <ListFilterIcon className="h-3 w-3 text-muted" />
         Filter
         <span className="font-normal text-muted tabular-nums">
@@ -157,43 +189,36 @@ export function FilterMenu({
         </span>
         <ChevronDownIcon className="h-3 w-3 text-muted" />
       </Button>
-      {open && (
-        <div className="absolute top-full right-0 z-30 mt-1 w-56 rounded-card border border-line-strong bg-surface py-1 shadow-lg">
+      <div
+        id={id}
+        popover="auto"
+        className="inset-auto m-0 mt-1 w-56 rounded-card border border-line-strong bg-surface px-0 py-1 text-xs text-fg shadow-lg [position-area:block-end_span-inline-start] [position-try-fallbacks:flip-block]"
+      >
+        <fieldset>
+          <legend className="sr-only">Show</legend>
           {options.map((o) => (
-            <button
-              key={o.id}
-              title={o.title}
-              onClick={() => toggle(o.id)}
-              className="flex h-control w-full cursor-pointer items-center gap-2 px-2 text-left hover:bg-surface-muted"
-            >
-              <span
-                className={cx(
-                  'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border',
-                  shown.has(o.id) ? 'border-accent bg-accent text-white' : 'border-line-strong',
-                )}
-              >
-                {shown.has(o.id) && <CheckIcon className="h-2.5 w-2.5" />}
-              </span>
+            <label key={o.id} title={o.title} className="flex h-control cursor-pointer items-center gap-2 px-2 hover:bg-surface-muted">
+              <input type="checkbox" checked={shown.has(o.id)} onChange={() => toggle(o.id)} className="accent-accent" />
               <span className="flex-1">{o.label}</span>
               {o.count != null && <span className="text-muted tabular-nums">{o.count}</span>}
-            </button>
+            </label>
           ))}
-          <div className="mt-1 flex gap-3 border-t border-line px-2 pt-1.5 pb-0.5 text-muted">
-            <button className="cursor-pointer hover:text-fg" onClick={() => onChange(new Set(options.map((o) => o.id)))}>
-              All
+        </fieldset>
+        <div className="mt-1 flex gap-3 border-t border-line px-2 pt-1.5 pb-0.5 text-muted">
+          <button type="button" className={link} onClick={() => onChange(new Set(options.map((o) => o.id)))}>
+            All
+          </button>
+          <button type="button" className={link} onClick={() => onChange(new Set())}>
+            None
+          </button>
+          {reset && !isReset && (
+            <button type="button" className={cx('ml-auto', link)} onClick={() => onChange(new Set(reset))}>
+              Reset
             </button>
-            <button className="cursor-pointer hover:text-fg" onClick={() => onChange(new Set())}>
-              None
-            </button>
-            {reset && !isReset && (
-              <button className="ml-auto cursor-pointer hover:text-fg" onClick={() => onChange(new Set(reset))}>
-                Reset
-              </button>
-            )}
-          </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -235,15 +260,25 @@ export function Detail({
   );
 }
 
-export function SubTabs<K extends string>({ tabs, value, onChange }: { tabs: [K, string][]; value: K; onChange: (k: K) => void }) {
+export function SubTabs<K extends string>({
+  id,
+  tabs,
+  value,
+  onChange,
+}: {
+  id: string;
+  tabs: TabItem<K>[];
+  value: K;
+  onChange: (k: K) => void;
+}) {
   return (
-    <div className="sticky top-0 flex h-8 items-stretch gap-0.5 border-b border-line bg-surface px-1">
-      {tabs.map(([k, label]) => (
-        <button key={k} onClick={() => onChange(k)} className={tabClass(k === value)}>
-          {label}
-        </button>
-      ))}
-    </div>
+    <Tabs
+      id={id}
+      tabs={tabs}
+      value={value}
+      onChange={onChange}
+      className="sticky top-0 flex h-8 items-stretch gap-0.5 border-b border-line bg-surface px-1"
+    />
   );
 }
 
@@ -307,7 +342,7 @@ export function Body({
     return (
       <div className="space-y-2 p-2">
         <div className="text-muted">Binary, {formatBytes(data?.length)}</div>
-        {imgUrl && <img src={imgUrl} className="max-h-80 max-w-full border border-line" />}
+        {imgUrl && <img src={imgUrl} alt={`The ${mime} body`} className="max-h-80 max-w-full border border-line" />}
         {note}
       </div>
     );
@@ -318,11 +353,11 @@ export function Body({
       <div className="flex items-center gap-2 px-2 py-1 text-2xs text-muted">
         <span>{formatBytes(new TextEncoder().encode(body ?? '').length)}</span>
         {(pretty.json || raw) && (
-          <button className="cursor-pointer hover:text-fg" onClick={() => setRaw(!raw)}>
+          <button type="button" className="cursor-pointer hover:text-fg" onClick={() => setRaw(!raw)}>
             {raw ? 'Pretty' : 'Raw'}
           </button>
         )}
-        <button className="cursor-pointer hover:text-fg" onClick={() => navigator.clipboard?.writeText(body ?? '')}>
+        <button type="button" className="cursor-pointer hover:text-fg" onClick={() => navigator.clipboard?.writeText(body ?? '')}>
           Copy
         </button>
         {note}
@@ -331,7 +366,7 @@ export function Body({
         {pretty.json && !raw ? <JsonText text={shown} /> : shown}
       </pre>
       {!all && pretty.text.length > SHOW_MAX && (
-        <button className="mx-2 mb-2 cursor-pointer text-accent hover:underline" onClick={() => setAll(true)}>
+        <button type="button" className="mx-2 mb-2 cursor-pointer text-accent hover:underline" onClick={() => setAll(true)}>
           Show all ({formatBytes(pretty.text.length)})
         </button>
       )}

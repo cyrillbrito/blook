@@ -66,11 +66,13 @@ function App() {
           <MicIcon className="h-4 w-4" />
           Allow microphone
         </Button>
-        {s.text && (
-          <p className={s.kind === 'error' || s.kind === 'once' ? 'text-danger' : s.kind === 'granted' ? 'text-ok' : 'text-muted'}>
-            {s.text}
-          </p>
-        )}
+        {/* Always rendered: a live region only announces changes to an element that already exists. */}
+        <p
+          role="status"
+          className={s.kind === 'error' || s.kind === 'once' ? 'text-danger' : s.kind === 'granted' ? 'text-ok' : 'text-muted'}
+        >
+          {s.text}
+        </p>
         {s.kind === 'once' && (
           <Button variant="secondary" onClick={() => void browser.tabs.create({ url: SITE_SETTINGS })}>
             Open Blook's microphone settings

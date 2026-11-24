@@ -1,4 +1,5 @@
 ---
+import { Picture } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import timeline from '../../../store/images/screenshot-1-timeline.png';
 import popup from '../../../store/images/screenshot-4-popup.png';
@@ -95,9 +96,9 @@ const section = 'border-t border-line py-16 sm:py-24';
 // A two-column section: the heading and its sentence on the left, the content on the right.
 const split = 'grid grid-cols-[minmax(0,1fr)] gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]';
 const copyBtn =
-  'shrink-0 cursor-pointer border-l border-line-strong px-4 text-sm font-medium outline-none hover:bg-line focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-inset active:bg-line-strong';
+  'shrink-0 cursor-pointer border-l border-line-strong px-4 text-sm font-medium -outline-offset-2 hover:bg-line active:bg-line-strong';
 const addBtn =
-  'inline-flex items-center gap-2.5 rounded-card bg-fg px-5 py-3 font-medium text-white outline-none hover:bg-accent-strong focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2';
+  'inline-flex items-center gap-2.5 rounded-card bg-fg px-5 py-3 font-medium text-white hover:bg-accent-strong';
 const shot = 'rounded-card border border-line shadow-sm';
 ---
 
@@ -111,13 +112,16 @@ const shot = 'rounded-card border border-line shadow-sm';
             A Chrome extension that saves the page, the network, the console and your voice in one ZIP, for a developer or a coding agent.
           </p>
         </div>
-        <!-- The toolbar popup at its real size (a 2x screenshot): where a recording starts. -->
-        <img
-          src={popup.src}
+        <!-- The toolbar popup at its real size (a 2x screenshot): where a recording starts. The page's LCP image. -->
+        <Picture
+          src={popup}
+          formats={['avif', 'webp']}
           width={popup.width / 2}
-          height={popup.height / 2}
+          densities={[1, 2]}
+          priority
           alt="The Blook popup: a Start recording button for this tab, the Microphone and Mask inputs and text switches, All recordings and Open bundle"
-          class:list={[shot, 'justify-self-center shadow-card']}
+          class:list={[shot, 'shadow-card']}
+          pictureAttributes={{ class: 'justify-self-center' }}
         />
       </div>
       <div class="mt-10">
@@ -160,11 +164,11 @@ const shot = 'rounded-card border border-line shadow-sm';
       <p class="mt-16 max-w-3xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
         All on one clock: the sentence, the click, the failed request and the error line up.
       </p>
-      <img
-        src={timeline.src}
-        width={timeline.width}
-        height={timeline.height}
-        loading="lazy"
+      <Picture
+        src={timeline}
+        formats={['avif', 'webp']}
+        widths={[640, 960, timeline.width]}
+        sizes="(min-width: 1024px) 984px, calc(100vw - 2.5rem)"
         alt="The Blook viewer: the page replay on the left, the timeline of clicks, requests and console errors on the right"
         class:list={[shot, 'mt-10 w-full']}
       />
@@ -293,7 +297,7 @@ blook transcribe blook-2026-11-03_21-12-51.zip</code></pre>
             <li>Pin Blook from the puzzle icon, and click it to start recording.</li>
           </ol>
           <!-- The official badge (developer.chrome.com/docs/webstore/branding): unmodified, and always links to the listing. -->
-          <a href={store} class="mt-5 -ml-3 inline-block rounded-control focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none">
+          <a href={store} class="mt-5 -ml-3 inline-block rounded-control">
             <img src={badge.src} width={badge.width / 2} height={badge.height / 2} alt="Available in the Chrome Web Store" />
           </a>
           <p class="mt-4 text-muted">Chrome keeps it up to date.</p>
@@ -303,6 +307,7 @@ blook transcribe blook-2026-11-03_21-12-51.zip</code></pre>
           <div class="mt-2 flex items-stretch overflow-hidden rounded-card border border-line-strong bg-surface-sunken">
             <pre class="min-w-0 flex-1 overflow-x-auto px-4 py-3 font-mono text-sm"><code>{install}</code></pre>
             <button type="button" data-copy={install} class={copyBtn}>Copy</button>
+            <span role="status" class="sr-only"></span>
           </div>
           <p class="mt-4 text-muted">Then give your agent a recording's ZIP.</p>
         </div>
@@ -321,11 +326,15 @@ blook transcribe blook-2026-11-03_21-12-51.zip</code></pre>
 </Base>
 
 <script>
-  // Copy the install command; the button text says it worked.
+  // Copy the install command. The button text says how it went, and the status next to it tells screen readers.
   for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
+    const status = btn.nextElementSibling!;
     btn.addEventListener('click', async () => {
-      await navigator.clipboard.writeText(btn.dataset.copy!);
-      btn.textContent = 'Copied';
+      const ok = await navigator.clipboard.writeText(btn.dataset.copy!).then(
+        () => true,
+        () => false,
+      );
+      btn.textContent = status.textContent = ok ? 'Copied' : 'Copy failed';
       setTimeout(() => (btn.textContent = 'Copy'), 1500);
     });
   }

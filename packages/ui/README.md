@@ -1,21 +1,32 @@
 # UI primitives
 
-The bare minimum so the extension pages, the viewer and the site look alike. No component or icon library.
+The shared look of the extension pages, the viewer and the site: Tailwind theme tokens, a few React primitives, the logo and the icons. No component library.
 
-**Tokens** live in `@theme` in [src/theme.css](src/theme.css) and become normal Tailwind classes (`bg-surface`, `text-muted`, `border-line`, `rounded-card`, `text-2xs`). Use them instead of raw colours. The palette comes from the logo: neutrals are Tailwind slate (the logo's window is slate-700), actions use dark slate (`accent`), and vermilion (`recording`) is kept for the eye and for recording. Write `slate-*`, never `gray-*`. The `-strong` colors are for text and for fills under white text. A host imports them after Tailwind: `@import "tailwindcss"; @import "@blook/ui/theme.css";`. The theme also tells Tailwind to scan these primitives.
+- [src/theme.css](src/theme.css): the tokens, as normal Tailwind classes (`bg-surface`, `text-muted`, `border-line`, `rounded-card`, `text-2xs`). A host imports it after Tailwind: `@import "tailwindcss"; @import "@blook/ui/theme.css";`. It also tells Tailwind to scan these primitives.
+- [src/index.tsx](src/index.tsx) (`@blook/ui`): the primitives listed below.
+- [src/icons.tsx](src/icons.tsx) (`@blook/ui/icons`): the app icon, the filled record, stop, play and pause glyphs, and `Spinner`. Every other icon is [Lucide](https://lucide.dev), one deep import each: `import MicIcon from 'lucide-react/icons/mic'`.
+- [src/icon.svg](src/icon.svg): the logo. `packages/extension/scripts/render-icons.sh` turns it into the extension icons.
 
-**Primitives** in [src/index.tsx](src/index.tsx) (`@blook/ui`), the app icon and the filled record, stop, play and pause glyphs in [src/icons.tsx](src/icons.tsx) (`@blook/ui/icons`, inline SVG, colour follows the text; every other icon is [Lucide](https://lucide.dev), one deep import each: `import MicIcon from 'lucide-react/icons/mic'`), the logo in [src/icon.svg](src/icon.svg) (`packages/extension/scripts/render-icons.sh` turns it into the extension icons):
+## Rules
 
-**Layers.** Every page sits on `bg-canvas` and puts its content in `Card`s (white, `border-line-strong`, `shadow-sm`). Inside a card, `bg-surface-muted` marks bars (toolbars, detail headers) and `bg-surface-sunken` marks wells (the replay stage). Lines go `line-soft` between list rows, `line` between parts of a card, and `line-strong` for card edges and main dividers.
+**Colours.** Use tokens, never raw colours or arbitrary values (`text-[11px]`, `bg-[#…]`): add a token instead. The palette comes from the logo. Neutrals are Tailwind slate (write `slate-*`, never `gray-*`), actions use dark slate (`accent`), and vermilion (`recording`) is only for the eye and for recording. The `-strong` colours are for text and for fills under white text. Event colours in the viewer (timeline tags, scrubber marks, legend) come from one map, `packages/viewer/src/kinds.ts`.
 
-**Sizes.** Small controls (`sm` buttons, `Toggle`, `Input`, selects, the viewer's search and filter) are all `h-control` (28 px). Pages use `text-sm`; the dense viewer uses `text-xs`, with `text-2xs` for tags, legends and column headers. No arbitrary values (`text-[11px]`, `bg-[#…]`): add a token instead.
+**Layers.** Every page sits on `bg-canvas` and puts its content in `Card`s. Inside a card, `bg-surface-muted` marks bars (toolbars, detail headers) and `bg-surface-sunken` marks wells (the replay stage). Lines go `line-soft` between list rows, `line` between parts of a card, and `line-strong` for card edges and main dividers.
+
+**Sizes.** Small controls (`sm` buttons, `Toggle`, `Input`, selects, the viewer's search and filter) are all `h-control` (28 px). Pages use `text-sm`; the dense viewer uses `text-xs`, with `text-2xs` for tags, legends and column headers.
+
+**Focus.** One `:focus-visible` outline in the theme covers every control, so components add no focus styles and never `outline-none`. Inside an `overflow-hidden` parent, add `-outline-offset-2` so the outline isn't clipped.
+
+**Keyboard and screen readers.** Prefer native elements (`<button>`, range and checkbox inputs, `popover`); oxlint's `jsx-a11y` rules flag most of what they replace. A control that handles a key calls `preventDefault()`, because the viewer's page shortcuts (Space, ←/→) skip handled keys. Text that appears later, such as a status or an error, goes in an element that is always rendered, with `role="status"` (or `Alert`): a live region added together with its text isn't announced.
+
+## Primitives
 
 - `Button`: variants `primary` (the main action), `secondary` (default), `ghost` (quiet toolbar or header actions), `danger` (confirmed destructive action), `record` (Start recording only). Sizes `sm`, `md`, `lg`.
 - `Toggle`: an on/off filter button, `primary` when pressed and `secondary` when not.
-- `tabClass(active)`: one tab in an underlined tab row (the viewer's panels and sub-tabs, the Recordings page header).
+- `Tabs`: an underlined tab row with the ARIA tab keys (the viewer's panels and a request's sub-tabs). Its panel spreads `tabPanelProps(id, value)`. `tabClass(active)` gives links the same look (the Recordings page header, with `aria-current`).
 - `IconButton`: icon-only, needs a `label` (tooltip and accessible name). Use for secondary row actions.
 - `Badge`: small status pill with a `tone`. Use for states, not for actions.
 - `Switch`: boolean settings. `Input` and `Field` (label above) for text settings.
-- `Card` groups content; `SectionTitle` heads a list (sentence case, no all-caps labels). `Alert` shows an error line. `LiveDot` means "recording now".
+- `Card` groups content; `SectionTitle` heads a list (sentence case, no all-caps labels). `Alert` shows an error line and announces it. `LiveDot` means "recording now".
 
-Dense data views (viewer lists and detail panes) keep their own small helpers in `packages/viewer/src/ui.tsx`, built on these primitives. Event colours (timeline tags, scrubber marks, legend) come from one map, `packages/viewer/src/kinds.ts`.
+Dense data views keep their own helpers in `packages/viewer/src/ui.tsx`, built on these. Every viewer list is a `RowList`: a listbox where clicks and ↑/↓ select a row and selecting seeks.

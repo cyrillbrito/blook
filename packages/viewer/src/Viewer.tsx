@@ -1,16 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { EventType } from '@rrweb/types';
 import type { Bundle } from './bundle';
 import { AudioSync, Clock, TabReplay, lastAtOrBefore } from './playback';
 import { ConsolePanel, NetworkPanel, TimelinePanel, TranscriptPanel, WebSocketsPanel, type Focus, type PanelId } from './panels';
 import { formatDuration, formatTime, shortUrl } from '@blook/core/format';
 import { useNow, usePlaying } from './util';
-import { Badge, Button, Card, Toggle, cx, tabClass } from '@blook/ui';
+import { Badge, Button, Card, Tabs, Toggle, cx, tabPanelProps } from '@blook/ui';
 import { KIND, type Kind } from './kinds';
-import { BlookIcon, PauseIcon, PlayIcon } from '@blook/ui/icons';
+import { BlookIcon, PauseIcon, PlayIcon, Spinner } from '@blook/ui/icons';
 import ArrowLeftIcon from 'lucide-react/icons/arrow-left';
 import DownloadIcon from 'lucide-react/icons/download';
-import LoaderCircleIcon from 'lucide-react/icons/loader-circle';
 import Volume2Icon from 'lucide-react/icons/volume-2';
 import VolumeXIcon from 'lucide-react/icons/volume-x';
 
@@ -57,7 +56,9 @@ function ViewerBody({
   const [tabId, setTabId] = useState<number | undefined>(tabs[0]);
   const [panel, setPanel] = useState<PanelId>('timeline');
   const [focus, setFocus] = useState<Focus>();
-  const [split, setSplit] = useState(() => Math.round(innerWidth * 0.55));
+  // The replay card's share of the width.
+  const [split, setSplit] = useState(0.55);
+  const tabsId = useId();
 
   const seek = useCallback(
     (t: number, tab?: number) => {
@@ -71,12 +72,15 @@ function ViewerBody({
     setFocus((f) => ({ panel: p, key, n: (f?.n ?? 0) + 1 }));
   }, []);
 
-  // Space plays/pauses, arrows step 1 s (5 s with Shift).
+  // Space plays/pauses, ←/→ step 1 s (5 s with Shift). A key a focused control handled (preventDefault) is its own,
+  // as is Space on anything it presses and every key while typing.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
       const el = e.target as HTMLElement;
-      if (el.closest('input, textarea, select, [contenteditable]')) return;
+      if (el.closest('input:not([type=range]), textarea, select, [contenteditable]')) return;
       if (e.key === ' ') {
+        if (el.closest('button, a, summary')) return;
         e.preventDefault();
         clock.toggle();
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -101,7 +105,6 @@ function ViewerBody({
   const panelProps = { bundle, tabs: allTabs, clock, seek, open, focus };
 
   return (
-    // Layers: the header sits on a tinted canvas; the replay and the panels are white cards on it.
     <div className="flex h-screen flex-col bg-canvas text-xs text-fg antialiased">
       <header className="flex h-11 shrink-0 items-center gap-3 px-4">
         {back ? (
@@ -116,9 +119,9 @@ function ViewerBody({
           </span>
         )}
         <span className="h-4 w-px shrink-0 bg-line-strong" />
-        <span className="min-w-0 truncate text-sm font-medium" title={s.url}>
+        <h1 className="min-w-0 truncate text-sm font-medium" title={s.url}>
           {s.title || shortUrl(s.url)}
-        </span>
+        </h1>
         <span className="shrink-0 text-muted">
           {new Date(s.startedAt).toLocaleString()} · {formatDuration(bundle.endT)}
         </span>
@@ -130,8 +133,8 @@ function ViewerBody({
         <span className="ml-auto flex shrink-0 items-center gap-2">{onDownload && <DownloadButton onDownload={onDownload} />}</span>
       </header>
 
-      <div className="flex min-h-0 flex-1 px-2 pb-2">
-        <Card className="flex min-w-0 flex-col overflow-hidden" style={{ width: split - 8 }}>
+      <main className="flex min-h-0 flex-1 px-2 pb-2">
+        <Card className="flex min-w-80 flex-col overflow-hidden" style={{ flexBasis: `${split * 100}%` }}>
           {tabs.length > 1 && (
             <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-line px-2 py-1.5">
               {tabs.map((id, i) => {
@@ -158,32 +161,35 @@ function ViewerBody({
           <Controls bundle={bundle} clock={clock} audio={audio} />
         </Card>
 
-        <Splitter onDrag={(x) => setSplit(Math.max(320, Math.min(innerWidth - 360, x)))} />
+        <Splitter value={split} onChange={(f) => setSplit(Math.max(0.15, Math.min(0.85, f)))} />
 
-        <Card className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex h-9 shrink-0 items-stretch gap-0.5 border-b border-line-strong px-1.5">
-            {PANELS.map(([id, label, none]) => {
+        <Card className="flex min-w-90 flex-1 flex-col overflow-hidden">
+          <Tabs
+            id={tabsId}
+            value={panel}
+            onChange={setPanel}
+            className="flex h-9 shrink-0 items-stretch gap-0.5 border-b border-line-strong px-1.5"
+            tabs={PANELS.map(([id, label, none]) => {
               const empty = c[id] === 0;
-              return (
-                <button
-                  key={id}
-                  onClick={() => setPanel(id)}
-                  aria-pressed={panel === id}
-                  title={empty ? none : undefined}
-                  className={cx(tabClass(panel === id), empty && 'italic opacity-70')}
-                >
-                  {label}
-                  {!empty && (
-                    <span className={cx('font-normal text-muted tabular-nums', id === 'console' && errors > 0 && 'text-danger')}>
-                      {id === 'console' && errors > 0 && '✖ '}
-                      {c[id]}
-                    </span>
-                  )}
-                </button>
-              );
+              return {
+                id,
+                title: empty ? none : undefined,
+                className: cx(empty && 'italic'),
+                label: (
+                  <>
+                    {label}
+                    {!empty && (
+                      <span className={cx('font-normal text-muted tabular-nums', id === 'console' && errors > 0 && 'text-danger')}>
+                        {id === 'console' && errors > 0 && '✖ '}
+                        {c[id]}
+                      </span>
+                    )}
+                  </>
+                ),
+              };
             })}
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col">
+          />
+          <div className="flex min-h-0 flex-1 flex-col" {...tabPanelProps(tabsId, panel)}>
             {panel === 'timeline' && <TimelinePanel {...panelProps} />}
             {panel === 'transcript' && <TranscriptPanel {...panelProps} />}
             {panel === 'network' && <NetworkPanel {...panelProps} />}
@@ -191,7 +197,7 @@ function ViewerBody({
             {panel === 'console' && <ConsolePanel {...panelProps} />}
           </div>
         </Card>
-      </div>
+      </main>
     </div>
   );
 }
@@ -205,15 +211,28 @@ const PANELS: [PanelId, string, string][] = [
   ['transcript', 'Transcript', 'No speech was transcribed in this recording'],
 ];
 
-/** The gap between the cards; a line shows on hover. */
-function Splitter({ onDrag }: { onDrag: (x: number) => void }) {
+/** The gap between the cards; a line shows on hover. Drag it, or focus it and use ←/→. `value` is the left card's share. */
+function Splitter({ value, onChange }: { value: number; onChange: (share: number) => void }) {
   return (
     <div
-      className="group flex w-2 shrink-0 cursor-col-resize justify-center"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize the replay"
+      aria-valuenow={Math.round(value * 100)}
+      aria-valuemin={15}
+      aria-valuemax={85}
+      tabIndex={0}
+      className="group flex w-2 shrink-0 cursor-col-resize justify-center rounded-full"
+      onKeyDown={(e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        onChange(value + (e.key === 'ArrowLeft' ? -0.05 : 0.05));
+      }}
       onPointerDown={(e) => {
         const el = e.currentTarget;
+        const box = el.parentElement!.getBoundingClientRect();
         el.setPointerCapture(e.pointerId);
-        const move = (ev: PointerEvent) => onDrag(ev.clientX);
+        const move = (ev: PointerEvent) => onChange((ev.clientX - box.left) / box.width);
         const up = () => {
           el.removeEventListener('pointermove', move);
           el.removeEventListener('pointerup', up);
@@ -323,7 +342,7 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
   const [muted, setMuted] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const fillRef = useRef<HTMLDivElement>(null);
-  const headRef = useRef<HTMLDivElement>(null);
+  const rangeRef = useRef<HTMLInputElement>(null);
   const timeRef = useRef<HTMLSpanElement>(null);
   const [hover, setHover] = useState<{ x: number; t: number }>();
   const end = Math.max(1, bundle.endT);
@@ -331,10 +350,14 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
   // Playhead moves every frame without React renders.
   useEffect(() => {
     const draw = () => {
-      const p = `${(clock.now() / end) * 100}%`;
-      if (fillRef.current) fillRef.current.style.width = p;
-      if (headRef.current) headRef.current.style.left = p;
-      if (timeRef.current) timeRef.current.textContent = formatTime(clock.now());
+      const now = clock.now();
+      const text = formatTime(now);
+      if (fillRef.current) fillRef.current.style.width = `${(now / end) * 100}%`;
+      if (rangeRef.current) rangeRef.current.value = String(now);
+      if (timeRef.current && timeRef.current.textContent !== text) {
+        timeRef.current.textContent = text;
+        rangeRef.current?.setAttribute('aria-valuetext', `${text} of ${formatTime(end)}`);
+      }
     };
     draw();
     return clock.onTick(draw);
@@ -361,21 +384,17 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
 
   return (
     <div className="shrink-0 border-t border-line-strong px-2 pt-1.5 pb-2">
+      {/* The marks are drawn under a native range input, whose thumb is the playhead: it brings the keys,
+          dragging and the screen reader value. */}
       <div
         ref={barRef}
-        className="relative h-6 cursor-pointer select-none"
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          clock.seek(tAt(e.clientX));
-        }}
+        className="relative h-6 select-none"
         onPointerMove={(e) => {
           const r = barRef.current!.getBoundingClientRect();
           setHover({ x: e.clientX - r.left, t: tAt(e.clientX) });
-          if (e.buttons & 1) clock.seek(tAt(e.clientX));
         }}
         onPointerLeave={() => setHover(undefined)}
       >
-        {/* speech bands on top, event ticks below the track */}
         {markers
           .filter((m) => m.kind === 'speech')
           .map((m, i) => (
@@ -397,7 +416,17 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
               style={{ left: `${(m.t / end) * 100}%` }}
             />
           ))}
-        <div ref={headRef} className="pointer-events-none absolute top-0.5 h-5 w-1 -translate-x-1/2 rounded-full bg-playhead" />
+        <input
+          ref={rangeRef}
+          type="range"
+          min={0}
+          max={end}
+          step="any"
+          defaultValue={0}
+          aria-label="Playback position"
+          onChange={(e) => clock.seek(Number(e.target.value))}
+          className="scrubber absolute inset-0 h-full w-full"
+        />
         {hover && (
           <div
             className="pointer-events-none absolute bottom-7 z-20 max-w-80 -translate-x-1/2 rounded-control bg-fg px-2 py-1 text-2xs text-white shadow-md"
@@ -425,8 +454,9 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
         <select
           value={speed}
           onChange={(e) => clock.setSpeed(Number(e.target.value))}
-          className="h-control rounded-control border border-line-strong bg-surface px-1.5 outline-none focus:border-accent"
+          className="h-control rounded-control border border-line-strong bg-surface px-1.5"
           title="Speed"
+          aria-label="Speed"
         >
           {SPEEDS.map((v) => (
             <option key={v} value={v}>
@@ -463,7 +493,7 @@ function DownloadButton({ onDownload }: { onDownload: Download }) {
   return (
     <>
       {error && (
-        <span className="max-w-64 truncate text-danger" title={error}>
+        <span role="alert" className="max-w-64 truncate text-danger" title={error}>
           {error}
         </span>
       )}
@@ -478,7 +508,7 @@ function DownloadButton({ onDownload }: { onDownload: Download }) {
           setBusy(false);
         }}
       >
-        {busy ? <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" /> : <DownloadIcon className="h-3.5 w-3.5" />}
+        {busy ? <Spinner className="h-3.5 w-3.5" /> : <DownloadIcon className="h-3.5 w-3.5" />}
         {busy ? 'Preparing…' : 'Download bundle'}
       </Button>
     </>

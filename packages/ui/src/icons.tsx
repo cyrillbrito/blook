@@ -1,4 +1,4 @@
-// The app icon and the filled media glyphs. Every other icon comes from lucide-react, one deep import each
+// The app icon, the filled media glyphs and the spinner. Every other icon comes from lucide-react, one deep import each
 // (`import MicIcon from 'lucide-react/icons/mic'`). Size with `className`, colour follows the text.
 type P = { className?: string };
 
@@ -40,5 +40,19 @@ export const PauseIcon = ({ className = 'h-4 w-4' }: P) => (
   <svg viewBox="0 0 24 24" className={className} aria-hidden>
     <rect x="6.5" y="5" width="4" height="14" rx="1" fill="currentColor" />
     <rect x="13.5" y="5" width="4" height="14" rx="1" fill="currentColor" />
+  </svg>
+);
+/** Busy indicator (Lucide loader-circle). Spins slowly with reduced motion: it still has to show that work goes on. */
+export const Spinner = ({ className = 'h-4 w-4' }: P) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    className={`animate-spin motion-reduce:[animation-duration:3s] ${className}`}
+    aria-hidden
+  >
+    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
   </svg>
 );

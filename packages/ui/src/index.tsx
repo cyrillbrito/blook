@@ -1,5 +1,5 @@
 // Tiny UI primitives on the theme tokens of theme.css. See README.md.
-import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import type { ComponentProps, HTMLAttributes, InputHTMLAttributes, KeyboardEvent, ReactNode } from 'react';
 
 export function cx(...parts: (string | false | undefined | null)[]): string {
   return parts.filter(Boolean).join(' ');
@@ -24,7 +24,7 @@ const SIZE: Record<Size, string> = {
 
 const ICON_SIZE: Record<Size, string> = { sm: 'size-control', md: 'size-8', lg: 'size-12' };
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size };
+type ButtonProps = ComponentProps<'button'> & { variant?: Variant; size?: Size };
 
 /** A pressed toggle looks like `primary`, a released one like `secondary`. */
 export function Toggle({ pressed, ...rest }: Omit<ButtonProps, 'variant'> & { pressed: boolean }) {
@@ -33,7 +33,7 @@ export function Toggle({ pressed, ...rest }: Omit<ButtonProps, 'variant'> & { pr
 
 const base =
   'inline-flex shrink-0 cursor-pointer items-center justify-center rounded-control font-medium whitespace-nowrap transition-colors ' +
-  'outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-default disabled:opacity-50';
+  'disabled:cursor-default disabled:opacity-50';
 
 export function Button({ variant = 'secondary', size = 'md', className, type = 'button', ...rest }: ButtonProps) {
   return <button type={type} className={cx(base, VARIANT[variant], SIZE[size], className)} {...rest} />;
@@ -81,6 +81,7 @@ export function Switch(props: { label: ReactNode; checked: boolean; disabled?: b
       <input
         type="checkbox"
         role="switch"
+        aria-checked={props.checked}
         className="peer sr-only"
         checked={props.checked}
         disabled={props.disabled}
@@ -88,7 +89,7 @@ export function Switch(props: { label: ReactNode; checked: boolean; disabled?: b
       />
       <span
         className={cx(
-          'relative h-4 w-7 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-accent/50',
+          'relative h-4 w-7 shrink-0 rounded-full outline-accent transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2',
           props.checked ? 'bg-accent' : 'bg-line-strong',
         )}
       >
@@ -104,12 +105,72 @@ export function Switch(props: { label: ReactNode; checked: boolean; disabled?: b
   );
 }
 
-/** One tab in an underlined tab row; the row sets the height and the bottom line. */
+/** One tab in an underlined tab row; the row sets the height and the bottom line. `Tabs` uses it; links use it directly. */
 export function tabClass(active: boolean) {
   return cx(
-    '-mb-px flex cursor-pointer items-center gap-1 border-b-2 px-2 whitespace-nowrap outline-none focus-visible:bg-accent-soft',
+    '-mb-px flex cursor-pointer items-center gap-1 border-b-2 px-2 whitespace-nowrap -outline-offset-2',
     active ? 'border-accent font-medium text-fg' : 'border-transparent text-muted hover:text-fg',
   );
+}
+
+export interface TabItem<K extends string> {
+  id: K;
+  label: ReactNode;
+  title?: string;
+  className?: string;
+}
+
+/**
+ * ARIA tabs: one tab stop, and the arrow keys, Home and End select. `id` (from useId) ties the tabs to the panel,
+ * which spreads `tabPanelProps(id, value)`. Handled keys are preventDefault-ed, so page shortcuts can skip them.
+ */
+export function Tabs<K extends string>({
+  id,
+  tabs,
+  value,
+  onChange,
+  className,
+}: {
+  id: string;
+  tabs: TabItem<K>[];
+  value: K;
+  onChange: (id: K) => void;
+  className?: string;
+}) {
+  const onKeyDown = (e: KeyboardEvent) => {
+    const i = tabs.findIndex((t) => t.id === value);
+    const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    const tab = tabs[(to + tabs.length) % tabs.length]!;
+    onChange(tab.id);
+    document.getElementById(`${id}-${tab.id}`)?.focus();
+  };
+  return (
+    <div role="tablist" className={className}>
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="tab"
+          id={`${id}-${t.id}`}
+          aria-selected={t.id === value}
+          aria-controls={`${id}-panel`}
+          tabIndex={t.id === value ? 0 : -1}
+          title={t.title}
+          onClick={() => onChange(t.id)}
+          onKeyDown={onKeyDown}
+          className={cx(tabClass(t.id === value), t.className)}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function tabPanelProps(id: string, value: string) {
+  return { role: 'tabpanel', id: `${id}-panel`, 'aria-labelledby': `${id}-${value}` } as const;
 }
 
 /** White content on the canvas. Every card has the same edge and shadow. */
@@ -130,10 +191,7 @@ export function SectionTitle({ children, actions }: { children: ReactNode; actio
 export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={cx(
-        'h-control w-full rounded-control border border-line-strong bg-surface px-2 text-xs outline-none placeholder:text-muted focus:border-accent',
-        className,
-      )}
+      className={cx('h-control w-full rounded-control border border-line-strong bg-surface px-2 text-xs placeholder:text-muted', className)}
       {...rest}
     />
   );
@@ -161,6 +219,7 @@ export function LiveDot({ className }: { className?: string }) {
 export function Alert({ tone = 'danger', children }: { tone?: 'danger' | 'warn'; children: ReactNode }) {
   return (
     <p
+      role="alert"
       className={cx(
         'rounded-control border px-2 py-1.5 text-xs',
         tone === 'danger' ? 'border-red-200 bg-danger-soft text-danger-strong' : 'border-amber-200 bg-warn-soft text-warn',

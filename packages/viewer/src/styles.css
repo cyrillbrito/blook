@@ -1,4 +1,31 @@
 /* Import in the host's Tailwind stylesheet, after "tailwindcss" and "@blook/ui/theme.css":
-   the rrweb replayer CSS, and an @source so Tailwind sees the viewer's classes. */
+   the rrweb replayer CSS, an @source so Tailwind sees the viewer's classes, and the scrubber's styles. */
 @import '@rrweb/replay/dist/style.css';
 @source "./";
+
+/* The scrubber (Viewer.tsx): a range input with a clear track, so the marks under it show; its thumb is the playhead. */
+.scrubber {
+  appearance: none;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.scrubber::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+.scrubber::-webkit-slider-thumb {
+  appearance: none;
+  width: 4px;
+  height: 20px;
+  margin-top: 2px;
+  border-radius: 9999px;
+  background: var(--color-playhead);
+}
+.scrubber::-moz-range-thumb {
+  width: 4px;
+  height: 20px;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--color-playhead);
+}

@@ -1,12 +1,10 @@
-// The viewer with its loading states. It shows one replay: hosts pass an optional initial loader
-// (IndexedDB). Only while nothing is loaded can the user
-// drop or pick a bundle .zip or unzipped folder; once a bundle is open there are no load-other controls.
+// The viewer with its loading states. It shows one bundle: the host's `initial` loader, or a .zip or unzipped
+// folder the user drops or picks. Once a bundle is open there is no way to load another.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, Button, Card } from '@blook/ui';
-import { BlookIcon } from '@blook/ui/icons';
+import { BlookIcon, Spinner } from '@blook/ui/icons';
 import ArrowLeftIcon from 'lucide-react/icons/arrow-left';
 import FolderOpenIcon from 'lucide-react/icons/folder-open';
-import LoaderCircleIcon from 'lucide-react/icons/loader-circle';
 import { bundleFromUserFiles, filesFromDrop, filesFromInput, type Bundle } from './bundle';
 import { Viewer, type BackLink } from './Viewer';
 
@@ -125,8 +123,8 @@ export function ViewerApp({ initial, onDownload, note, back }: ViewerAppProps) {
             Blook viewer
           </h1>
           {s.state === 'loading' ? (
-            <p className="flex items-center gap-2 text-muted">
-              <LoaderCircleIcon className="h-4 w-4 animate-spin" /> Loading {s.what}…
+            <p role="status" className="flex items-center gap-2 text-muted">
+              <Spinner /> Loading {s.what}…
             </p>
           ) : (
             <>

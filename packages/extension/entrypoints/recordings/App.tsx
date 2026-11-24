@@ -57,7 +57,7 @@ export default function App() {
 
 function Tab({ href, active, children }: { href: string; active: boolean; children: string }) {
   return (
-    <a href={href} className={tabClass(active)}>
+    <a href={href} aria-current={active ? 'page' : undefined} className={tabClass(active)}>
       {children}
     </a>
   );

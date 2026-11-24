@@ -68,7 +68,7 @@ Open a doc when your task touches what it covers:
 - [docs/cli-design.md](docs/cli-design.md): the rules every `blook` command, output and exit code follows.
 - [docs/references.md](docs/references.md): similar tools cloned in `references/`, useful when designing a feature or when rrweb, CDP or the mic misbehave.
 - [packages/cli/README.md](packages/cli/README.md): running and building the replay CLI, replay behavior and `transcribe`.
-- [packages/viewer/README.md](packages/viewer/README.md) and [packages/ui/README.md](packages/ui/README.md): hosting the viewer, and the UI primitives to build any screen with.
+- [packages/viewer/README.md](packages/viewer/README.md) and [packages/ui/README.md](packages/ui/README.md): hosting the viewer, and the UI tokens, primitives and rules (colour, focus, keyboard) to build any screen with.
 - [skills/blook/SKILL.md](skills/blook/SKILL.md): how an agent reads a bundle; it follows every bundle and CLI change.
 - [packages/videos/README.md](packages/videos/README.md): the marketing films (HyperFrames), which need a pass when the UI they show changes.
 - [packages/store/README.md](packages/store/README.md): the Chrome Web Store listing, privacy answers and images, and how to release an update.
