@@ -128,7 +128,9 @@ export class TabReplay {
       root,
       showWarning: false,
       skipInactive: false,
-      // Canvas recordings are WebP snapshots; rrweb only draws them with this on.
+      // Canvas recordings are WebP snapshots; rrweb only draws them with this on. It also adds allow-scripts to
+      // the replay iframe, so with a bundle from anyone the host page's CSP is what blocks inline handlers:
+      // MV3's on the Replay page; the site has none.
       UNSAFE_replayCanvas: opts.canvas,
       mouseTail: { strokeStyle: 'rgba(239, 68, 68, 0.6)', lineWidth: 2, duration: 600 },
       triggerFocus: false,

@@ -14,6 +14,7 @@ async function hasOffscreen(): Promise<boolean> {
 }
 
 export async function ensureOffscreen(): Promise<void> {
+  if (creating) return creating;
   if (await hasOffscreen()) return;
   creating ??= browser.offscreen
     .createDocument({

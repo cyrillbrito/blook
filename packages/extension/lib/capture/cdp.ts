@@ -10,21 +10,50 @@ type Commands = ProtocolMapping.Commands;
 /** The params of a CDP event. */
 type Ev<M extends keyof ProtocolMapping.Events> = ProtocolMapping.Events[M][0];
 
+/** A tab's own CDP session, or a child session in it: a cross-origin iframe or a worker. */
+export interface Debuggee {
+  tabId: number;
+  sessionId?: string;
+}
+
 export type SendCommand = <M extends keyof Commands>(
-  tabId: number,
+  target: Debuggee,
   method: M,
   ...params: Commands[M]['paramsType']
 ) => Promise<Commands[M]['returnType']>;
 
-/** Commands to run on every attached tab. */
-export async function enableDomains(send: SendCommand, tabId: number) {
-  await send(tabId, 'Network.enable', {
-    maxTotalBufferSize: 200_000_000,
-    maxResourceBufferSize: 20_000_000,
-    maxPostDataSize: BODY_MAX_BYTES,
-  });
-  await send(tabId, 'Runtime.enable');
-  await send(tabId, 'Log.enable');
+/**
+ * Turns capture on for a tab, and for each child session as it attaches. The tab's session doesn't see
+ * cross-origin iframes or workers, so auto-attach brings them in; it isn't recursive, so each child turns it
+ * on too. A child starts paused until `startChild` resumes it, so its first requests are seen.
+ */
+export async function enableDomains(send: SendCommand, target: Debuggee) {
+  const calls = [
+    () =>
+      send(target, 'Network.enable', {
+        maxTotalBufferSize: 200_000_000,
+        maxResourceBufferSize: 20_000_000,
+        maxPostDataSize: BODY_MAX_BYTES,
+      }),
+    () => send(target, 'Runtime.enable'),
+    () => send(target, 'Log.enable'),
+    () =>
+      send(target, 'Target.setAutoAttach', {
+        autoAttach: true,
+        waitForDebuggerOnStart: true,
+        flatten: true,
+        filter: [{ type: 'iframe' }, { type: 'worker' }],
+      }),
+  ];
+  // A tab must take them all (a failure fails Record). A child takes what its kind of target supports.
+  if (target.sessionId) await Promise.allSettled(calls.map((call) => call()));
+  else for (const call of calls) await call();
+}
+
+/** Enables capture on a new child session, then always resumes it: a child left paused would hang its frame or worker. */
+async function startChild(send: SendCommand, target: Debuggee) {
+  await enableDomains(send, target);
+  await send(target, 'Runtime.runIfWaitingForDebugger').catch(() => {});
 }
 
 export class CdpCapture {
@@ -58,10 +87,13 @@ export class CdpCapture {
   }
 
   /** One chrome.debugger event. `params` is untyped there; each case reads it as its CDP event. */
-  handle(tabId: number, method: string, params: unknown) {
+  handle(source: Debuggee, method: string, params: unknown) {
+    const { tabId } = source;
     switch (method) {
+      case 'Target.attachedToTarget':
+        return void startChild(this.send, { tabId, sessionId: (params as Ev<'Target.attachedToTarget'>).sessionId });
       case 'Network.requestWillBeSent':
-        return this.onRequest(tabId, params as Ev<'Network.requestWillBeSent'>);
+        return this.onRequest(source, params as Ev<'Network.requestWillBeSent'>);
       case 'Network.responseReceived':
         return this.onResponse(params as Ev<'Network.responseReceived'>);
       case 'Network.dataReceived': {
@@ -71,7 +103,7 @@ export class CdpCapture {
         return;
       }
       case 'Network.loadingFinished':
-        return void this.onFinished(tabId, params as Ev<'Network.loadingFinished'>);
+        return void this.onFinished(source, params as Ev<'Network.loadingFinished'>);
       case 'Network.loadingFailed':
         return this.onFailed(params as Ev<'Network.loadingFailed'>);
       case 'Network.webSocketCreated':
@@ -136,7 +168,9 @@ export class CdpCapture {
     this.sockets.clear();
   }
 
-  private onRequest(tabId: number, p: Ev<'Network.requestWillBeSent'>) {
+  // Request ids are unique across a tab's processes; one request reported by two sessions (an iframe's
+  // navigation, by its parent and itself) keeps one row.
+  private onRequest(source: Debuggee, p: Ev<'Network.requestWillBeSent'>) {
     this.learnClock(p.timestamp, p.wallTime);
     const url: string = p.request?.url ?? '';
     if (url.startsWith('data:') || url.startsWith('blob:')) return;
@@ -157,7 +191,7 @@ export class CdpCapture {
     const row: NetworkRequestRow = {
       sessionId: this.sessionId,
       requestId: p.requestId,
-      tabId,
+      tabId: source.tabId,
       t,
       method: p.request?.method ?? 'GET',
       url: url + (p.request?.urlFragment ?? ''),
@@ -169,7 +203,7 @@ export class CdpCapture {
     this.writer.upsertRequest(row);
 
     if (p.request?.hasPostData && row.requestBody === undefined) {
-      this.send(tabId, 'Network.getRequestPostData', { requestId: p.requestId })
+      this.send(source, 'Network.getRequestPostData', { requestId: p.requestId })
         .then((r) => {
           this.setRequestBody(row, r?.postData);
           this.writer.upsertRequest(row);
@@ -195,11 +229,12 @@ export class CdpCapture {
     this.writer.upsertRequest(row);
   }
 
-  private async onFinished(tabId: number, p: Ev<'Network.loadingFinished'>) {
+  private async onFinished(source: Debuggee, p: Ev<'Network.loadingFinished'>) {
     const row = this.requests.get(p.requestId);
     if (!row) return;
     row.endT = this.mono(p.timestamp);
     this.requests.delete(p.requestId);
+    this.redirects.delete(p.requestId);
     const policy = bodyPolicy({ direction: 'response', resourceType: row.resourceType, status: row.status, mimeType: row.mimeType });
     if (!policy.keep) {
       // Don't fetch what we drop: no CDP transfer, nothing stored.
@@ -209,7 +244,7 @@ export class CdpCapture {
     }
     try {
       // Ask right away: Chrome may evict the body from its buffer later.
-      const r = await this.send(tabId, 'Network.getResponseBody', { requestId: p.requestId });
+      const r = await this.send(source, 'Network.getResponseBody', { requestId: p.requestId });
       const body = r?.body ?? '';
       // Empty is kept as no body: Chrome returns '' for a fetch read as a blob, and the
       // dataReceived size is then the better number.
@@ -233,6 +268,7 @@ export class CdpCapture {
     // The `canceled` prefix is what core's isCanceled checks.
     row.errorText = p.canceled ? `canceled${p.errorText ? ` (${p.errorText})` : ''}` : p.errorText || p.blockedReason;
     this.requests.delete(p.requestId);
+    this.redirects.delete(p.requestId);
     this.writer.upsertRequest(row);
   }
 
@@ -295,7 +331,8 @@ export class CdpCapture {
   }
 
   private onLog(tabId: number, e: Protocol.Log.LogEntry | undefined) {
-    if (!e) return;
+    // The page's Log copies its workers' console calls; the worker's own session reports them with args and stack.
+    if (!e || e.source === 'worker') return;
     const level = e.level === 'verbose' ? 'debug' : e.level === 'warning' ? 'warn' : e.level;
     this.consoleRow(tabId, {
       t: this.wall(e.timestamp),

@@ -52,6 +52,15 @@ export function openBlookDB(): Promise<BlookDBHandle> {
       db.createObjectStore('audioChunks', { keyPath: ['sessionId', 'index'] }).createIndex('bySession', 'sessionId');
       db.createObjectStore('transcripts', { keyPath: 'sessionId' });
     },
+    // The background and the offscreen document each hold a connection: close ours when another context
+    // needs a version upgrade, and reopen on next use, else the upgrade waits forever.
+    blocking() {
+      void dbPromise?.then((db) => db.close());
+      dbPromise = undefined;
+    },
+    terminated() {
+      dbPromise = undefined;
+    },
   });
   return dbPromise;
 }

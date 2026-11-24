@@ -1,5 +1,6 @@
 import { storage } from '#imports';
 import type { Settings } from '@blook/core/types';
+import type { PillPosition } from './messages';
 
 export const DEFAULT_SETTINGS: Settings = {
   mask: false,
@@ -8,12 +9,12 @@ export const DEFAULT_SETTINGS: Settings = {
   openRouterApiKey: '',
 };
 
-/** Where the recording pill was dragged to (left and top, in CSS pixels). Null: the bottom-left corner. */
-export const pillPositionItem = storage.defineItem<{ x: number; y: number } | null>('local:pillPosition', {
+/** Where the recording pill was dragged to. Null: bottom center. Only the background uses it, for the pill. */
+export const pillPositionItem = storage.defineItem<PillPosition | null>('local:pillPosition', {
   fallback: null,
 });
 
-/** Settings live in browser.storage.local, readable from every extension context. Read them with getSettings. */
+/** Settings live in browser.storage.local, which the background closes to content scripts. Read them with getSettings. */
 const settingsItem = storage.defineItem<Partial<Settings>>('local:settings', { fallback: {} });
 
 /** Stored settings over the defaults, so a setting added later has its default for existing users. */

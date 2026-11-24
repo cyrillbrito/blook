@@ -1,8 +1,5 @@
-// Isolated-world bridge for the MAIN-world rrweb recorder (recorder-main.content.ts).
-// It asks the background whether to record, starts the recorder, and forwards its event
-// batches to the background, since the MAIN world has no extension APIs.
-// Registered by the background at Record (all frames, document_start) next to
-// /content-scripts/recorder-main.js, and also injected with executeScript as a fallback.
+// Isolated-world bridge for the MAIN-world rrweb recorder (recorder-main.content.ts), which has no
+// extension APIs. It runs in every page while recording, so outside recorded tabs it stops after its hello.
 import type { eventWithTime } from '@rrweb/types';
 import { sendToBackground, type ContentMessage } from '@/lib/messages';
 import { emit, on, type RecorderEvents } from '@/lib/recorder-bridge';
@@ -37,13 +34,14 @@ function start() {
     const events = buffer;
     buffer = [];
     sending = sending.then(() =>
-      sendToBackground({ type: 'rrweb/events', events }).catch(() => {
-        buffer = events.concat(buffer); // worker restarting: retry with the next batch
+      deliver(events).catch(() => {
+        buffer = events.concat(buffer); // no worker to receive it: retry with the next batch
       }),
     );
     return sending;
   };
   on('blook:events', ({ events }) => {
+    if (!options || !Array.isArray(events)) return; // a page can fire this event too
     for (const e of events) buffer.push(e);
     void send();
   });
@@ -80,4 +78,20 @@ function start() {
   };
   window.__blookBridge = { hello };
   void hello();
+}
+
+/**
+ * Sends a batch, halving it when Chrome rejects it as too big (a full snapshot of a heavy page can be).
+ * An event too big alone is dropped so it can't block the rest. Throws only when the background can't be reached.
+ */
+async function deliver(events: eventWithTime[]): Promise<void> {
+  try {
+    await sendToBackground({ type: 'rrweb/events', events });
+  } catch (err) {
+    if (/receiving end|establish connection/i.test(String(err))) throw err;
+    if (events.length === 1) return void console.warn('[blook] dropped an rrweb event too big to send', err);
+    const half = Math.ceil(events.length / 2);
+    await deliver(events.slice(0, half));
+    await deliver(events.slice(half));
+  }
 }

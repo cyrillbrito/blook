@@ -5,12 +5,14 @@ import type { SessionId } from '@blook/core/types';
 import { ensureTranscript } from '../transcribe/openrouter';
 import { buildBundle } from './bundle';
 
-/** Service workers have no URL.createObjectURL, so the download uses a base64 data URL. */
-function toDataUrl(bytes: Uint8Array): string {
-  let bin = '';
-  const step = 0x8000;
-  for (let i = 0; i < bytes.length; i += step) bin += String.fromCharCode(...bytes.subarray(i, i + step));
-  return `data:application/zip;base64,${btoa(bin)}`;
+/** Service workers have no URL.createObjectURL, so the download is a data URL. */
+function toDataUrl(bytes: Uint8Array): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'application/zip' }));
+  });
 }
 
 export async function exportSession(sessionId: SessionId): Promise<{ ok: boolean; error?: string; warning?: string }> {
@@ -22,7 +24,7 @@ export async function exportSession(sessionId: SessionId): Promise<{ ok: boolean
     await ensureTranscript(sessionId);
     const { folder, zip, transcript } = await buildBundle(sessionId);
     await browser.downloads.download({
-      url: toDataUrl(zip),
+      url: await toDataUrl(zip),
       filename: `${folder}.zip`,
       conflictAction: 'uniquify',
     });

@@ -1,77 +1,72 @@
 # Architecture
 
-Blook has a recording side (the extension) and a reviewing side (the viewer for people, the skill and replay CLI for agents). The bundle ZIP sits between them. Its fields are in [bundle-format.md](bundle-format.md).
-
-The code is a Bun workspaces monorepo. Paths below are inside `packages/extension/` unless they name another package.
-
-| Package | What | Used by |
-| --- | --- | --- |
-| `core` | The bundle format and the logic more than one package needs: data types (`types.ts`), bundle and timeline builders, transcript mapping, VAD, the OpenRouter request, the body policy, display formatting. No browser-extension APIs | extension, viewer, cli |
-| `ui` | UI primitives, icons, the logo (`src/icon.svg`), the Tailwind theme | extension, viewer, site |
-| `viewer` | The React viewer and the zip/folder loader. No `chrome.*`: hosts pass the initial loader and the download handler as props | extension, site |
-| `extension` | The WXT extension: `entrypoints/` (popup, Recordings page, background, recorder, pill, offscreen mic, Replay page) and `lib/` (capture, IndexedDB, messages, settings, export, transcription) | |
-| `cli` | The `blook` replay CLI and its single binary, which embeds the files in `src/assets.ts` | |
-| `site` | The Astro website on GitHub Pages (https://cyrillbrito.github.io/blook/): the landing page and `/viewer`. `.github/workflows/site.yml` deploys it on push to main | |
-| `store` | Not a package (no `package.json`): the Chrome Web Store listing, privacy answers, images and their HTML sources, and the demo app recorded for the screenshots. See [packages/store/README.md](../packages/store/README.md) | site, videos (images) |
-| `videos` | Marketing films made with [HyperFrames](https://hyperframes.heygen.com) (HTML and GSAP rendered to MP4): one project per film in `films/`, the shared brief and brand assets. See [packages/videos/README.md](../packages/videos/README.md) | |
-
-Outside `packages/`: the agent skill in `skills/blook/` (at the root, where the skills CLI finds it), the CLI and skill installer `install.sh`, the release build `.github/workflows/release.yml`, and the privacy policy `PRIVACY.md`.
+Blook has two sides. The extension records a browser session. The viewer (for people) and the skill with the replay CLI (for agents) review it. A bundle ZIP sits between them, and [bundle-format.md](bundle-format.md) lists its files and fields.
 
 ```mermaid
 flowchart TD
-  P["Popup, pill, Recordings page"] -->|"Record / Stop / Export"| BG["Background worker"]
-  RR["rrweb recorder in the page"] --> BG
-  CDP["chrome.debugger: network, WebSocket, console"] --> BG
-  MIC["Offscreen mic recorder"] --> BG
+  UI["Popup, pill, Recordings page"] -->|"Record, Stop, Download"| BG["Background worker"]
+  RR["Page recorder (rrweb)"] --> BG
+  CDP["Debugger: network, WebSockets, console"] --> BG
+  MIC["Mic recorder"] --> BG
   BG --> DB[("IndexedDB")]
-  STT["OpenRouter speech-to-text"] --> DB
   DB --> ZIP["Bundle ZIP"]
-  ZIP --> V["Viewer: Replay page"]
-  ZIP --> A["Agent: skill + replay CLI"]
+  ZIP --> V["Viewer"]
+  ZIP --> A["Agent: skill and replay CLI"]
 ```
+
+## Packages
+
+The code is a Bun workspaces monorepo.
+
+| Package | What it is |
+| --- | --- |
+| `core` | The bundle format and the logic several packages share: data types, the bundle and timeline builders, transcript mapping, the OpenRouter request. No extension APIs. |
+| `ui` | UI primitives, icons, the logo and the Tailwind theme. |
+| `viewer` | The React viewer and the ZIP or folder loader. No extension APIs, so the extension and the website both host it. |
+| `extension` | The WXT extension. `entrypoints/` holds each page and script, `lib/` the capture, storage, messages and export. |
+| `cli` | The `blook` replay CLI, built as one binary. See [packages/cli/README.md](../packages/cli/README.md). |
+| `site` | The website on GitHub Pages: the landing page and `/viewer`. |
+| `store` | Not a package: the Chrome Web Store listing, privacy answers and images. See [packages/store/README.md](../packages/store/README.md). |
+| `videos` | Marketing films made with HyperFrames. See [packages/videos/README.md](../packages/videos/README.md). |
+
+Outside `packages/` are the agent skill (`skills/blook/`), the installer `install.sh`, the release workflow and the privacy policy `PRIVACY.md`.
 
 ## Recording
 
-**Popup** (`entrypoints/popup/`). The toolbar icon's menu: Record (or Stop), the mic and mask switches (canvas is in Settings) and the latest recordings. It closes once recording starts. The `toggle-recording` command (Alt+Shift+R) starts and stops without it.
+**What the user touches.** The toolbar popup starts and stops a recording, holds the mic and mask switches and lists the latest recordings. Alt+Shift+R does the same without it. While recording, a pill on the page shows the time, the mic and Stop, then "Saved" with Open and Download. The Recordings page lists every recording and holds the settings, including the OpenRouter key.
 
-**Pill** (`entrypoints/pill.content.ts`). While recording, a draggable control on the recorded page, bottom center until moved: time, the mic (only when it is used), Stop, then "Saved" with Open and Download. It pops in with a few red rings when a recording starts. The background registers it with the recorder (top frame) and pushes the status to it. It sits in a closed shadow root from the isolated world, so rrweb sees only an empty `<blook-pill>`, and the recorder blocks that element so clicks on it are not recorded.
+**The background worker** owns the recording. Every page and script asks it to act, through the messages in `lib/messages.ts`. It attaches the debugger, injects the page recorder and starts the mic. It writes what arrives to IndexedDB about once a second and keeps the running session in session storage, so a worker restart resumes the recording and loses little.
 
-**Recordings page** (`entrypoints/recordings/`). The extension's full page, with two views in one header: Recordings (every recording with Replay, Download and Delete, and "Open bundle…") and Settings (`#settings`: mic, mask, canvas, the OpenRouter key, the shortcut). The popup's gear opens Settings, "All recordings" opens Recordings. A recording opens in the same tab, and the Replay page links back with "← Recordings". The popup's shared parts are in `components/recorder-ui.tsx`. All of them send messages to the background (`lib/messages.ts`) and keep settings in extension storage (`lib/settings.ts`).
+**The page recorder** is rrweb, running in the page's own JavaScript world. A small script in the extension's isolated world passes its events to the background, since only that world can talk to the extension. The pill also lives in the isolated world, inside a closed shadow root, so it never shows up in the replay.
 
-**Background worker** (`entrypoints/background.ts`, `lib/capture/session.ts`). Owns the session. It attaches the debugger, injects the recorder, starts the mic, and writes every event to IndexedDB about once a second (`lib/capture/writer.ts`), so a worker restart loses little.
+**Network and console** come from `chrome.debugger`. It sees every request with its body, every WebSocket frame and every console message, including those of the page's cross-origin iframes and workers.
 
-**rrweb recorder** (`entrypoints/recorder-main.content.ts`, `entrypoints/recorder.content.ts`). rrweb runs in the page's own world. A small bridge in the isolated world forwards its events to the background; the two talk over DOM events (`lib/recorder-bridge.ts`).
+**The mic** records in a hidden offscreen page, in chunks of 20 to 40 seconds cut at a pause. The first time, Chrome asks for permission in a visible page that Blook opens. With an OpenRouter key, each chunk is transcribed as soon as it's saved.
 
-**CDP capture** (`lib/capture/cdp.ts`). Turns `chrome.debugger` events into requests with bodies, sockets with frames, and console entries.
-
-**Mic** (`entrypoints/offscreen/`, `entrypoints/mic-permission/`). An offscreen document records the mic in chunks of 20 to 40 s, cut at a pause (an AnalyserNode level check, `PauseDetector` in `core/src/vad.ts`). The first mic permission needs a visible page. It retries the mic before it closes: "Allow this time" grants only that tab, so the page then asks for a lasting Allow instead of reopening.
-
-**Transcription** (`lib/transcribe/openrouter.ts`). With an OpenRouter key, the background sends each audio chunk to OpenRouter as soon as it's saved and stores the word times per chunk. Export transcribes the chunks still missing. The request and the mapping to session ms are in core (`openrouter.ts`, `transcript.ts`), shared with `blook transcribe`.
-
-**Export** (`lib/export/`). Reads a session's rows and stored transcript from IndexedDB and hands them to core's `bundle.ts`, which builds the ZIP (the Replay page builds the same one), including `timeline.json` (`timeline.ts`), which merges every source into one sorted list.
+**Download** reads the session from IndexedDB, transcribes any chunk still missing and builds the ZIP. The Replay page builds the same ZIP, so it shows exactly what a download holds.
 
 ## Reviewing
 
-**Viewer** (`packages/viewer`). A React app that plays the rrweb replay with the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. It runs in the extension's Replay page (`entrypoints/replay/`), which reads a recorded session straight from IndexedDB, or, without a session, is the picker for a ZIP or folder ("Open bundle…"). The viewer has no extension APIs, so the website's `/viewer` (`packages/site`) hosts it as is, reading the ZIP in the browser.
+**Viewer.** Plays the page replay and the mic audio on one clock, next to the timeline, transcript, network, WebSockets and console. The extension's Replay page opens a recording or a ZIP with it, and the website's `/viewer` opens a ZIP in the browser.
 
-**Agent skill** (`skills/blook/`). Tells an agent how to read a bundle: read order, jq recipes, and workflows for bug triage, task lists and E2E tests.
+**Agent skill.** Tells an agent how to read a bundle: what to read first, jq recipes, and workflows for bug triage and E2E tests.
 
-**Replay CLI** (`packages/cli`). Replays the rrweb file in headless Chromium (Playwright) and answers `screenshot`, `dom` and `pointer` at time T. See [packages/cli/README.md](../packages/cli/README.md).
+**Replay CLI.** Replays the page in headless Chromium and answers `screenshot`, `dom` and `pointer` at any time.
 
 ## Key decisions
 
-- **CDP over patching.** `chrome.debugger` sees every request, including ones made before page scripts run, gets full bodies and WebSocket frames, and needs no code in the page. The cost is Chrome's "debugging this browser" banner, and recording fails if DevTools is already attached to the tab.
-- **rrweb in the MAIN world.** rrweb patches `insertRule`, adopted stylesheets and canvas, and those patches only see the page's calls in the page's own world. Without it, CSS-in-JS styles would be missing from the replay.
-- **Reload on Record.** The tab reloads after the debugger attaches, so the first snapshot is fresh and every request and socket is seen from the start. The reload uses the HTTP cache. The popup shows "Loading page…" until the load event (`pageReadyT`).
-- **Bodies only for API calls.** Response bodies are kept for XHR, Fetch, EventSource and failed page loads, cut at 1 MB. Scripts, CSS, fonts, images and normal page loads are most of the bytes and rarely the bug, so their bodies aren't fetched. Request bodies are always kept. One function decides: `core/src/body-policy.ts`.
-- **One network.json.** Bodies are inline and JSON bodies are parsed, so jq walks straight into them. The file is queried, not read whole.
-- **One clock.** Every `t` is ms since Record, from one `Date.now()` epoch. rrweb timestamps are shifted to it at export.
-- **One MediaRecorder per chunk.** Each chunk is its own recorder run, so every file is a standalone WebM.
-- **The audio is the source.** The bundle always keeps the audio, and a transcript is one run of speech-to-text over it, with its `source` in transcript.json. `blook transcribe` makes or re-runs it from the bundle, with OpenRouter or locally with whisper.cpp. The extension uses Whisper on OpenRouter because it returns word timestamps. An energy VAD (`core/src/vad.ts`) moves word edges out of silence, because Whisper often starts a word in the pause before it.
-- **No screenshots or video.** The replay can rebuild any moment, so the bundle stays small and the agent asks for visuals only when it needs them.
+- **Debugger over patching.** `chrome.debugger` sees requests made before page scripts run, full bodies and WebSocket frames, with no code in the page. The cost is Chrome's "debugging this browser" banner, and recording fails if DevTools is already open on the tab.
+- **rrweb in the page's world.** rrweb patches style and canvas APIs, and only patches in the page's own world see the page's calls. Elsewhere, CSS-in-JS styles go missing from the replay.
+- **Recorder only in recorded tabs.** Chrome can't register a script for one tab. So while recording, a small script runs in every page and only asks whether its tab is recorded. The background then injects rrweb and the pill into recorded tabs only.
+- **Pages are untrusted.** Extension scripts in a web page can be driven by that page. The background answers them only about their own recorded tab, and they can't read extension storage, where the OpenRouter key is.
+- **Reload on Record.** The tab reloads once the debugger is attached, so the first snapshot is fresh and every request is seen from the start.
+- **Bodies only for API calls.** Response bodies are kept for XHR, Fetch, EventSource and failed page loads, cut at 1 MB. Scripts, styles, fonts and images are most of the bytes and rarely the bug.
+- **One clock.** Every time in the bundle is milliseconds since Record.
+- **The audio is the source.** The bundle always keeps the audio, and a transcript is one run of speech-to-text over it. `blook transcribe` can redo it, with OpenRouter or locally with whisper.cpp.
+- **No screenshots or video.** The replay can rebuild any moment, so the bundle stays small.
 
 ## Known limits
 
-- rrweb doesn't replay video or cross-origin iframes. Canvas replays only with the canvas setting (2 fps).
+- The replay doesn't play video. Canvas replays only with the canvas setting, at 2 frames per second.
 - Pointing is the mouse position. There is no "mark this element" hotkey.
 - Images and fonts in the replay load from the original server.

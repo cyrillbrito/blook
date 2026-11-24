@@ -37,8 +37,9 @@ export interface TranscriptionStatus {
 /**
  * Requests to the background, keyed by `type`: `req` is the message, `res` is the reply.
  * A handler that throws replies `undefined` (and logs the error in the background), as does a worker that doesn't answer.
- * Senders: popup and Recordings page (session/*, sessions/*), pill (session/*), recorder content script (rrweb/*),
- * offscreen document (audio/*, mic/*).
+ * Senders: popup and Recordings page (session/*, sessions/*), pill (pill/*, session/stop, open and export),
+ * recorder content script (rrweb/*), offscreen document (audio/*, mic/*).
+ * A request a content script sends must also be allowed in `contentScriptMay` (background.ts).
  */
 export interface BackgroundRequests {
   // Popup, Recordings page and pill → background
@@ -52,11 +53,20 @@ export interface BackgroundRequests {
   /** Opens the Replay page of a session in a new tab. From the pill, which can't open extension pages itself. */
   'session/open': { req: { sessionId: SessionId }; res: { ok: boolean } };
 
-  // Content script (rrweb) → background. tabId and frameId come from the sender.
-  /** Asks whether to record and with which rrweb options. */
+  // Content script (rrweb) → background. tabId, frameId and documentId come from the sender.
+  /**
+   * Asks whether to record and with which rrweb options. When this tab is recorded, the background also
+   * injects the MAIN-world recorder into the asking document, and the pill when it's the top frame.
+   */
   'rrweb/hello': { req: {}; res: { record: boolean; mask: boolean; canvas: boolean } };
   /** A batch of rrweb events, flushed about every 500 ms. */
   'rrweb/events': { req: { events: eventWithTime[] }; res: { ok: boolean } };
+
+  // Pill → background. The pill can't read extension storage, so the background keeps its position.
+  /** The status to show at load, and where the user last dragged the pill (null: bottom center). */
+  'pill/hello': { req: {}; res: { status: RecordingStatus; position: PillPosition | null } };
+  /** Saves where the pill was dragged to, for the next page. */
+  'pill/moved': { req: { position: PillPosition }; res: { ok: boolean } };
 
   // Offscreen document → background
   /**
@@ -72,6 +82,12 @@ export interface BackgroundRequests {
    * `ok: false`: the recorder still can't use the mic (an "Allow this time" grant), the page stays open.
    */
   'mic/permission-granted': { req: {}; res: { ok: boolean } };
+}
+
+/** Left and top of the pill, in CSS pixels. */
+export interface PillPosition {
+  x: number;
+  y: number;
 }
 
 export type BackgroundRequestType = keyof BackgroundRequests;

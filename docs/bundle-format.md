@@ -176,7 +176,7 @@ Notes:
 
 ## network.json
 
-Array of HTTP requests sorted by `t`. `data:` and `blob:` URLs are not recorded. WebSocket handshakes are in `websockets.json`.
+Array of HTTP requests sorted by `t`, from the tab's pages, their cross-origin iframes and their workers (`tabId` is the tab's). `data:` and `blob:` URLs are not recorded. WebSocket handshakes are in `websockets.json`.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -297,7 +297,7 @@ Example:
 
 ## console.json
 
-Array of console entries sorted by `t`. Entries from Blook's own scripts (a `chrome-extension://` URL or top stack frame, for example rrweb's canvas readback warning) are left out.
+Array of console entries sorted by `t`, from the same pages, iframes and workers as `network.json`. Entries from Blook's own scripts (a `chrome-extension://` URL or top stack frame, for example rrweb's canvas readback warning) are left out.
 
 | Field | Type | Meaning |
 |---|---|---|

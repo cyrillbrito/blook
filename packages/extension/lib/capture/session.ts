@@ -1,6 +1,6 @@
 // Recording session lifecycle, run in the background service worker:
 // debugger attach and detach, recorder injection, mic, batching and status broadcasts.
-import { browser } from 'wxt/browser';
+import { browser, type Browser } from 'wxt/browser';
 import { getBySession, openBlookDB, putSession } from '../db';
 import type { BroadcastMessage, ContentMessage, OffscreenReply, RecordingStatus } from '../messages';
 import { getSettings } from '../settings';
@@ -12,15 +12,12 @@ import { BatchWriter } from './writer';
 import { ensureTranscript } from '../transcribe/openrouter';
 import { EventType, type eventWithTime } from '@rrweb/types';
 
-/** Isolated-world bridge (extension messaging) and MAIN-world rrweb recorder. */
+/** The isolated-world bridge, registered for every page while recording because a registration can't name tabs. */
 const RECORDER_JS = '/content-scripts/recorder.js';
-const RECORDER_MAIN_JS = '/content-scripts/recorder-main.js';
-const RECORDER_MAIN_ID = 'blook-recorder-main';
 const RECORDER_ID = 'blook-recorder';
-/** The on-page recording pill, top frame only. */
+/** Injected by rrweb/hello into the asking document of a recorded tab: rrweb in the MAIN world, and the pill in the top frame. */
+const RECORDER_MAIN_JS = '/content-scripts/recorder-main.js';
 const PILL_JS = '/content-scripts/pill.js';
-const PILL_ID = 'blook-pill';
-const SCRIPT_IDS = [RECORDER_ID, RECORDER_MAIN_ID, PILL_ID];
 /** Saved in storage.session so a restarted service worker can resume the session. */
 const ACTIVE_KEY = 'blook-active';
 
@@ -30,8 +27,9 @@ interface Active {
   attached: Set<number>;
   writer: BatchWriter;
   cdp: CdpCapture;
-  keepalive: ReturnType<typeof setInterval>;
   micRunning: boolean;
+  /** The mic start in flight, so Stop waits for it instead of leaving a mic running in the offscreen document. */
+  micStart?: Promise<void>;
   /** The mic error shown in the status, cleared once the mic records. */
   micNotice?: string;
   permissionTabId?: number;
@@ -43,13 +41,38 @@ interface Active {
 
 let status: RecordingStatus = { state: 'idle' };
 let active: Active | undefined;
-let stopping: Promise<RecordingStatus> | undefined;
+
+/** Start, stop, restore and the mic retry run one at a time: a Stop or a second Record during Start waits for it. */
+let queue: Promise<unknown> = Promise.resolve();
+function serial<T>(fn: () => Promise<T>): Promise<T> {
+  const run = queue.then(fn, fn);
+  queue = run.catch(() => {});
+  return run;
+}
+
+/** Resolves once a session from before a worker restart is resumed (or there was none). */
+let restored: Promise<void> = Promise.resolve();
+
+/** Holds a browser event until the restore is done, in arrival order: the event that woke the worker isn't dropped. */
+const afterRestore =
+  <A extends unknown[]>(fn: (...args: A) => unknown) =>
+  (...args: A) =>
+    void restored.then(() => fn(...args));
 
 // chrome.debugger.sendCommand is untyped; SendCommand gives it the CDP types.
-const send = ((tabId: number, method: string, params?: object) => browser.debugger.sendCommand({ tabId }, method, params)) as SendCommand;
+const send = ((target, method: string, params?: object) => browser.debugger.sendCommand(target, method, params)) as SendCommand;
 
 export function getStatus(): RecordingStatus {
   return status;
+}
+
+export function isRecordedTab(tabId: number): boolean {
+  return !!active?.attached.has(tabId) && status.state === 'recording';
+}
+
+/** The status a page in `tabId` may see: the current or just-saved session when the tab is in it, else idle. */
+export function statusForTab(tabId: number): RecordingStatus {
+  return status.session?.tabs.some((t) => t.tabId === tabId) ? status : { state: 'idle' };
 }
 
 function setStatus(next: RecordingStatus) {
@@ -76,7 +99,7 @@ function persist() {
 
 /** Saves the active session's meta to IndexedDB, and the resume state for a worker restart. */
 function save(a: Active) {
-  void putSession(a.meta);
+  putSession(a.meta).catch((err) => console.error('[blook] save session', err));
   persist();
 }
 
@@ -100,55 +123,42 @@ function sessionIdFor(epoch: number): string {
 function makeActive(meta: SessionMeta): Active {
   const writer = new BatchWriter();
   writer.start();
-  return {
-    meta,
-    attached: new Set(),
-    writer,
-    cdp: new CdpCapture(meta.id, meta.startedAt, writer, send),
-    // Any extension API call resets the service worker idle timer (Chrome 110+).
-    keepalive: setInterval(() => void browser.runtime.getPlatformInfo(), 20_000),
-    micRunning: false,
-  };
+  return { meta, attached: new Set(), writer, cdp: new CdpCapture(meta.id, meta.startedAt, writer, send), micRunning: false };
 }
 
 async function attach(tabId: number) {
   await browser.debugger.attach({ tabId }, '1.3');
   active?.attached.add(tabId);
-  await enableDomains(send, tabId);
+  await enableDomains(send, { tabId });
 }
 
+/** Blook registers no other scripts, so clearing all of them also removes any left by a crash or an update. */
+const unregisterAll = () => browser.scripting.unregisterContentScripts().catch(() => {});
+
 async function registerRecorder() {
-  await browser.scripting.unregisterContentScripts({ ids: SCRIPT_IDS }).catch(() => {});
+  await unregisterAll();
   await browser.scripting.registerContentScripts([
-    {
-      id: RECORDER_MAIN_ID,
-      js: [RECORDER_MAIN_JS],
-      matches: ['<all_urls>'],
-      allFrames: true,
-      runAt: 'document_start',
-      world: 'MAIN',
-      persistAcrossSessions: false,
-    },
-    {
-      id: RECORDER_ID,
-      js: [RECORDER_JS],
-      matches: ['<all_urls>'],
-      allFrames: true,
-      runAt: 'document_start',
-      persistAcrossSessions: false,
-    },
-    { id: PILL_ID, js: [PILL_JS], matches: ['<all_urls>'], runAt: 'document_start', persistAcrossSessions: false },
+    { id: RECORDER_ID, js: [RECORDER_JS], matches: ['<all_urls>'], allFrames: true, runAt: 'document_start', persistAcrossSessions: false },
   ]);
 }
 
-/** Fallback for documents the registered script missed. The script ignores a second injection. */
-function inject(tabId: number) {
-  browser.scripting.executeScript({ target: { tabId, allFrames: true }, files: [RECORDER_MAIN_JS], world: 'MAIN' }).catch(() => {});
+/** Fallback for documents the registered bridge missed, like the page open at Record. A second injection only repeats its hello. */
+function injectBridge(tabId: number) {
   browser.scripting.executeScript({ target: { tabId, allFrames: true }, files: [RECORDER_JS] }).catch(() => {});
-  browser.scripting.executeScript({ target: { tabId }, files: [PILL_JS] }).catch(() => {});
 }
 
-export async function startSession(tabId: number): Promise<RecordingStatus> {
+/** Puts rrweb (MAIN world) into the document that said hello, and the pill when it's the top frame. Both ignore a second injection. */
+function injectRecorder(tabId: number, sender: Browser.runtime.MessageSender) {
+  const target = sender.documentId ? { tabId, documentIds: [sender.documentId] } : { tabId, frameIds: [sender.frameId ?? 0] };
+  browser.scripting.executeScript({ target, files: [RECORDER_MAIN_JS], world: 'MAIN', injectImmediately: true }).catch(() => {});
+  if (sender.frameId === 0) browser.scripting.executeScript({ target, files: [PILL_JS], injectImmediately: true }).catch(() => {});
+}
+
+export function startSession(tabId: number): Promise<RecordingStatus> {
+  return serial(() => doStart(tabId));
+}
+
+async function doStart(tabId: number): Promise<RecordingStatus> {
   if (status.state !== 'idle') return status;
   const tab = await browser.tabs.get(tabId).catch(() => undefined);
   if (!tab?.url || !isRecordable(tab.url)) {
@@ -169,12 +179,13 @@ export async function startSession(tabId: number): Promise<RecordingStatus> {
     settings: safeSettings,
     mic: { state: settings.mic ? 'starting' : 'off' },
   };
-  active = makeActive(meta);
+  const a = (active = makeActive(meta));
   setStatus({ state: 'starting', session: meta });
 
   try {
     await attach(tabId);
     await registerRecorder();
+    await putSession(meta);
   } catch (err) {
     await teardown();
     const msg = String((err as Error)?.message ?? err);
@@ -187,41 +198,37 @@ export async function startSession(tabId: number): Promise<RecordingStatus> {
     return status;
   }
 
-  await putSession(meta);
   persist();
   setStatus({ state: 'recording', phase: 'loading-page', session: meta });
   // Reload so the rrweb snapshot is fresh and every request and socket is seen from the start.
   // No bypassCache: re-downloading a big SPA (10 MB of Grafana JS) leaves the page blank for
   // seconds. Cached responses still show up in CDP (fromDiskCache).
   await browser.tabs.reload(tabId).catch(() => {});
-  active.readyTimer = setTimeout(() => markPageReady('timeout'), PAGE_READY_TIMEOUT_MS);
+  a.readyTimer = setTimeout(() => markPageReady('timeout'), PAGE_READY_TIMEOUT_MS);
   if (settings.mic) void startMic();
   return status;
 }
 
-async function startMic() {
-  if (!active || active.micRunning) return;
+/** Starts the mic for the active session; a call while one is starting shares it. */
+function startMic(): Promise<void> {
+  const a = active;
+  if (!a || a.micRunning) return Promise.resolve();
+  a.micStart ??= runMicStart(a).finally(() => (a.micStart = undefined));
+  return a.micStart;
+}
+
+async function runMicStart(a: Active) {
   try {
     setMic({ state: 'starting' });
     await ensureOffscreen();
-    const msg = {
-      target: 'offscreen',
-      type: 'mic/start',
-      sessionId: active.meta.id,
-      startedAt: active.meta.startedAt,
-    } as const;
-    let reply: OffscreenReply = await sendToOffscreen(msg).catch((err): OffscreenReply => ({ ok: false, error: String(err) }));
-    // A freshly created offscreen document may not have its listener up yet.
-    if (!reply.ok && /receiving end/i.test(reply.error ?? '')) {
-      await new Promise((r) => setTimeout(r, 300));
-      reply = await sendToOffscreen(msg).catch((err): OffscreenReply => ({ ok: false, error: String(err) }));
-    }
-    if (!active) return;
+    const msg = { target: 'offscreen', type: 'mic/start', sessionId: a.meta.id, startedAt: a.meta.startedAt } as const;
+    const reply: OffscreenReply = await sendToOffscreen(msg).catch((err): OffscreenReply => ({ ok: false, error: String(err) }));
+    if (active !== a) return;
     if (reply.ok) {
-      active.micRunning = true;
+      a.micRunning = true;
       setMic({ state: 'recording' });
-      if (active.micNotice && status.error === active.micNotice) setStatus({ ...status, error: undefined });
-      active.micNotice = undefined;
+      if (a.micNotice && status.error === a.micNotice) setStatus({ ...status, error: undefined });
+      a.micNotice = undefined;
       return;
     }
     await onMicError(reply.error ?? 'mic failed', reply.needsPermission);
@@ -250,8 +257,9 @@ export async function onMicError(error: string, needsPermission?: boolean) {
     : `Microphone: ${error}`;
   setStatus({ ...status, error: a.micNotice });
   if (needsPermission && a.permissionTabId === undefined) {
-    const tab = await browser.tabs.create({ url: browser.runtime.getURL('/mic-permission.html') });
-    a.permissionTabId = tab.id;
+    a.permissionTabId = -1; // claimed while the tab opens, so a second error doesn't open another
+    const tab = await browser.tabs.create({ url: browser.runtime.getURL('/mic-permission.html') }).catch(() => undefined);
+    a.permissionTabId = tab?.id;
   }
 }
 
@@ -260,22 +268,27 @@ export async function onMicError(error: string, needsPermission?: boolean) {
  * It fails when the user picked "Allow this time": that grant ends with the tab, and the
  * offscreen document doesn't get it. The page then asks for a lasting Allow.
  */
-export async function onMicPermissionGranted(): Promise<{ ok: boolean }> {
-  if (!active?.meta.settings.mic) return { ok: true };
-  // A fresh offscreen document, so no state from the denied attempt is left.
-  await closeOffscreen();
-  await startMic();
-  if (!active?.micRunning) return { ok: false };
-  const permTab = active.permissionTabId;
-  active.permissionTabId = undefined;
-  await browser.tabs.update(primaryTab(active.meta), { active: true }).catch(() => {});
-  if (permTab !== undefined) await browser.tabs.remove(permTab).catch(() => {});
-  return { ok: true };
+export function onMicPermissionGranted(): Promise<{ ok: boolean }> {
+  return serial(async () => {
+    if (!active?.meta.settings.mic) return { ok: true };
+    // A fresh offscreen document, so no state from the denied attempt is left.
+    await closeOffscreen();
+    await startMic();
+    if (!active?.micRunning) return { ok: false };
+    const permTab = active.permissionTabId;
+    active.permissionTabId = undefined;
+    await browser.tabs.update(primaryTab(active.meta), { active: true }).catch(() => {});
+    if (permTab !== undefined) await browser.tabs.remove(permTab).catch(() => {});
+    return { ok: true };
+  });
 }
 
-export function rrwebHello(tabId: number | undefined): { record: boolean; mask: boolean; canvas: boolean } {
-  const ok = !!active && tabId !== undefined && active.attached.has(tabId) && status.state !== 'stopping';
-  return { record: ok, mask: !!active?.meta.settings.mask, canvas: !!active?.meta.settings.canvas };
+/** Answers the bridge's hello, and injects the recorder when its tab is recorded. */
+export function rrwebHello(sender: Browser.runtime.MessageSender): { record: boolean; mask: boolean; canvas: boolean } {
+  const tabId = sender.tab?.id;
+  const record = !!active && tabId !== undefined && active.attached.has(tabId) && status.state !== 'stopping';
+  if (record) injectRecorder(tabId, sender);
+  return { record, mask: !!active?.meta.settings.mask, canvas: !!active?.meta.settings.canvas };
 }
 
 export function addRrwebEvents(tabId: number | undefined, frameId: number | undefined, events: eventWithTime[]) {
@@ -324,14 +337,12 @@ function markPageReady(why: 'load' | 'timeout') {
   }
 }
 
-export async function stopSession(error?: string): Promise<RecordingStatus> {
-  if (!active) return status;
-  stopping ??= doStop(error).finally(() => (stopping = undefined));
-  return stopping;
+/** Stops the active session, if any. Later calls (a closed tab, a detach) find nothing left to stop. */
+export function stopSession(error?: string): Promise<RecordingStatus> {
+  return serial(async () => (active ? doStop(active, error) : status));
 }
 
-async function doStop(error?: string): Promise<RecordingStatus> {
-  const a = active!;
+async function doStop(a: Active, error?: string): Promise<RecordingStatus> {
   setStatus({ ...status, state: 'stopping', session: a.meta, error: error ?? status.error });
 
   // Last rrweb batch from each tab (top frame owns the recorder output).
@@ -343,6 +354,8 @@ async function doStop(error?: string): Promise<RecordingStatus> {
       ]),
     ),
   );
+  // Else a mic still starting comes up after the offscreen document is closed.
+  await a.micStart;
   // mic/stop resolves only after the partial last chunk is in IndexedDB, so closing is safe after it.
   let micStopError: string | undefined;
   if (a.micRunning) {
@@ -380,79 +393,95 @@ async function teardown() {
   persist();
   if (a) {
     for (const tabId of a.attached) await browser.debugger.detach({ tabId }).catch(() => {});
-    clearInterval(a.keepalive);
     clearTimeout(a.readyTimer);
     a.writer.stop();
     if (a.permissionTabId !== undefined) browser.tabs.remove(a.permissionTabId).catch(() => {});
   }
-  await browser.scripting.unregisterContentScripts({ ids: SCRIPT_IDS }).catch(() => {});
+  await unregisterAll();
 }
 
-// ---- Browser events. Registered synchronously at service worker start. ----
+// ---- Browser events ----
 
-export function registerListeners() {
-  browser.debugger.onEvent.addListener((source, method, params) => {
-    if (!active || source.tabId === undefined || !active.attached.has(source.tabId)) return;
-    active.cdp.handle(source.tabId, method, params);
-  });
+/** Registers the browser event listeners (synchronously, at worker start) and resumes a session from before a restart. */
+export function initSession(): Promise<void> {
+  browser.debugger.onEvent.addListener(
+    afterRestore((source: Browser.debugger.DebuggerSession, method: string, params?: object) => {
+      const tabId = source.tabId;
+      if (!active || tabId === undefined || !active.attached.has(tabId)) return;
+      active.cdp.handle({ tabId, sessionId: source.sessionId }, method, params);
+    }),
+  );
 
-  browser.debugger.onDetach.addListener((source, reason) => {
-    const tabId = source.tabId;
-    if (!active || tabId === undefined || !active.attached.has(tabId)) return;
-    active.attached.delete(tabId);
-    persist();
-    if (reason === 'canceled_by_user') {
-      void stopSession('Recording stopped: the debugger banner was dismissed.');
-    } else if (tabId === primaryTab(active.meta) || active.attached.size === 0) {
-      void stopSession(reason === 'target_closed' ? undefined : `Recording stopped: debugger detached (${reason}).`);
-    }
-  });
-
-  browser.tabs.onRemoved.addListener((tabId) => {
-    if (active && tabId === primaryTab(active.meta)) void stopSession();
-  });
-
-  browser.tabs.onCreated.addListener(async (tab) => {
-    if (!active || tab.id === undefined || tab.openerTabId === undefined) return;
-    if (!active.attached.has(tab.openerTabId) || status.state !== 'recording') return;
-    const a = active;
-    try {
-      await attach(tab.id);
-    } catch (err) {
-      console.warn('[blook] could not follow tab', tab.id, err);
-      return;
-    }
-    const url = tab.pendingUrl || tab.url || '';
-    a.meta.tabs.push({ tabId: tab.id, openerTabId: tab.openerTabId, t: Date.now() - a.meta.startedAt, url });
-    save(a);
-    setStatus({ ...status, session: a.meta });
-  });
-
-  browser.tabs.onUpdated.addListener((tabId, info) => {
-    if (!active || !active.attached.has(tabId)) return;
-    if (info.url) {
-      const tab = active.meta.tabs.find((t) => t.tabId === tabId);
-      if (tab && !tab.url) tab.url = info.url;
-      const navs = active.meta.navigations;
-      if (navs.at(-1)?.url !== info.url || navs.at(-1)?.tabId !== tabId) {
-        navs.push({ tabId, t: Date.now() - active.meta.startedAt, url: info.url });
-        save(active);
+  browser.debugger.onDetach.addListener(
+    afterRestore((source: Browser.debugger.Debuggee, reason: `${Browser.debugger.DetachReason}`) => {
+      const tabId = source.tabId;
+      if (!active || tabId === undefined || !active.attached.has(tabId)) return;
+      active.attached.delete(tabId);
+      persist();
+      if (reason === 'canceled_by_user') {
+        void stopSession('Recording stopped: the debugger banner was dismissed.');
+      } else if (tabId === primaryTab(active.meta) || active.attached.size === 0) {
+        void stopSession(reason === 'target_closed' ? undefined : `Recording stopped: debugger detached (${reason}).`);
       }
-    }
-    if (tabId === primaryTab(active.meta) && active.meta.pageReadyT === undefined) {
-      if (info.status === 'loading') active.reloadSeen = true;
-      else if (info.status === 'complete' && active.reloadSeen) markPageReady('load');
-    }
-    if (info.status === 'complete') inject(tabId);
-  });
+    }),
+  );
+
+  browser.tabs.onRemoved.addListener(
+    afterRestore((tabId: number) => {
+      if (active && tabId === primaryTab(active.meta)) void stopSession();
+    }),
+  );
+
+  // A tab opened from a recorded one (a link with target=_blank, an OAuth popup) is recorded too.
+  browser.tabs.onCreated.addListener(
+    afterRestore(async (tab: Browser.tabs.Tab) => {
+      if (!active || tab.id === undefined || tab.openerTabId === undefined) return;
+      if (!active.attached.has(tab.openerTabId) || status.state !== 'recording') return;
+      const a = active;
+      try {
+        await attach(tab.id);
+      } catch (err) {
+        console.warn('[blook] could not follow tab', tab.id, err);
+        return;
+      }
+      const url = tab.pendingUrl || tab.url || '';
+      a.meta.tabs.push({ tabId: tab.id, openerTabId: tab.openerTabId, t: Date.now() - a.meta.startedAt, url });
+      save(a);
+      setStatus({ ...status, session: a.meta });
+    }),
+  );
+
+  browser.tabs.onUpdated.addListener(
+    afterRestore((tabId: number, info: Browser.tabs.OnUpdatedInfo) => {
+      if (!active || !active.attached.has(tabId)) return;
+      if (info.url) {
+        const tab = active.meta.tabs.find((t) => t.tabId === tabId);
+        if (tab && !tab.url) tab.url = info.url;
+        const navs = active.meta.navigations;
+        if (navs.at(-1)?.url !== info.url || navs.at(-1)?.tabId !== tabId) {
+          navs.push({ tabId, t: Date.now() - active.meta.startedAt, url: info.url });
+          save(active);
+        }
+      }
+      if (tabId === primaryTab(active.meta) && active.meta.pageReadyT === undefined) {
+        if (info.status === 'loading') active.reloadSeen = true;
+        else if (info.status === 'complete' && active.reloadSeen) markPageReady('load');
+      }
+      if (info.status === 'complete') injectBridge(tabId);
+    }),
+  );
+
+  restored = serial(restoreSession).catch((err) => console.error('[blook] restore', err));
+  return restored;
 }
 
 /** Resumes a session after the service worker restarted mid-recording. */
-export async function restoreSession() {
+async function restoreSession() {
   const saved = (await browser.storage.session.get(ACTIVE_KEY))[ACTIVE_KEY] as
     | { meta: SessionMeta; attached: number[]; micRunning: boolean }
     | undefined;
-  if (!saved || active) return;
+  if (active) return;
+  if (!saved) return void (await unregisterAll());
   active = makeActive(saved.meta);
   active.micRunning = saved.micRunning;
   for (const tabId of saved.attached) {

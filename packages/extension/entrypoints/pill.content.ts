@@ -1,5 +1,5 @@
 // The recording pill: a draggable control on the recorded page (/content-scripts/pill.js).
-// Registered by the background at Record next to the recorder, top frame only. It shows the time,
+// The background injects it into the top frame of recorded tabs only (on rrweb/hello). It shows the time,
 // the mic (when it's used) and Stop while recording, then "Saved" with Open and Download for a few seconds.
 //
 // It stays out of the replay: the pill lives in a closed shadow root made in this isolated world,
@@ -7,8 +7,7 @@
 // moving the pill changes nothing outside the shadow root.
 import { formatDuration } from '@blook/core/format';
 import { MIC } from '@/components/mic';
-import { sendToBackground, type ContentMessage, type RecordingStatus } from '@/lib/messages';
-import { pillPositionItem } from '@/lib/settings';
+import { sendToBackground, type ContentMessage, type PillPosition, type RecordingStatus } from '@/lib/messages';
 
 declare global {
   interface Window {
@@ -42,7 +41,7 @@ function start() {
   /** The session this page showed live; "Saved" is shown only for it. */
   let shownId: string | undefined;
   let saved: { id: string; durationMs?: number; error?: string; until: number; busy?: string } | undefined;
-  let pos: { x: number; y: number } | null = null;
+  let pos: PillPosition | null = null;
   let timer: ReturnType<typeof setInterval> | undefined;
 
   /** Some pages replace their document's children; put the pill back. Waits for <body> so the parser isn't disturbed. */
@@ -189,7 +188,7 @@ function start() {
       removeEventListener('pointerup', up);
       removeEventListener('pointercancel', up);
       pill.classList.remove('dragging');
-      if (moved && pos) void pillPositionItem.setValue(pos);
+      if (moved && pos) void sendToBackground({ type: 'pill/moved', position: pos }).catch(() => {});
       // The click after a drag is ignored, then clicks work again.
       setTimeout(() => (moved = false));
     };
@@ -206,14 +205,11 @@ function start() {
     return undefined;
   });
 
-  void pillPositionItem.getValue().then((p) => {
-    pos = p;
-    place();
-  });
-  void sendToBackground({ type: 'session/status' })
-    .then((s) => {
-      if (!s) return;
-      status = s;
+  void sendToBackground({ type: 'pill/hello' })
+    .then((res) => {
+      if (!res) return;
+      pos = res.position;
+      status = res.status;
       render();
     })
     .catch(() => {});
