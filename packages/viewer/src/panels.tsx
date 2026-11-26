@@ -20,9 +20,13 @@ import {
 } from './ui';
 import { formatBytes, formatMs, formatTime, urlName } from '@blook/core/format';
 import { BODY_MAX_BYTES } from '@blook/core/body-policy';
-import { isCanceled } from '@blook/core/bundle';
+import { isCanceled, type TranscriptStatus } from '@blook/core/bundle';
 import { Button, cx, tabPanelProps } from '@blook/ui';
-import { KIND, TYPE_KIND } from './kinds';
+import ArrowDownIcon from 'lucide-react/icons/arrow-down';
+import ArrowUpIcon from 'lucide-react/icons/arrow-up';
+import CircleXIcon from 'lucide-react/icons/circle-x';
+import TriangleAlertIcon from 'lucide-react/icons/triangle-alert';
+import { KIND, TYPE } from './kinds';
 
 export type PanelId = 'timeline' | 'transcript' | 'network' | 'websockets' | 'console';
 
@@ -130,18 +134,23 @@ export function TimelinePanel({ bundle, tabs, clock, seek, open, focus }: Props)
   const problems = useMemo(() => bundle.timeline.filter((e) => e.type === 'error' || e.type === 'request-failed').length, [bundle]);
 
   const render = useCallback(
-    (e: TimelineEntry) => (
-      <div className="flex items-center gap-2 px-2 py-px">
-        <Time t={e.t} />
-        <span className={cx('w-24 shrink-0 truncate rounded-full px-1.5 text-center text-2xs font-medium', KIND[TYPE_KIND[e.type]].tag)}>
-          {e.type}
-        </span>
-        <TabBadge tabId={e.tabId} tabs={tabs} />
-        <span className={cx('truncate', (e.type === 'error' || e.type === 'request-failed') && 'text-danger')} title={e.summary}>
-          {e.summary}
-        </span>
-      </div>
-    ),
+    (e: TimelineEntry) => {
+      const type = TYPE[e.type];
+      const Icon = type.icon;
+      return (
+        <div className="flex items-center gap-2 px-2 py-px">
+          <Time t={e.t} />
+          <span title={type.label} className="flex shrink-0">
+            <Icon aria-hidden className={cx('size-3.5', KIND[type.kind].icon)} />
+            <span className="sr-only">{type.label}: </span>
+          </span>
+          <TabBadge tabId={e.tabId} tabs={tabs} />
+          <span className={cx('truncate', isProblem(e) && 'text-danger')} title={e.summary}>
+            {entryText(e)}
+          </span>
+        </div>
+      );
+    },
     [tabs],
   );
 
@@ -206,9 +215,61 @@ function TimelineDetail({
     const frame = bundle.websockets.find((s) => s.id === ref.socketId)?.frames[ref.frame];
     if (frame) return <FrameDetail key={`${ref.socketId}:${ref.frame}`} frame={frame} onClose={onClose} actions={actions} />;
   }
+  return <EntryDetail bundle={bundle} entry={entry} onClose={onClose} actions={actions} />;
+}
+
+const isProblem = (e: TimelineEntry) => e.type === 'error' || e.type === 'request-failed';
+
+/** The summary as the list shows it: a speech row drops the bundle's speaker glyph, the icon says it. */
+const entryText = (e: TimelineEntry) => (e.type === 'speech' ? e.summary.replace(/^🗣\uFE0F?\s*/u, '') : e.summary);
+
+/** Any other entry, in words first: its summary or the console message it points to, then the raw entry. */
+function EntryDetail({
+  bundle,
+  entry,
+  onClose,
+  actions,
+}: {
+  bundle: Bundle;
+  entry: TimelineEntry;
+  onClose: () => void;
+  actions?: ReactNode;
+}) {
+  const type = TYPE[entry.type];
+  const ref = entry.ref;
+  const c = ref?.file === 'console.json' ? bundle.console.find((x) => x.index === ref.index) : undefined;
+  const where = c?.url && `${urlName(c.url)}${c.line != null ? `:${c.line}` : ''}${c.column != null ? `:${c.column}` : ''}`;
   return (
-    <Detail title={entry.summary} onClose={onClose} actions={actions}>
-      <Json value={entry} />
+    <Detail
+      title={
+        <>
+          {type.label} <span className="font-normal text-muted tabular-nums">· {formatTime(entry.t)}</span>
+        </>
+      }
+      onClose={onClose}
+      actions={actions}
+    >
+      <div className="space-y-2 px-3 py-2.5">
+        <p
+          className={cx(
+            'leading-relaxed break-words whitespace-pre-wrap',
+            c ? 'font-mono' : 'text-sm',
+            isProblem(entry) && 'text-danger-strong',
+          )}
+        >
+          {c ? c.text : entryText(entry)}
+        </p>
+        {where && (
+          <p className="text-muted" title={c.url}>
+            at <span className="font-mono text-fg">{where}</span>
+          </p>
+        )}
+        {c?.stack && <pre className="font-mono text-2xs whitespace-pre-wrap text-muted">{c.stack}</pre>}
+      </div>
+      <details className="border-t border-line-soft">
+        <summary className="cursor-pointer px-3 py-1.5 text-muted -outline-offset-2 hover:text-fg">Timeline entry (JSON)</summary>
+        <Json value={entry} />
+      </details>
     </Detail>
   );
 }
@@ -412,7 +473,7 @@ type FrameRow = FrameOut & { socket: SocketOut; key: string; text?: string };
 function FrameDetail({ frame, onClose, actions }: { frame: FrameOut; onClose: () => void; actions?: ReactNode }) {
   return (
     <Detail
-      title={`${frame.direction === 'sent' ? '↑ Sent' : '↓ Received'} · frame ${frame.index} · ${formatTime(frame.t)} · ${formatBytes(frame.size)}`}
+      title={`${frame.direction === 'sent' ? 'Sent' : 'Received'} · frame ${frame.index} · ${formatTime(frame.t)} · ${formatBytes(frame.size)}`}
       onClose={onClose}
       actions={actions}
     >
@@ -456,8 +517,9 @@ export function WebSocketsPanel({ bundle, tabs, clock, seek, focus }: Props) {
     (f: FrameRow) => (
       <div className="flex items-center gap-2 px-2 py-px">
         <Time t={f.t} />
-        <span className={cx('w-3 shrink-0 font-bold', f.direction === 'sent' ? 'text-ok' : 'text-accent')} title={f.direction}>
-          {f.direction === 'sent' ? '↑' : '↓'}
+        <span className={cx('flex shrink-0', f.direction === 'sent' ? 'text-ok' : 'text-accent')} title={f.direction}>
+          {f.direction === 'sent' ? <ArrowUpIcon aria-hidden className="size-3.5" /> : <ArrowDownIcon aria-hidden className="size-3.5" />}
+          <span className="sr-only">{f.direction}</span>
         </span>
         {!socket && <span className="w-24 shrink-0 truncate text-muted">{urlName(f.socket.url)}</span>}
         <span className="min-w-0 flex-1 truncate font-mono">
@@ -500,8 +562,15 @@ export function WebSocketsPanel({ bundle, tabs, clock, seek, focus }: Props) {
             <span className="min-w-0 flex-1 truncate" title={s.url}>
               {s.url}
             </span>
-            <span className="shrink-0 text-muted">
-              <span className="text-ok">↑{s.sentCount}</span> <span className="text-accent">↓{s.receivedCount}</span>
+            <span className="flex shrink-0 items-center gap-1.5 text-muted" title={`${s.sentCount} sent, ${s.receivedCount} received`}>
+              <span className="flex items-center text-ok">
+                <ArrowUpIcon aria-hidden className="size-3" />
+                {s.sentCount}
+              </span>
+              <span className="flex items-center text-accent">
+                <ArrowDownIcon aria-hidden className="size-3" />
+                {s.receivedCount}
+              </span>
             </span>
             <span className="w-14 shrink-0 text-right text-muted">{s.endT != null ? formatMs(s.durationMs) : 'open'}</span>
           </button>
@@ -513,10 +582,12 @@ export function WebSocketsPanel({ bundle, tabs, clock, seek, focus }: Props) {
           All
         </Chip>
         <Chip active={dir === 'sent'} onClick={() => setDir('sent')}>
-          ↑ Sent
+          <ArrowUpIcon aria-hidden className="size-3" />
+          Sent
         </Chip>
         <Chip active={dir === 'received'} onClick={() => setDir('received')}>
-          ↓ Received
+          <ArrowDownIcon aria-hidden className="size-3" />
+          Received
         </Chip>
         <span className="ml-auto text-muted">{socket ? urlName(socket.url) : 'All sockets'}</span>
       </Toolbar>
@@ -592,7 +663,13 @@ export function ConsolePanel({ bundle, tabs, clock, seek, focus }: Props) {
       <div className={cx('px-2 py-px', LEVEL_ROW[c.level])}>
         <div className="flex items-start gap-2">
           <Time t={c.t} />
-          <span className="w-3 shrink-0">{c.level === 'error' ? '✖' : c.level === 'warn' ? '⚠' : ''}</span>
+          <span className="flex h-4 w-3.5 shrink-0 items-center">
+            {c.level === 'error' ? (
+              <CircleXIcon aria-label="Error" className="size-3.5" />
+            ) : c.level === 'warn' ? (
+              <TriangleAlertIcon aria-label="Warning" className="size-3.5" />
+            ) : null}
+          </span>
           <TabBadge tabId={c.tabId} tabs={tabs} />
           <span className={cx('min-w-0 flex-1 font-mono', selected ? 'break-all whitespace-pre-wrap' : 'truncate')}>
             {c.source === 'exception' && (
@@ -643,6 +720,14 @@ export function ConsolePanel({ bundle, tabs, clock, seek, focus }: Props) {
 }
 
 // ---------------------------------------------------------------- Transcript
+
+const TRANSCRIPT_STATUS: Record<Exclude<TranscriptStatus, 'ok'>, string> = {
+  partial: 'Transcript incomplete',
+  pending: 'Transcript not finished',
+  none: 'No transcript',
+  skipped: 'Transcription skipped',
+  failed: 'Transcription failed',
+};
 
 export function TranscriptPanel({ bundle, clock, seek, focus }: Props) {
   const { transcript, audio } = bundle;
@@ -702,9 +787,16 @@ export function TranscriptPanel({ bundle, clock, seek, focus }: Props) {
   return (
     <>
       {transcript.status !== 'ok' && (
-        <div className="shrink-0 border-b border-line bg-warn-soft px-2 py-1.5 text-warn">
-          Transcript {transcript.status}
-          {transcript.note && `: ${transcript.note}`}
+        <div
+          className={cx(
+            'shrink-0 border-b border-line px-2 py-1.5',
+            transcript.status === 'none' || transcript.status === 'skipped' ? 'bg-surface-muted text-muted' : 'bg-warn-soft text-warn',
+          )}
+        >
+          {TRANSCRIPT_STATUS[transcript.status]}
+          {/* Some notes repeat the status ("skipped: no OpenRouter API key set"). */}
+          {transcript.note &&
+            `: ${transcript.note.startsWith(`${transcript.status}: `) ? transcript.note.slice(transcript.status.length + 2) : transcript.note}`}
           {transcript.errors?.map((e) => (
             <div key={e.chunk}>
               Chunk {e.chunk} at {formatTime(e.t)}: {e.error}
@@ -734,7 +826,7 @@ export function TranscriptPanel({ bundle, clock, seek, focus }: Props) {
         label="Transcript"
         empty={
           <div className="space-y-2">
-            <div>No transcript segments.</div>
+            <div>No speech in this recording.</div>
             {audio.length > 0 && (
               <div>
                 {audio.length} audio chunk{audio.length > 1 && 's'} in the bundle play with the replay (

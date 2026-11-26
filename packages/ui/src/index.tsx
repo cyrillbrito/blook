@@ -13,7 +13,9 @@ const VARIANT: Record<Variant, string> = {
   secondary: 'border border-line-strong bg-surface text-fg hover:bg-surface-sunken',
   ghost: 'text-muted hover:bg-surface-sunken hover:text-fg',
   danger: 'bg-danger text-white hover:bg-danger-strong',
-  record: 'bg-recording-strong text-white shadow-sm hover:bg-recording-hover',
+  // Disabled, it turns neutral: a faded vermilion reads as an error.
+  record:
+    'bg-recording-strong text-white shadow-sm hover:bg-recording-hover disabled:bg-surface-sunken disabled:text-muted disabled:opacity-100 disabled:shadow-none',
 };
 
 const SIZE: Record<Size, string> = {
@@ -175,7 +177,7 @@ export function tabPanelProps(id: string, value: string) {
 
 /** White content on the canvas. Every card has the same edge and shadow. */
 export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cx('rounded-card border border-line-strong bg-surface shadow-sm', className)} {...rest} />;
+  return <div className={cx('rounded-card border border-line-strong bg-surface shadow-card', className)} {...rest} />;
 }
 
 /** Small heading for a group, with optional actions on the right. */

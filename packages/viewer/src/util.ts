@@ -9,7 +9,8 @@ export function useNow(clock: Clock, step = 100): number {
     setNow(clock.now());
     return clock.onTick(() => {
       const q = Math.floor(clock.now() / step);
-      if (q !== last) {
+      // While paused every tick is a seek: always take it, or a small seek within one step would be missed.
+      if (q !== last || !clock.playing) {
         last = q;
         setNow(clock.now());
       }

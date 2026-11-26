@@ -45,7 +45,7 @@ function start() {
         <span class="ok" aria-hidden="true"></span><span class="what"></span>
         <button class="ghost" data-action="open">Open</button>
         <button class="ghost" data-action="download"></button>
-        <button class="x" data-action="close" aria-label="Close">✕</button>
+        <button class="x" data-action="close" aria-label="Close">${X_SVG}</button>
       </span>
     </div>`;
   const $ = <E extends HTMLElement>(selector: string) => root.querySelector<E>(selector)!;
@@ -248,6 +248,8 @@ function start() {
 // Lucide's mic and mic-off (lucide.dev), pasted: the pill has no React to import lucide-react.
 const MIC_SVG =
   '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg>';
+const X_SVG =
+  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 const MIC_OFF_SVG =
   '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v3"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M16.95 16.95A7 7 0 0 1 5 12v-2"/><path d="M18.89 13.23A7 7 0 0 0 19 12v-2"/><path d="m2 2 20 20"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/></svg>';
 
@@ -265,7 +267,7 @@ const CSS = `
   cursor: grab; user-select: none; touch-action: none;
 }
 .pill.dragging { cursor: grabbing; }
-.pill.intro { animation: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1), ring 1.1s ease-out 0.35s 3; }
+.pill.intro { animation: pop 0.4s cubic-bezier(0.16, 1, 0.3, 1), ring 1.1s ease-out 0.4s 3; }
 @keyframes pop { from { transform: translateY(24px) scale(0.85); opacity: 0; } }
 @keyframes ring {
   from { box-shadow: 0 6px 24px rgba(15, 23, 42, 0.4), 0 0 0 0 rgba(242, 84, 45, 0.75); }

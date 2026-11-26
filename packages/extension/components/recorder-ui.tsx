@@ -4,8 +4,8 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } f
 import type { BroadcastMessage, RecordingStatus, SessionListItem, TranscriptionStatus } from '@/lib/messages';
 import { DEFAULT_SETTINGS, getSettings, updateSettings, watchSettings } from '@/lib/settings';
 import { TRANSCRIPTION_MODEL, type Settings } from '@blook/core/types';
-import { formatDuration, shortUrl, urlHost } from '@blook/core/format';
-import { formatDate, NO_ANSWER, tryBackground } from './util';
+import { formatDate, formatDuration, shortUrl, urlHost } from '@blook/core/format';
+import { NO_ANSWER, tryBackground } from './util';
 import { MIC } from './mic';
 import { Badge, Button, Card, Field, IconButton, Input, LiveDot, Switch, cx } from '@blook/ui';
 import { Spinner, StopIcon } from '@blook/ui/icons';
@@ -294,10 +294,8 @@ function SessionRow({
   const t = session.transcription;
   const tLabel = t ? TRANSCRIPTION[t.state].label(t) : '';
   const tTone = t ? TRANSCRIPTION[t.state].tone : undefined;
-  // Row actions stay quiet until hover or keyboard focus; busy or confirming keeps them shown.
-  const actionsShown = !!busy || confirming;
   return (
-    <div className={cx('group px-3 py-2', live ? 'bg-recording-soft/60' : 'hover:bg-surface-muted')}>
+    <div className={cx('px-3 py-2', live ? 'bg-recording-soft/60' : 'hover:bg-surface-muted')}>
       <div className="flex items-center gap-2">
         <button
           className="min-w-0 flex-1 cursor-pointer truncate rounded-control text-left font-medium hover:underline disabled:cursor-default disabled:no-underline"
@@ -317,12 +315,7 @@ function SessionRow({
             </Button>
           </div>
         ) : (
-          <div
-            className={cx(
-              'flex shrink-0 items-center gap-0.5 transition-opacity',
-              !actionsShown && 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
-            )}
-          >
+          <div className="flex shrink-0 items-center gap-0.5">
             <IconButton label="Download bundle .zip" onClick={exportZip} disabled={!!busy || live}>
               {busy === 'export' ? <Spinner className="h-3.5 w-3.5" /> : <DownloadIcon className="h-3.5 w-3.5" />}
             </IconButton>

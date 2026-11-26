@@ -19,12 +19,3 @@ export async function tryBackground<K extends BackgroundRequestType>(
     return undefined;
   }
 }
-
-export function formatDate(epochMs: number): string {
-  return new Date(epochMs).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}

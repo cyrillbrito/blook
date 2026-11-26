@@ -9,6 +9,11 @@ export function formatDuration(ms: number): string {
   return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
 }
 
+/** When a session started, short and in the user's locale: "24 Nov, 22:44". */
+export function formatDate(epochMs: number): string {
+  return new Date(epochMs).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 /** Session time with tenths: "1:23.4". */
 export function formatTime(ms: number): string {
   return `${formatDuration(ms)}.${Math.floor((Math.max(0, ms) % 1000) / 100)}`;

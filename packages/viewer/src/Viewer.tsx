@@ -3,12 +3,14 @@ import { EventType } from '@rrweb/types';
 import type { Bundle } from './bundle';
 import { AudioSync, Clock, TabReplay, lastAtOrBefore } from './playback';
 import { ConsolePanel, NetworkPanel, TimelinePanel, TranscriptPanel, WebSocketsPanel, type Focus, type PanelId } from './panels';
-import { formatDuration, formatTime, shortUrl } from '@blook/core/format';
+import { formatDate, formatDuration, formatTime, shortUrl } from '@blook/core/format';
 import { useNow, usePlaying } from './util';
 import { Badge, Button, Card, Tabs, Toggle, cx, tabPanelProps } from '@blook/ui';
 import { KIND, type Kind } from './kinds';
 import { BlookIcon, PauseIcon, PlayIcon, Spinner } from '@blook/ui/icons';
 import ArrowLeftIcon from 'lucide-react/icons/arrow-left';
+import CircleXIcon from 'lucide-react/icons/circle-x';
+import MessageSquareQuoteIcon from 'lucide-react/icons/message-square-quote';
 import DownloadIcon from 'lucide-react/icons/download';
 import Volume2Icon from 'lucide-react/icons/volume-2';
 import VolumeXIcon from 'lucide-react/icons/volume-x';
@@ -72,6 +74,18 @@ function ViewerBody({
     setFocus((f) => ({ panel: p, key, n: (f?.n ?? 0) + 1 }));
   }, []);
 
+  // Open on a page there is to see. Record reloads the tab, so 0:00 is before its first DOM snapshot, and right after
+  // the load event most apps are still fetching. So: a second after the load event, or the first action if sooner.
+  useEffect(() => {
+    const firsts = [...bundle.rrweb.values()].map((events) => events.find((e) => e.type === EventType.FullSnapshot)?.timestamp ?? Infinity);
+    const first = Math.min(...firsts);
+    if (!Number.isFinite(first)) return;
+    const ready = bundle.timeline.find((e) => e.type === 'page-ready' && e.t >= first)?.t ?? first;
+    const action = bundle.timeline.find((e) => e.t >= ready && (e.type === 'click' || e.type === 'input' || e.type === 'scroll'))?.t;
+    const start = Math.max(first, Math.min(ready + 1000, action ?? Infinity, bundle.endT));
+    if (clock.now() < start) clock.seek(start);
+  }, [bundle, clock]);
+
   // Space plays/pauses, ←/→ step 1 s (5 s with Shift). A key a focused control handled (preventDefault) is its own,
   // as is Space on anything it presses and every key while typing.
   useEffect(() => {
@@ -122,8 +136,10 @@ function ViewerBody({
         <h1 className="min-w-0 truncate text-sm font-medium" title={s.url}>
           {s.title || shortUrl(s.url)}
         </h1>
-        <span className="shrink-0 text-muted">
-          {new Date(s.startedAt).toLocaleString()} · {formatDuration(bundle.endT)}
+        <span className="shrink-0 text-muted tabular-nums" title={new Date(s.startedAt).toLocaleString()}>
+          {formatDate(s.startedAt)}
+          <span className="mx-1.5">·</span>
+          {formatDuration(bundle.endT)}
         </span>
         <span className="flex shrink-0 gap-1">
           {s.status === 'recording' && <Badge tone="warn">ended without Stop</Badge>}
@@ -150,7 +166,6 @@ function ViewerBody({
               })}
             </nav>
           )}
-          <AddressBar bundle={bundle} tabId={tabId} clock={clock} />
           {tabId != null ? (
             <Stage key={tabId} bundle={bundle} tabId={tabId} clock={clock} />
           ) : (
@@ -168,19 +183,26 @@ function ViewerBody({
             id={tabsId}
             value={panel}
             onChange={setPanel}
-            className="flex h-9 shrink-0 items-stretch gap-0.5 border-b border-line-strong px-1.5"
+            // Scrolls sideways when the panel is too narrow for every tab. The line is an inset shadow, not a border,
+            // so the overflow clip doesn't cut the active tab's underline.
+            className="flex h-9 shrink-0 items-stretch gap-0.5 overflow-x-auto overflow-y-hidden px-1.5 pb-px shadow-[inset_0_-1px_0_var(--color-line-strong)] [scrollbar-width:none]"
             tabs={PANELS.map(([id, label, none]) => {
               const empty = c[id] === 0;
+              const errs = id === 'console' && errors > 0;
               return {
                 id,
-                title: empty ? none : undefined,
-                className: cx(empty && 'italic'),
+                title: empty ? none : errs ? `${errors} error${errors > 1 ? 's' : ''}` : undefined,
+                className: cx(empty && 'text-muted/70'),
                 label: (
                   <>
                     {label}
                     {!empty && (
-                      <span className={cx('font-normal text-muted tabular-nums', id === 'console' && errors > 0 && 'text-danger')}>
-                        {id === 'console' && errors > 0 && '✖ '}
+                      <span
+                        className={cx(
+                          'tabular-nums',
+                          errs ? 'rounded-full bg-danger-soft px-1.5 font-medium text-danger-strong' : 'font-normal text-muted',
+                        )}
+                      >
                         {c[id]}
                       </span>
                     )}
@@ -246,21 +268,10 @@ function Splitter({ value, onChange }: { value: number; onChange: (share: number
   );
 }
 
-/** The tab's URL at the playhead, from session.navigations. */
-function AddressBar({ bundle, tabId, clock }: { bundle: Bundle; tabId?: number; clock: Clock }) {
-  const now = useNow(clock, 250);
-  const navs = useMemo(() => bundle.session.navigations.filter((n) => n.tabId === tabId), [bundle, tabId]);
-  const url = navs[lastAtOrBefore(navs, now)]?.url ?? bundle.session.tabs.find((t) => t.tabId === tabId)?.url ?? '';
-  return (
-    <div className="shrink-0 border-b border-line-strong px-2 py-1.5">
-      <div className="truncate rounded-control bg-surface-sunken px-3 py-1 text-sm" title={url}>
-        {url || '—'}
-      </div>
-    </div>
-  );
-}
-
-/** The rrweb replay of one tab, scaled to fit. */
+/**
+ * The rrweb replay of one tab, scaled to fit. The card it sits in is the browser window, like the app icon's: a dark
+ * slate title bar with two dots and the tab's URL at the playhead (from session.navigations), then the page.
+ */
 function Stage({ bundle, tabId, clock }: { bundle: Bundle; tabId: number; clock: Clock }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -269,6 +280,8 @@ function Stage({ bundle, tabId, clock }: { bundle: Bundle; tabId: number; clock:
   const events = bundle.rrweb.get(tabId)!;
   const firstFull = useMemo(() => events.find((e) => e.type === EventType.FullSnapshot)?.timestamp, [events]);
   const now = useNow(clock, 250);
+  const navs = useMemo(() => bundle.session.navigations.filter((n) => n.tabId === tabId), [bundle, tabId]);
+  const url = navs[lastAtOrBefore(navs, now)]?.url ?? bundle.session.tabs.find((t) => t.tabId === tabId)?.url ?? '';
 
   useEffect(() => {
     const root = rootRef.current!;
@@ -318,13 +331,33 @@ function Stage({ bundle, tabId, clock }: { bundle: Bundle; tabId: number; clock:
         : undefined);
 
   return (
-    <div ref={boxRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-surface-sunken">
-      <div
-        ref={rootRef}
-        className={cx('overflow-hidden bg-surface shadow [&_iframe]:border-0 [&_iframe]:bg-surface', overlay && 'opacity-40')}
-      />
-      {overlay && <span className="absolute top-2 left-1/2 -translate-x-1/2 rounded-control bg-fg/85 px-3 py-1 text-white">{overlay}</span>}
-    </div>
+    <>
+      <div className="flex h-9 shrink-0 items-center gap-1.5 bg-accent px-3">
+        <span className="size-2.5 shrink-0 rounded-full bg-slate-400" />
+        <span className="size-2.5 shrink-0 rounded-full bg-slate-400" />
+        <span
+          className="ml-2 h-6 min-w-0 flex-1 truncate rounded-full bg-white/10 px-3 font-mono text-2xs leading-6 text-slate-100"
+          title={url}
+        >
+          {url || '—'}
+        </span>
+      </div>
+      <div ref={boxRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-surface-sunken">
+        {/* Inert: Tab must not walk into the replayed page's links and inputs. */}
+        <div
+          ref={rootRef}
+          inert
+          className={cx(
+            'overflow-hidden bg-surface [&_iframe]:border-0 [&_iframe]:bg-surface',
+            !replay && 'invisible',
+            overlay && 'opacity-40',
+          )}
+        />
+        {overlay && (
+          <span className="absolute top-4 left-1/2 -translate-x-1/2 rounded-full bg-fg/85 px-3 py-1 text-white shadow-md">{overlay}</span>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -383,7 +416,7 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
   const speech = hover ? markers.find((m) => m.kind === 'speech' && hover.t >= m.t && hover.t <= m.endT!) : undefined;
 
   return (
-    <div className="shrink-0 border-t border-line-strong px-2 pt-1.5 pb-2">
+    <div className="@container shrink-0 border-t border-line-strong px-2 pt-1.5 pb-2">
       {/* The marks are drawn under a native range input, whose thumb is the playhead: it brings the keys,
           dragging and the screen reader value. */}
       <div
@@ -433,13 +466,21 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
             style={{ left: Math.max(60, Math.min(hover.x, (barRef.current?.clientWidth ?? 0) - 60)) }}
           >
             <div className="tabular-nums">{formatTime(hover.t)}</div>
-            {speech && <div className="truncate text-blue-200">🗣 {speech.label}</div>}
-            {near.map((m, i) => (
-              <div key={i} className={cx('truncate', m.kind === 'error' || m.kind === 'failed' ? 'text-red-300' : 'text-white/70')}>
-                {(m.kind === 'error' || m.kind === 'failed') && '✖ '}
-                {m.label}
+            {speech && (
+              <div className="flex items-center gap-1 text-blue-200">
+                <MessageSquareQuoteIcon aria-hidden className="size-3 shrink-0" />
+                <span className="truncate">{speech.label}</span>
               </div>
-            ))}
+            )}
+            {near.map((m, i) => {
+              const bad = m.kind === 'error' || m.kind === 'failed';
+              return (
+                <div key={i} className={cx('flex items-center gap-1', bad ? 'text-red-300' : 'text-white/70')}>
+                  {bad && <CircleXIcon aria-hidden className="size-3 shrink-0" />}
+                  <span className="truncate">{m.label}</span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -448,7 +489,7 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
           {playing ? <PauseIcon className="h-3.5 w-3.5" /> : <PlayIcon className="h-3.5 w-3.5" />}
           {playing ? 'Pause' : 'Play'}
         </Button>
-        <span className="tabular-nums">
+        <span className="whitespace-nowrap tabular-nums">
           <span ref={timeRef} /> <span className="text-muted">/ {formatTime(bundle.endT)}</span>
         </span>
         <select
@@ -477,8 +518,9 @@ function Controls({ bundle, clock, audio }: { bundle: Bundle; clock: Clock; audi
             {muted ? 'Muted' : 'Audio'}
           </Button>
         )}
-        <span className="ml-auto flex gap-2 text-2xs text-muted">
-          {LEGEND.map((k) => (
+        {/* Only the kinds this recording has, and only when there is room for them on one line. */}
+        <span className="ml-auto hidden flex-wrap justify-end gap-x-2.5 text-2xs whitespace-nowrap text-muted @xl:flex">
+          {LEGEND.filter((k) => markers.some((m) => m.kind === k)).map((k) => (
             <Legend key={k} cls={KIND[k].mark} label={KIND[k].label} />
           ))}
         </span>
@@ -518,7 +560,7 @@ function DownloadButton({ onDownload }: { onDownload: Download }) {
 function Legend({ cls, label }: { cls: string; label: string }) {
   return (
     <span className="flex items-center gap-1">
-      <span className={cx('inline-block h-2 w-2 rounded-sm', cls)} />
+      <span className={cx('inline-block size-2 rounded-full', cls)} />
       {label}
     </span>
   );
